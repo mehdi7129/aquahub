@@ -1,0 +1,112 @@
+AquaHub — contrat d’intégration du bundle
+
+1. Principe
+
+AquaHub présente les fonctions d’un bundle externe reconnu. Il n’embarque
+pas son code fournisseur dans le dépôt public. Les empreintes KNOWN_FILES
+de drone.py et updates.py identifient les scripts et Compose pris en charge.
+Un nom d’archive, un tag latest ou une réponse HTTP200 ne suffit pas à
+reconnaître un contrat de configuration.
+
+Les huit identifiants de services, leur projet Compose et les actions
+disponibles sont définis dans docker.py. L’adaptateur Docker fixe le contexte
+natif default et neutralise les variables de contexte héritées. Toutes les
+commandes Compose du moteur de mise à jour précisent le projet connu ; ne
+pas le déduire du nom du dossier d’installation.
+
+2. Configuration d’un appareil
+
+drone.py réutilise le générateur et deploy.py vérifiés du fournisseur. Son
+transport est limité aux fichiers et à l’appareil attendus. Les modèles VPN
+requis sont externes. La découverte reste bornée aux profils prévus ; elle
+ne renumérote pas une machine et n’administre pas ses adresses.
+
+Avant configuration : identité SSH approuvée, identité machine cohérente,
+version du bundle connue, fichiers attendus présents et comparaison des
+paramètres réseau locaux/distants. Le précontrôle produit un identifiant
+temporaire associé à une cible. L’exécution vérifie à nouveau sa fraîcheur
+et la confirmation d’identité.
+
+Le modèle de flotte du hub ne doit pas être réduit implicitement lorsqu’un
+numéro inférieur est sélectionné. Une procédure qui régénère le hub doit
+conserver les appareils déjà configurés. Les tests de contrat le vérifient.
+Les erreurs partielles d’un script ne deviennent pas des réussites parce
+que son code de retour final est zéro.
+
+3. Reconnaissance et inspection d’une archive
+
+ArchiveReader dans updates.py examine les membres et calcule leurs empreintes.
+Il rejette les chemins sortants, liens, fichiers spéciaux, doublons et
+décompressions dépassant ses plafonds. Les limites actuelles sont notamment
+16 Gio d’entrée, 32 Gio décompressés et20000 membres ; les en-têtes étendus
+possèdent des limites propres. Les tests adverses couvrent aussi les archives
+Docker/OCI et leurs graphes de descripteurs.
+
+Une archive historique reconnue est inspectable. Elle ne devient applicable
+que si un contrat d’application pris en charge prouve ce qu’elle changera.
+Les scripts présents dans une archive ne sont jamais exécutés par l’inspection.
+
+4. Manifeste image-refresh-v1
+
+Le manifeste s’appelle aquahub-manifest.json. Le schéma actuel attend :
+
+  schema              1
+  product             aqua-hub
+  architecture        amd64
+  mode                image-refresh-v1
+  version             Identifiant de livraison non vide.
+  compose_sha256      Empreinte du Compose reconnu.
+  data_compatibility  unchanged
+  rollback_compatible true
+  from_images         Identité exacte des huit services avant application.
+  to_images           Identité exacte des huit services après application.
+  image_archives      Chemins des archives d’images attendues.
+  files               Chemin -> SHA256 des fichiers déclarés.
+
+La validation exacte et ses bornes sont dans UpdateManager ; les fixtures
+de tests/test_updates.py constituent des exemples exécutables du contrat.
+Ne pas copier un manifeste de test dans une livraison de production.
+
+Compose, .env, configurations et schémas de données restent identiques.
+Les images de net_setup, wireguard et gcs_reactor restent inchangées. Deux
+services partageant une même référence d’image doivent garder une cible
+cohérente. Une référence immuable ou une migration exige un autre contrat,
+pas un contournement de la validation.
+
+Les octets d’une archive Docker/OCI doivent prouver les identités chargées.
+image_identity.py gère notamment les formes classiques, manifests, index et
+digests. Un fichier qui affirme son identité sans la prouver est refusé.
+
+5. Transaction et restauration
+
+Avant la bascule, comparer l’installation aux from_images, la configuration
+et le réseau, puis sauvegarder les images précédentes et les métadonnées.
+L’application charge les images, fixe les références attendues et utilise
+Compose sans téléchargement implicite. Les contrôles vérifient les images
+réellement actives, les empreintes Compose et l’état des conteneurs.
+
+En cas d’échec, la restauration exige une sauvegarde intègre et le même
+bundle, la même configuration et le même réseau administré. AquaHub ne
+réécrit pas une IP pour restaurer son ancien constat. Si la restauration
+échoue ou reste incertaine, son résultat demeure explicite ; ne pas fabriquer
+un succès pour débloquer l’interface.
+
+Le code update_failed_restored signifie que la mise à jour a échoué et que
+la version précédente a été rétablie et vérifiée. Ce résultat diffère d’une
+mise à jour réussie. Le snapshot et les logs restent privés.
+
+6. Faire évoluer le contrat
+
+Pour un nouveau bundle, recueillir la procédure officielle d’installation,
+de mise à jour et de retour arrière ; identifier les fichiers modifiés,
+migrations et effets réseau. Ajouter les fixtures adverses et les tests de
+contrat, puis une recette réelle sur une VM et un banc autorisés.
+
+Ne jamais remplacer uniquement KNOWN_FILES pour accepter une nouvelle
+livraison. Les empreintes sont une garde de compatibilité, pas une preuve
+que la nouvelle procédure possède les mêmes effets.
+
+Un flux Git + registre doit figer une révision et les digests d’images,
+protéger les accès et qualifier ses effets. Il n’est pas implémenté par le
+connecteur de Releases actuel. La mise à jour de l’application AquaHub est
+un troisième contrat distinct à développer ultérieurement.

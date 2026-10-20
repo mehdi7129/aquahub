@@ -1,0 +1,90 @@
+AquaHub — construction et publication
+
+1. Trois livraisons différentes
+
+Sources : ce dépôt, licence MIT, sans bundle client ni dépendances vendues.
+Application : futur paquet de mise à jour AquaHub seul, pas encore séparé.
+Kit complet : installateur graphique, runtime, Docker, Portainer et bundle.
+
+Le constructeur actuel fabrique le kit complet. Le futur bouton de mise à
+jour d’AquaHub n’est pas développé et ne doit pas être confondu avec l’import
+d’une archive de bundle dans la GUI.
+
+2. Préparer les ressources de l’interface
+
+Depuis frontend/ : npm ci, npm run check, npm test puis npm run build.
+Le constructeur exige frontend/dist/index.html, app.js et styles.css.
+Le poste de construction nécessite gcc, pkg-config et les en-têtes GTK4.
+Les dépendances de construction ne sont pas à installer chez le client.
+
+3. Payload externe
+
+Le dossier fourni à --payload doit contenir au minimum le dépôt APT signé,
+sa clé publique, la liste des paquets, les archives d’images du bundle et de
+Portainer, bundle.tar.gz, kit.json et SHA256SUMS. La couverture des empreintes
+est exacte : un fichier manquant, altéré, ajouté ou lié est rejeté.
+
+scripts/prepare_payload.py prépare un kit PRIVÉ sur un poste déjà équipé.
+Il lit les images Docker locales, télécharge la fermeture des dépendances
+APT et copie une archive fournisseur externe. Il utilise sudo non interactif,
+le contexte Docker default et une clé de signature de recette. Il ne fabrique
+pas à lui seul un produit redistribuable ni une identité de publication.
+Son option --private-kit est obligatoire. Conserver sa sortie hors du dépôt.
+
+Consulter ses arguments avant utilisation :
+  python3 scripts/prepare_payload.py --help
+
+Ne pas utiliser ce script comme installation du poste client. La clé de
+recette, le cache, les exports Docker et les configurations restent privés.
+Le script ne remplace pas le processus futur de production d’un kit public.
+
+4. Construire un paquet
+
+Exemple avec un payload externe déjà vérifié, depuis la racine du dépôt :
+
+  python3 installer/build_package.py \
+    --payload /chemin/hors-depot/payload \
+    --output dist/aquahub-setup_0.1.2_amd64.deb \
+    --version 0.1.2
+
+Cette commande refuse un payload déclaré privé ou contenant les formes de
+clés privées reconnues. L’option --private-kit permet uniquement une recette
+locale explicitement privée ; elle ne doit pas être ajoutée pour contourner
+un refus lors d’une publication publique. Le résultat reste alors privé.
+
+Le constructeur compile les helpers, copie les sources et l’interface,
+intègre le payload et produit le .deb. Il n’installe pas ce paquet sur le
+poste de construction. Les scripts Debian évitent un apt récursif depuis
+postinst ; l’assistant effectue ensuite l’installation hors ligne.
+
+5. Qualifier avant publication
+
+Relier l’artefact à son commit, sa version, ses dépendances et ses empreintes.
+Exécuter les tests génériques, puis les recettes réelles de la livraison :
+installation GNOME hors ligne, autorisations graphiques, adoption d’un bundle
+existant, réinstallation, redémarrage, mise à niveau, désinstallation,
+conservation des données et absence de changement des IP existantes.
+
+Vérifier le contenu réel, y compris les archives imbriquées. Un .gitignore
+n’est pas un analyseur de secrets et une licence MIT ne donne pas les droits
+de redistribuer les configurations ou logiciels d’un fournisseur.
+Les notices, sources requises par des licences tierces et droits des images
+doivent être traités dans la livraison des composants concernés.
+
+6. GitHub Releases
+
+Dépôt de publication prévu : https://github.com/mehdi7129/aquahub
+Ne pas pousser le dépôt privé du banc ou son historique dans ce dépôt public.
+Publier une version seulement quand le paquet est qualifié et redistribuable.
+Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
+et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
+
+GitHub limite actuellement chaque fichier joint à une Release à moins de
+2 Gio. Un gros kit complet doit donc avoir une stratégie de distribution
+adaptée ; le futur paquet AquaHub seul doit rester distinct du kit fournisseur.
+Cette contrainte ne justifie pas de retirer des fichiers requis du kit hors
+ligne. Documentation officielle :
+https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
+
+Une archive de sources automatique de GitHub ne contient ni les dépendances,
+ni les images, ni un installateur complet. Ne pas la présenter comme tel.

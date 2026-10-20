@@ -1,0 +1,76 @@
+AquaHub — état et prochains chantiers
+Publication initiale des sources, préproduction 0.1.2
+
+Développé
+
+Fenêtre native GTK/WebKitGTK et interface locale TypeScript ; navigation
+latérale ; thèmes clair/sombre ; vues supervision, mises à jour, Aqua_Drones,
+historique et réglages. Supervision Docker native, logs, incidents persistants,
+tâches sérialisées, configuration d’une cible vérifiée, préparation d’archives,
+dialogues privés et assistant hors ligne sont présents dans les sources.
+
+Le pilote actuel connaît huit services. Deux ont un healthcheck ; six sont
+sans sonde. Les relances de net_setup, wireguard et gcs_reactor sont bloquées.
+Le provisioning vérifie une cible SSH et respecte les adresses existantes.
+
+Validations initiales
+
+Sur le banc privé initial : installation hors ligne automatisée en VM Debian,
+adoption et réinstallation sur un poste existant, redémarrage VM, conservation
+du compte Portainer et raccordement à son moteur local, configuration réelle
+d’un appareil, mise à jour d’une image de recette, rollback manuel et rollback
+automatique après échec injecté. Ce sont des recettes ciblées, pas une garantie
+sur une autre installation ou sur une flotte complète.
+
+L’export public est testé séparément. Les tests génériques n’exigent pas le
+bundle, les identifiants ou les résultats privés. Les préconditions et les
+tests ignorés sont décrits dans TESTS.txt.
+
+Priorité 1 : terminer le contrat fournisseur
+
+Obtenir et qualifier une procédure de mise à jour d’un Hub déjà installé,
+conservant .env, configurations client/VPN et adresses. Définir la procédure
+de restauration, les migrations éventuelles et l’identité durable de chaque
+version du dépôt et de ses images. Le pilote actuel image-refresh-v1 garde
+Compose/configurations et images réseau fixes ; il ne couvre pas toutes
+les évolutions possibles d’un fournisseur.
+
+Un flux Git + registre nécessite un adaptateur dédié et une recette réelle.
+La recherche de Releases GitHub/GitLab n’est pas cet adaptateur.
+
+Priorité 2 : créer une livraison publique propre
+
+Séparer le paquet de l’application et le kit complet hors ligne. Préparer
+un payload redistribuable sans secret du banc ni donnée client. Finaliser
+les notices des composants et la signature de publication. Vérifier depuis
+une VM GNOME propre le parcours graphique complet, les autorisations,
+la réparation, la mise à niveau et la désinstallation.
+
+Compléter les essais de manque d’espace, ports occupés, coupures contrôlées,
+présence de ressources Docker tierces et cohabitation Docker Desktop. Garder
+le moteur natif explicite. Le code contient des refus et simulations ; la
+recette d’un artefact livré doit aussi observer les effets réels.
+
+Priorité 3 : mise à jour d’AquaHub depuis ce dépôt
+
+Ce bouton n’existe pas encore. Le développer séparément des mises à jour du
+bundle et de la configuration des drones. Prévoir découverte de versions,
+compatibilité OS/architecture, notes, téléchargement contrôlé, signature,
+confirmation, installation privilégiée et retour arrière. Conserver un
+parcours hors ligne. Ne pas exécuter un ZIP de sources téléchargé comme une
+mise à jour applicative.
+
+Priorité 4 : qualification de flotte et exploitation
+
+Avec plusieurs appareils physiques : doublons, identité changée, cible absente,
+configuration sélective, absence d’écriture hors cible et conservation de la
+flotte déjà configurée. Les simulations actuelles ne remplacent pas cette
+recette. Améliorer les sondes métier en accord avec le fournisseur, sans
+déduire l’état de navigation d’un simple conteneur running.
+
+Entretien du dépôt
+
+Installer une CI pour les tests génériques et le frontend ; garder les tests
+matériels derrière des préconditions explicites. Publier des notes reliées
+à un commit et un tag. Mettre à jour cette feuille lors de la réalisation d’un
+chantier, sans transformer une simulation en validation matérielle.

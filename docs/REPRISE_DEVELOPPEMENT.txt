@@ -1,0 +1,155 @@
+AquaHub — reprendre le développement
+Référence : préproduction 0.1.2, publication initiale des sources
+
+1. Commencer ici
+
+Le dépôt contient le code de la GUI, de son agent et de son installateur.
+Le bundle fournisseur, ses images et les configurations d’un client restent
+externes. Aucun accès fournisseur n’est nécessaire pour compiler l’interface,
+utiliser la démo ou exécuter les tests génériques.
+
+Lire README.md, ARCHITECTURE.txt, SECURITE.txt et ETAT_ET_FEUILLE_DE_ROUTE.txt.
+Pour modifier une action, remonter le flux : frontend/src/app.ts, pont natif
+desktop/aquahub_desktop/app.py, dispatch agent/aquahub_agent/core.py, adaptateur
+spécialisé. Les fixtures dans tests/ montrent les entrées et sorties attendues.
+
+2. Poste de développement
+
+Référence supportée : Debian 13 amd64 / GNOME, Python système 3.13.
+Node.js doit satisfaire les contraintes du package-lock ; la compilation
+frontend utilise esbuild et TypeScript. Node n’est pas requis chez le client.
+
+Paquets de développement à prévoir, selon le poste :
+
+  sudo apt install git nodejs npm python3 python3-gi python3-cairo \
+    python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
+    build-essential pkg-config libgtk-4-dev dpkg-dev apt-utils gnupg \
+    xvfb xauth libx11-6 libxtst6
+
+Ces commandes concernent uniquement le développeur. Elles ne sont pas le
+parcours graphique de l’utilisateur final. Utiliser /usr/bin/python3 : les
+bindings GI proviennent des paquets Debian. Un venv isolé classique ne les
+voit pas automatiquement. L’agent n’a pas de dépendance pip.
+
+Docker natif et le bundle ne sont pas nécessaires à la démo ni aux tests
+génériques. Leur installation sur un banc est une opération séparée. Le
+préparateur de kit nécessite des paquets/images précis déjà disponibles et
+des droits sudo non interactifs ; lire PUBLICATION.txt avant son utilisation.
+
+3. Récupérer et compiler
+
+  git clone https://github.com/mehdi7129/aquahub.git
+  cd aquahub
+  cd frontend
+  npm ci
+  npm run check
+  npm test
+  npm run build
+  cd ..
+
+npm ci utilise les versions du lockfile. Le résultat est frontend/dist/.
+Ce répertoire généré n’est pas versionné. Ne pas ouvrir uniquement index.html
+dans un navigateur pour qualifier l’IPC : la vraie application est GTK/WebKitGTK.
+
+4. Lancer la démo sans matériel
+
+Depuis la racine du dépôt, avec un utilisateur normal :
+
+  PYTHONPATH=agent:desktop /usr/bin/python3 -m aquahub_desktop \
+    --demo --no-agent --socket /tmp/aquahub-demo-unused.sock \
+    --state-dir ./local-private/demo
+
+--demo choisit les données fictives du frontend et --no-agent empêche le
+démarrage d’un agent. Le socket indiqué n’est relié à aucun agent installé.
+Le dossier local-private/ est ignoré par Git. Le bandeau de démonstration
+doit rester visible. Cette fenêtre ne prouve aucun état du matériel.
+
+5. Exécuter les tests
+
+  PYTHONPATH=agent:desktop /usr/bin/python3 -m unittest discover -s tests -q
+
+Les tests génériques se lancent sans Docker ni drone. Trois tests Docker en
+lecture seule sont ignorés sans opt-in. Deux tests de contrat fournisseur
+sont ignorés sans le bundle local explicitement indiqué. Les commandes de
+ces recettes et les tests natifs sont dans TESTS.txt.
+
+Les tests d’installation compilent de petits helpers avec les en-têtes GTK4
+et construisent un faux paquet. Ils n’installent pas ce paquet dans le système.
+Lire leurs préconditions si le poste n’est pas Debian 13.
+
+6. Travailler avec un vrai agent
+
+Le démarrage normal du desktop peut sélectionner l’agent système déjà installé.
+Ne pas l’utiliser par inadvertance pour un développement isolé. Un agent de
+session possède son socket et son état propres ; il peut néanmoins piloter le
+moteur Docker auquel son utilisateur a accès. Une isolation de chemins n’est
+donc pas une isolation du matériel.
+
+Pour une recette réelle, préparer un banc autorisé, une sauvegarde et les
+preuves avant/après. Utiliser les options --socket, --state-dir et --bundle
+de l’agent, puis --socket et --no-agent du desktop. Les options exactes sont
+consultables sans lancer une opération :
+
+  PYTHONPATH=agent:desktop /usr/bin/python3 -m aquahub_agent --help
+  PYTHONPATH=agent:desktop /usr/bin/python3 -m aquahub_desktop --help
+
+Ne pas exécuter le desktop en root. Ne pas copier des règles PolicyKit de
+recette dans une installation client. Une lecture de paramètres SSH peut
+demander une autorisation : la méthode protégée sert aussi à leur modification.
+
+7. Où modifier quoi
+
+Interface et confirmations : frontend/src/app.ts et styles.css.
+Données métier UI : frontend/src/domain.ts ; transport et démo : bridge.ts.
+Fenêtre, dialogues privés, archives : desktop/aquahub_desktop/app.py.
+Client JSON et navigation : desktop/aquahub_desktop/bridge.py.
+Routes et tâches : agent/aquahub_agent/core.py.
+Socket serveur : server.py ; autorisations et redaction : security.py.
+Docker natif : docker.py ; bootstrap du compte Portainer : portainer.py.
+Configuration Aqua_Drones : drone.py ; archivage d’incidents : health_history.py.
+Historique SQLite : store.py ; comparaisons réseau : network.py.
+Archives/mises à jour du bundle : updates.py et image_identity.py.
+Paquet hors ligne : installer/build_package.py, bootstrap.c, setup_helper.c,
+finish.py et upgrade_guard.py.
+
+8. Ajouter une action sans contourner les contrôles
+
+Définir les paramètres et les erreurs attendues ; décider si la méthode est
+privilégiée. Enregistrer la méthode via register_handler. Garder les cibles
+fermées, les arguments sous forme de tableaux et l’exécution longue dans une
+tâche persistante. Ne pas créer de commande shell ou de proxy Docker générique.
+
+Ajouter le test du comportement et du refus associé avant de raccorder la vue.
+Une opération doit rester unique en cas de double-clic et son résultat doit
+être retrouvé après reconnexion. Ne pas inventer un succès quand le retour
+du service ou de l’appareil n’a pas été vérifié.
+
+9. Versionner et livrer
+
+La version visible est définie dans les modules __init__.py de l’agent et du
+desktop. Le constructeur injecte --version dans les modules empaquetés et
+finish.py. Toujours passer explicitement la version lors d’un build.
+frontend/package.json décrit l’outil de compilation, pas la version lue
+depuis l’agent à l’exécution.
+
+Faire évoluer main par des modifications relisibles. Garder les archives,
+clés, états SQLite, résultats de banc et node_modules hors du dépôt. Un tag de
+source ou un ZIP GitHub n’est pas un installateur qualifié. Lire PUBLICATION.txt.
+
+10. Ce qu’un prochain développeur doit savoir
+
+Le pilote reconnaît les empreintes d’un bundle précis. Un nouveau Compose,
+un nouveau script fournisseur ou une image configurant le réseau nécessite
+une nouvelle qualification ; changer une empreinte seule ne suffit pas.
+
+Le réglage de source Git actuel concerne les Releases d’un bundle compatible.
+Il ne met pas AquaHub à jour et ne réalise pas un flux fournisseur Git + registre.
+Le bouton de mise à jour de l’application est un chantier futur distinct.
+
+Les trois services configurant le réseau restent protégés. La présence d’un
+conteneur running et les deux seules sondes du bundle ne valident pas la
+préparation physique des drones. Les contrôles manuels restent manuels.
+
+Les recettes réelles initiales ont été réalisées sur un banc privé. Leurs
+identités, configurations et résultats bruts ne sont pas distribués ici.
+Reproduire les vérifications sur son propre banc avant de publier un binaire.

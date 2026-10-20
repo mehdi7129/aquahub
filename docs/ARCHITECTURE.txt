@@ -1,0 +1,212 @@
+AquaHub — architecture et points d’entrée
+
+Ce document décrit les sources de la préproduction 0.1.2. Il complète
+README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
+Les évolutions prévues sont distinctes du comportement implémenté ; consulter
+docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
+
+1. Périmètre et structure
+
+AquaHub est une application de bureau Linux pour superviser un bundle Aqua
+Hub fourni séparément. La cible de l’installateur est Debian 13 amd64 avec
+GNOME. L’interface, l’agent et l’installateur sont dans ce dépôt ; le bundle,
+ses images, ses configurations et les identifiants client ne le sont pas.
+
+Le chemin d’une action réelle est le suivant :
+
+  frontend/src/app.ts
+    -> frontend/src/bridge.ts : window.aquahub.request(...)
+    -> desktop/aquahub_desktop/app.py : pont WebKit et travail hors thread GTK
+    -> desktop/aquahub_desktop/bridge.py : client JSON sur socket Unix
+    -> agent/aquahub_agent/server.py : identité du processus et décodage
+    -> agent/aquahub_agent/core.py : autorisation et orchestration
+    -> adaptateur Docker, drones, mises à jour ou Portainer
+    -> SQLite, événement et résultat de tâche
+    -> affichage et suivi dans l’interface.
+
+L’agent ne publie pas de serveur HTTP d’administration. Le frontend n’utilise
+pas d’API réseau directement. Portainer reste une application indépendante,
+ouverte dans le navigateur du poste ; AquaHub supervise les services avec la
+CLI Docker et n’utilise pas l’API Portainer pour leur maintenance courante.
+
+2. Interface : frontend/
+
+src/app.ts compose les cinq vues : supervision, mises à jour du bundle,
+Aqua_Drones, historique et réglages. Le fichier contient la navigation,
+les confirmations, les notifications, le suivi des tâches et les interactions
+DOM. styles.css porte les thèmes et la mise en page avec navigation latérale.
+src/icons.ts contient le système d’icônes local, sans chargement distant.
+
+src/types.ts décrit les réponses consommées par l’interface. src/domain.ts
+regroupe les règles pures : distinction état/santé, validation des réponses,
+garde d’action, identité de cible, normalisation d’URL et échappement du texte.
+Les règles sensibles restent aussi vérifiées par l’agent : désactiver un
+bouton ne constitue jamais à lui seul une mesure d’autorisation.
+
+src/bridge.ts choisit le transport natif ou la simulation explicite ?demo=1.
+La simulation porte un bandeau permanent et ne lance pas de maintenance.
+Sans pont natif et sans mode démo, une connexion indisponible est affichée.
+
+build.mjs utilise esbuild pour produire frontend/dist/app.js et copie
+index.html et styles.css. Les tests de domaine produisent en plus un module
+dans frontend/tests/.runtime/. Node et npm servent au développement et à la
+construction ; ils ne sont pas nécessaires sur le poste client installé.
+
+3. Fenêtre et pont natif : desktop/aquahub_desktop/
+
+__main__.py lance app.main(). app.py charge GTK 3 et WebKitGTK 4.1, choisit les
+ressources locales et injecte le pont dans le document autorisé. Les appels
+potentiellement lents passent par un ThreadPoolExecutor ; GLib.idle_add
+ramène les résultats sur le thread de l’interface.
+
+bridge.py ne dépend pas de GTK et peut être testé sans affichage. Il contient
+RpcClient, les limites de transport, les validations d’URL locale, le choix
+de socket et la validation du premier compte Portainer.
+
+Les opérations native.* sont des fonctions de la fenêtre : choix de fichier,
+ouverture de liens prédéfinis, saisie native des accès et export. Les secrets
+des dialogues GTK ne transitent pas par le DOM. Les autres méthodes sont
+transmises à l’agent ; sa table de handlers décide de ce qui est autorisé.
+
+Une application installée utilise /run/aquahub/agent.sock. Elle ne crée pas
+d’agent de session de remplacement si le service système est indisponible.
+Le mode sources peut démarrer un agent de session, qui survit à la fermeture
+de la fenêtre ; --no-agent empêche ce démarrage. --socket choisit explicitement
+une socket et --state-dir isole les données du lanceur. La présence de
+/var/lib/aquahub/setup.complete est également considérée comme une installation.
+Utiliser le mode démo ou une fixture isolée pour les essais d’interface.
+
+4. Agent et protocole : agent/aquahub_agent/
+
+__main__.py parse les chemins, instancie Application et enregistre les modules
+drone, updates et portainer avant de servir la socket. Le protocole annoncé
+par app.version est 1. Les messages sont des objets JSON terminés par un saut
+de ligne ; voir server.py et desktop/…/bridge.py pour les limites exactes.
+
+Exemple de requête de lecture :
+  {"id":"example-1","method":"app.version","params":{}}
+
+Réponse : id identique avec result, ou error contenant code et message.
+Une clé idempotency_key facultative sert à reconnaître une demande de tâche
+répétée. Elle ne remplace pas l’autorisation du demandeur.
+
+Principales familles de méthodes :
+
+  app.version ; status.get ; service.logs ; service.start/stop/restart
+  events.list ; events.logs ; jobs.get ; diagnostics.export
+  settings.get/save ; portainer.status/initialize/restart
+  drones.list/scan/identity/enroll/ssh_settings/preflight/configure
+  updates.inspect/check/download/apply/rollback/settings
+
+core.py orchestre la collecte, l’état courant, les tâches et les erreurs.
+La collecte périodique observe les conteneurs et les événements Docker. Une
+panne de collecte rend les données périmées et enregistre un trou d’historique ;
+elle ne transforme pas le dernier état connu en état sain. L’état running
+d’un conteneur et son healthcheck restent deux informations distinctes.
+
+Les handlers déclarent s’ils exigent une autorisation de mutation. Les
+opérations longues utilisent submit_job() : une seule tâche mutante peut
+progresser à la fois. Un verrou de processus protège le dossier d’état ; un
+verrou de maintenance coordonne les tâches avec le remplacement du paquet.
+Les états de tâche sont queued, running, succeeded, failed et interrupted.
+Au redémarrage de l’agent, les tâches inachevées deviennent interrupted :
+elles ne sont pas relancées silencieusement. Fermer la fenêtre ne termine
+pas l’agent et ne constitue pas une annulation de la maintenance.
+
+store.py utilise SQLite en mode WAL et synchronous=FULL. settings contient
+des réglages JSON, events l’audit et jobs les demandes/résultats. Les secrets
+ne doivent pas être placés dans ces tables. health_history.py ajoute les
+captures bornées de panne et leur état disponible/expiré/indisponible.
+
+5. Adaptateurs et contrats
+
+docker.py restreint la supervision aux huit services du projet Compose connu.
+Il découvre le chemin du bundle à partir de ses labels, sans gérer toutes
+les stacks du poste. Le contexte Docker pris en charge est default. Les
+commandes sont des listes d’arguments, avec délais et volumes de sortie bornés.
+Les actions directes sur net_setup, wireguard et gcs_reactor sont bloquées
+tant que leur précontrôle ne garantit pas le respect du contrat réseau.
+
+drone.py contient le contrat actuel de numérotation et de cible du fournisseur.
+Le scan cherche les six cibles prévues, pas tout le réseau. Les profils du
+bundle ne sont pas confondus avec des appareils identifiés. L’association
+demande une empreinte SSH, puis les précontrôles comparent l’identité stable,
+le numéro, les fichiers attendus et le réseau avant une configuration.
+Les scripts fournisseur exécutables sont vérifiés par empreinte, copiés dans
+un espace privé et limités par des transports contrôlés. Une nouvelle version
+de script exige une nouvelle qualification, pas une simple mise à jour de hash.
+Les précontrôles expirent ; la configuration sauvegarde les fichiers distants
+concernés, suit le redémarrage et vérifie le résultat. Les contrôles matériels
+restent distincts des étapes automatiques. Voir docs/SECURITE.txt.
+
+updates.py inspecte les archives, valide un manifeste et prépare les tâches.
+Le contrat d’application implémenté est image-refresh-v1 : changement d’images
+borné, sans changement de Compose, configuration ni migration de données.
+Les images des composants qui configurent le réseau restent inchangées.
+Le moteur conserve un snapshot, vérifie les identités chargées, recrée les
+services avec leurs références attendues et contrôle l’état final. Une erreur
+déclenche une tentative de restauration ; updates.rollback expose également
+la restauration manuelle d’un snapshot reconnu. Une archive identifiable
+peut rester non applicable : ce résultat est attendu et doit être affiché.
+
+image_identity.py relie les identités des images Docker classiques et OCI aux
+octets d’une archive : références, configuration, manifests, index, plateforme,
+digests et couches. Il évite de supposer que tous les moteurs Docker exposent
+la même forme d’identifiant. network.py normalise les observations réseau
+pour comparer les adresses et routes pertinentes ; ses exceptions précises
+sont décrites dans docs/SECURITE.txt.
+
+Les connecteurs GitHub/GitLab de updates.py recherchent des Releases et leurs
+assets vérifiables. Ils ne constituent ni un exécuteur générique de dépôt Git,
+ni un client générique de registre fournisseur, ni une mise à jour d’AquaHub.
+Le futur bouton de mise à jour de l’application est un autre canal, à développer.
+
+portainer.py traite uniquement le premier compte de l’instance locale gérée.
+Il vérifie identité et port de cette instance, récupère son jeton d’initialisation
+en privé, crée le compte puis contrôle qu’il existe. Un compte déjà présent
+n’est pas remplacé. Les instances Portainer préexistantes sont distinguées de
+l’instance gérée pour éviter les actions sur un autre environnement.
+
+6. État persistant et installation
+
+Installation système :
+  /usr/lib/aquahub/agent et /usr/lib/aquahub/desktop : sources exécutées
+  /usr/share/aquahub/frontend : ressources compilées
+  /usr/share/aquahub/offline : payload externe du kit complet
+  /etc/aquahub/operator.conf : UID de l’opérateur autorisé
+  /run/aquahub/agent.sock : communication locale
+  /var/lib/aquahub/agent : base, préparations, snapshots et données privées
+  /var/lib/aquahub/installer : progression et journaux d’installation
+  /var/lib/aquahub/setup.complete : version ayant terminé l’assistant
+
+En développement, runtime_paths() utilise les dossiers XDG de l’utilisateur
+ou les chemins explicitement fournis. Les données WebKit et son cache sont
+séparés de SQLite. Les répertoires d’état et fichiers sensibles ne font jamais
+partie d’une contribution Git. Les noms de sous-dossiers privés précis sont
+définis par les constructeurs de Store, DroneManager et UpdateManager.
+
+installer/build_package.py assemble le .deb à partir des sources compilées
+et d’un payload externe vérifié. bootstrap.c est l’assistant GTK 4 ;
+setup_helper.c est le point privilégié fixe qui vérifie le kit et installe
+ses paquets depuis un dépôt APT local signé. finish.py réalise ensuite les
+contrôles et l’adoption/installation de Docker, du bundle, de Portainer et du
+service AquaHub. upgrade_guard.py empêche un remplacement ou une suppression
+du paquet pendant une tâche active.
+
+Le service aquahub-agent.service appartient à AquaHub. L’unité fournisseur
+reste distincte. Retirer AquaHub arrête son agent et conserve les services,
+volumes et configurations du bundle ainsi que Docker et Portainer. Le dépôt
+public n’inclut pas le payload nécessaire à un kit hors ligne complet.
+
+7. Où intervenir pour une évolution
+
+Une règle d’affichage pure : src/domain.ts et tests/domain.test.mjs.
+Une nouvelle réponse métier : types.ts, validation frontend, handler de l’agent
+et tests de l’adaptateur. Une opération privilégiée : handler avec mutation,
+paramètres fermés et tâche sérialisée si longue ; ne pas ajouter de commande
+shell fournie par le frontend. Un dialogue secret : app.py, hors du renderer.
+Un nouveau bundle : tests de contrat puis qualification séparée. Une évolution
+du paquet : tests/test_packaging.py, test_installer_finish.py et upgrade_guard.
+
+Les handlers et validations sont l’autorité ; la documentation ne permet pas
+de déduire qu’une procédure fournisseur inconnue est déjà compatible.

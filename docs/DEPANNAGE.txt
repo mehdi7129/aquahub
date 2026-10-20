@@ -1,0 +1,82 @@
+AquaHub — dépannage du développement
+
+Le diagnostic commence par le mode utilisé : démo, fixture synthétique ou
+agent réel. Ne pas corriger un problème de banc en relâchant une garde du
+produit. Les commandes de cette page sont destinées au développeur.
+
+Module gi introuvable
+
+Utiliser /usr/bin/python3 et vérifier les paquets python3-gi, GTK et WebKitGTK.
+Un venv isolé peut masquer ces bindings système. L’agent et les tests sans
+affichage n’ont pas besoin que la fenêtre GTK soit ouverte.
+
+Ressources de l’application absentes
+
+Compiler depuis frontend/ avec npm ci puis npm run build. Vérifier les trois
+fichiers de frontend/dist/. --frontend permet de sélectionner une construction
+précise. Un lancement depuis les sources ne lit pas automatiquement un serveur
+de développement ; l’interface livrée est locale.
+
+La fenêtre utilise un agent inattendu
+
+Vérifier --socket, --no-agent, les chemins d’état et la présence d’une
+installation système. Le produit installé ne crée pas un agent de session
+de secours. Pour l’interface seule, utiliser la commande --demo du guide de
+reprise, avec un socket inutilisé et un état local-private/ distinct.
+
+Une lecture de paramètres attend une autorisation
+
+Les réglages SSH et certaines préparations sont des méthodes protégées,
+même en lecture. Une fixture sans agent PolicyKit interactif ne prouve pas
+leur fonctionnement autorisé. Les tests natifs synthétiques utilisent leur
+propre serveur ; un banc réel doit suivre son parcours d’autorisation.
+Ne pas ajouter de règle PolicyKit permanente pour faire passer la recette.
+
+Bundle inconnu ou archive non applicable
+
+Lire l’échec du précontrôle. Comparer les versions et le contrat reconnu,
+pas seulement le nom du fichier. Une archive intègre peut contenir un schéma,
+un Compose ou des images incompatibles. Ne pas changer un hash attendu sans
+qualifier le nouveau comportement ; voir CONTRAT_BUNDLE.txt.
+
+Conteneurs présents mais absents d’une lecture Compose
+
+Comparer le moteur, le projet Compose, le dossier et le fichier utilisés.
+Le nom du dossier peut différer du projet explicite aqua-hub-bundle. Le moteur
+de mise à jour centralise les appels dans _compose() ; garder le projet
+explicite dans tout nouvel appel. Le contexte de l’utilisateur ou sa variable
+COMPOSE_PROJECT_NAME n’est pas une source d’autorité pour l’agent.
+
+Six services sans sonde
+
+C’est le contrat actuel du bundle, pas une erreur de rendu. Running ne veut
+pas dire healthy et l’absence de sonde ne signifie pas panne. Développer une
+nouvelle sonde avec le fournisseur et vérifier le comportement métier réel.
+
+Retour arrière refusé
+
+Lire si la sauvegarde est corrompue, la configuration ou le réseau ont changé,
+ou le retour n’a pas été confirmé. Préserver les preuves et éviter une seconde
+intervention concurrente. Le moteur ne remet pas automatiquement d’anciennes
+IP et ne couvre pas les migrations de données du fournisseur.
+
+Test de socket Unix : chemin trop long
+
+Les sockets AF_UNIX ont une longueur limitée. Les bancs natifs du dépôt
+créent leurs sockets synthétiques dans un répertoire temporaire court.
+Conserver cette propriété lorsqu’on ajoute une fixture ; ne pas utiliser
+un chemin de checkout long comme emplacement d’une socket de test.
+
+Retrait de paquet refusé pendant maintenance
+
+Le verrou est volontaire. Attendre le résultat réel de la tâche avant de
+réessayer. dpkg peut modifier sa sélection souhaitée même si prerm refuse
+le retrait ; distinguer cette métadonnée de l’état effectivement installé.
+Sur un banc, vérifier le paquet et les services plutôt que supposer le retrait.
+
+Incident à signaler
+
+Donner la version, la commande ou le parcours utilisé, la cible simulée ou
+réelle, le code d’erreur et une reproduction expurgée. Ne pas déposer la base
+SQLite, une archive client, un fichier SSH ou les logs bruts d’un fournisseur
+dans une issue publique.

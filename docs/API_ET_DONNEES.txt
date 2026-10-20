@@ -1,0 +1,132 @@
+AquaHub — protocole local et données
+Protocole annoncé : 1
+
+1. Transport et identité
+
+Le desktop contacte un socket Unix. Il n’existe pas de port HTTP de maintenance
+à appeler depuis le réseau. Le serveur reçoit une requête JSON terminée par
+un saut de ligne et renvoie une réponse portant le même identifiant.
+
+Exemple de lecture :
+  {"id":"example-1","method":"app.version","params":{}}
+
+Réponse de succès :
+  {"id":"example-1","result":{"version":"0.1.2","stage":"preproduction","protocol":1}}
+
+Réponse d’erreur :
+  {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
+
+La structure exacte est implémentée dans server.py et bridge.py. Le serveur
+borne les requêtes à 1 Mio et les réponses à 2 Mio ; le client desktop borne
+sa requête à 256 Kio. Les appels issus du document WebKit sont aussi bornés
+et passent par une origine exacte et un nonce.
+
+L’UID, le PID et l’heure de démarrage du processus viennent de SO_PEERCRED
+et de /proc, pas du JSON. Ne pas ajouter de champ permettant au renderer
+d’affirmer son rôle ou son identité. Les mutations passent par PolicyKit.
+
+2. Méthodes disponibles
+
+Le registre de core.py et les register() des adaptateurs sont la référence.
+Les champs inconnus sont rejetés par les handlers. Les réponses peuvent
+contenir des informations complémentaires selon l’état réellement observé.
+
+Lecture générale :
+  app.version       Version de l’application et numéro de protocole.
+  status.get        Services, santé, fraîcheur, outils et tâche active.
+  service.logs      service, tail facultatif ; logs courants bornés.
+  events.list       service facultatif, limit et before_id facultatifs.
+  events.logs       snapshot_id ; extrait associé à une panne.
+  jobs.get          id ; relire une tâche persistante.
+  settings.get      Réglages publics, sans secret.
+  diagnostics.export  Diagnostic local filtré.
+
+Maintenance générale, autorisation requise :
+  service.start/stop/restart  service limité à la liste connue.
+  settings.save             github_url et/ou theme.
+  portainer.restart         confirmed=true, instance locale gérée uniquement.
+
+Aqua_Drones :
+  drones.list/scan    Pas de paramètre ; profils et présence observée.
+  drones.identity     number ; empreinte observée, pas encore approuvée.
+  drones.enroll       number, host_key_fingerprint, confirmed=true.
+  drones.ssh_settings Réglages du transport SSH, autorisation requise même
+                      en lecture dans le contrat actuel.
+  drones.preflight    number ; contrôles et identifiant temporaire de plan.
+  drones.configure    number, preflight_id, confirmed_identity.
+
+enroll, ssh_settings, preflight et configure sont enregistrés comme protégés.
+Une réponse au scan ne suffit pas à autoriser configure. La confirmation
+d’identité doit correspondre au plan ; reprendre la forme exacte retournée
+par le précontrôle et utilisée par le frontend, sans recréer un objet supposé.
+
+Mises à jour du bundle :
+  updates.check      Recherche de Releases, sans déploiement.
+  updates.settings   repository_url et/ou token ; méthode protégée.
+  updates.inspect    path absolu d’une archive ; copie et inspection privées.
+  updates.download   release_id, asset_id obtenus par une recherche récente.
+  updates.apply      inspection_id d’une livraison applicable non expirée.
+  updates.rollback   Aucun paramètre ; snapshot reconnu disponible.
+
+Toutes ces méthodes sauf check exigent l’autorisation. La récupération ou
+l’inspection d’une livraison ne vaut pas confirmation d’application. Les
+assets doivent rester rattachés au fournisseur et aux métadonnées recherchées.
+
+Portainer :
+  portainer.status      Disponibilité, instance gérée et initialisation.
+  portainer.initialize  username, password ; méthode protégée et privée.
+
+Le mot de passe initialize et le jeton updates.settings proviennent d’un
+dialogue GTK natif. Ne pas créer de formulaire WebKit pour les saisir.
+
+3. Fonctions native.*
+
+Elles sont traitées dans la fenêtre, pas dans le registre de l’agent. Elles
+servent à choisir une archive, ouvrir un outil local autorisé, configurer
+des accès privés et enregistrer/afficher un diagnostic. Leur liste et leurs
+paramètres sont dans app.py. Ne pas ajouter une ouverture arbitraire d’URL,
+un accès arbitraire au système de fichiers ou une commande shell.
+
+test.report est un crochet de recette du desktop activé avec --test-output.
+Il ne fait pas partie d’un service distant ni des fonctions de maintenance.
+
+4. Tâches et idempotence
+
+Une opération longue renvoie une tâche avec un identifiant. La fenêtre suit
+jobs.get et l’état partagé, au lieu de maintenir une commande ouverte dans
+le renderer. États : queued, running, succeeded, failed, interrupted.
+
+Les étapes et le journal d’une tâche expliquent son progrès. La fermeture
+de la fenêtre n’annule pas le travail de l’agent. Un redémarrage d’agent
+marque les tâches inachevées interrupted ; il ne les rejoue pas automatiquement.
+
+idempotency_key est une clé facultative de la requête, de 1 à 128 caractères,
+transmise au contexte et aux tâches. Elle permet de reconnaître une même
+demande. Elle ne remplace ni les précontrôles, ni PolicyKit, ni le verrou de
+maintenance. Une nouvelle clé n’autorise pas une seconde mutation concurrente.
+
+5. Historique et pagination
+
+events.list prend limit entre 1 et 500 et before_id pour lire les pages
+précédentes. Utiliser le curseur de la réponse ; éviter d’interpréter une
+date ou un identifiant de tâche comme un curseur d’événement.
+Le frontend filtre le texte parmi les événements déjà chargés.
+
+Les événements sont conservés 365 jours, avec un plafond de 100000. Les
+extraits ont leurs propres limites : 64 Kio chacun, 1024 extraits, 64 Mio
+au total et 90 jours. Une absence d’extrait n’efface pas l’événement. Une
+lacune de collecte n’est pas une preuve d’absence d’incident.
+
+6. Persistance et évolution
+
+Store crée les tables nécessaires avec SQLite WAL et synchronous=FULL.
+Les réglages, tâches et événements restent privés. Des fichiers privés
+distincts portent les identités SSH, la préparation de livraisons et les
+accès aux fournisseurs ; voir SECURITE.txt. Ne pas exporter un dossier d’état
+dans une issue publique pour illustrer un problème.
+
+Il n’existe pas encore de framework général de migrations de schéma ou de
+négociation de versions de protocole. Pour faire évoluer les données ou les
+réponses, ajouter les tests de compatibilité et une stratégie de migration
+avant de livrer. Ne pas supprimer une base ou ignorer une tâche interrompue
+pour masquer une incompatibilité de version.

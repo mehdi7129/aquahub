@@ -1,0 +1,210 @@
+AquaHub — tests et reproduction depuis les sources publiques
+
+Toutes les commandes ci-dessous partent de la racine du dépôt, sauf un
+changement de répertoire explicitement indiqué. Les sorties et captures sont
+des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
+Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
+
+1. Résultat vérifié pour cet export
+
+La suite Python publique a découvert 185 tests : 180 ont été exécutés avec
+succès et cinq ont été ignorés. Ces cinq cas sont les trois lectures Docker
+réelles, désactivées sans option, et les deux tests de contrat fournisseur,
+ignorés sans bundle local explicitement fourni. TypeScript et la construction
+frontend ont réussi après une installation npm propre. Les 16 tests de
+domaine JavaScript ont réussi.
+
+Les commandes natives de ce document ont aussi été vérifiées dans cet export :
+17 scénarios de pannes synthétiques, deux scénarios du dialogue Portainer et
+deux du dialogue d’accès à la source ont réussi sous Xvfb. Leurs sockets sont
+privées et temporaires ; ces 21 scénarios sont distincts des tests unitaires.
+
+Ces nombres décrivent cet export et cette exécution, pas une promesse que
+chaque poste possède les outils de construction facultatifs. Ils ne prouvent
+ni une installation complète sur un poste vierge, ni une configuration physique
+de drone, ni la conformité d’une livraison fournisseur future.
+
+2. Préparation
+
+Référence de l’exécution : Debian 13 amd64, Python 3.13 et Node 20. Les modules
+de l’agent n’ont pas de dépendance pip. Le package-lock.json fixe les outils
+frontend ; utiliser npm ci, pas une mise à jour implicite des dépendances.
+
+La suite Python de base utilise unittest. Pour exercer aussi le test de
+construction Debian avec ses binaires C, installer les outils de développement
+appropriés au poste : compilateur C, pkg-config, dpkg-deb et en-têtes GTK 4.
+Sous Debian, les paquets correspondants sont notamment build-essential,
+pkg-config, dpkg-dev et libgtk-4-dev. desktop-file-utils permet également la
+validation du fichier .desktop. Le test ne construit qu’un paquet de fixture
+temporaire ; il ne l’installe pas et n’exécute pas son assistant privilégié.
+
+Les parcours natifs demandent Python GI et Cairo, GTK 3, WebKitGTK 4.1, Xvfb
+et les bibliothèques X11/XTest. Les paquets Debian utiles sont python3-gi,
+python3-cairo, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, xvfb,
+xauth, libx11-6 et libxtst6. GTK 4 sert à l’assistant C ; la fenêtre desktop
+actuelle utilise GTK 3. Préparer ces dépendances ne nécessite aucun contact
+avec un drone ni lancement de l’installateur AquaHub.
+
+3. Suite Python isolée
+
+Pour neutraliser les variables d’opt-in éventuellement héritées d’un terminal :
+
+  AQUAHUB_TEST_DOCKER=0 AQUAHUB_SUPPLIER_BUNDLE= PYTHONPATH=agent:desktop python3 -m unittest discover -s tests -q
+
+Il n’est pas nécessaire de lancer un agent, Docker ou une fenêtre. Ne pas
+utiliser sudo pour cette suite. Les adaptateurs sont remplacés par des fakes
+ou des mocks ; les écritures se font dans des répertoires temporaires. Le test
+Debian compile et extrait sa fixture si les outils sont présents.
+
+Pour cibler un module depuis la racine, par exemple les protections réseau :
+
+  PYTHONPATH=agent:desktop:tests python3 -m unittest test_drone_network -v
+
+Familles principales :
+
+  test_core.py : état, tâches, idempotence, refus concurrents et diagnostic.
+  test_server.py : socket Unix, identité et limites du protocole.
+  test_desktop.py : navigation, transport et séparation des agents.
+  test_docker.py : résolution de services et actions autorisées.
+  test_drone.py : profils, SSH, identité, précontrôles et retour après reboot.
+  test_drone_network.py : variations réseau pertinentes et exceptions bornées.
+  test_drone_supplier.py : contrat du script externe sur transports simulés.
+  test_health_history.py : captures de panne, persistance, quotas et expiration.
+  test_updates.py : archives, manifestes, sources et scénarios de restauration.
+  test_image_identity.py : identités Docker/OCI et rejets de contenus incohérents.
+  test_portainer.py : premier compte, instance attendue et refus de remplacement.
+  test_installer_finish.py : adoption/installation avec opérations simulées.
+  test_packaging.py : intégrité, contenu du .deb et portée des scripts Debian.
+  test_upgrade_guard.py : exclusion avec une tâche active et garde du paquet.
+
+4. Frontend : type-check, compilation et règles métier
+
+  cd frontend
+  npm ci --ignore-scripts --no-audit --no-fund
+  npm run check
+  npm test
+  cd ..
+
+npm test construit les ressources frontend et le module de domaine avant
+d’exécuter les 16 tests Node. Un simple npm run build construit les ressources
+sans les tests. TypeScript est vérifié séparément par npm run check ; esbuild
+ne remplace pas ce contrôle des types.
+
+Les tests de domaine couvrent état/santé, identité de cible, précontrôles,
+éligibilité des archives, verrou d’action, double clic, normalisation des URL,
+texte inerte, limites de logs et validation des réponses. Ils n’ont pas besoin
+de GTK, d’un navigateur, de Docker ou d’une connexion fournisseur.
+
+5. Recettes graphiques isolées
+
+Construire d’abord frontend/dist avec les commandes précédentes. Exécuter les
+parcours natifs sous Xvfb pour isoler l’affichage et les frappes synthétiques.
+Les bancs ci-dessous utilisent --demo ou leur propre socket de fixture ; ils
+n’ont pas besoin d’un agent réel. La fenêtre installée sur le poste ne doit
+pas être utilisée à la place de la commande de fixture.
+
+Pannes simulées, reconnexion, données périmées, texte hostile et suivi :
+
+  python3 frontend/tests/run_fixtures.py
+
+Ce script lance lui-même xvfb-run et son serveur Unix synthétique. Il crée
+frontend/tests/ui-fixtures-result.json et ses données sous frontend/tests/.runtime/.
+Les sockets des fixtures utilisent un dossier temporaire court sous /tmp,
+supprimé à la sortie, pour respecter la limite de longueur des chemins Unix.
+
+Dialogue natif du premier compte Portainer, avec backend synthétique :
+
+  xvfb-run -a python3 frontend/tests/run_portainer_native.py
+
+Dialogue natif des accès de source, avec backend synthétique :
+
+  xvfb-run -a python3 frontend/tests/run_source_native.py
+
+Ces tests saisissent uniquement des secrets artificiels dans le serveur X
+isolé. Ils vérifient aussi que le renderer ne reçoit pas les secrets.
+
+Parcours fonctionnel en démonstration :
+
+  PYTHONPATH=desktop xvfb-run -a python3 -m aquahub_desktop --demo --no-agent --frontend frontend/dist --state-dir frontend/tests/.runtime/demo --test-script frontend/tests/ui-webkit.js --test-output frontend/tests/ui-webkit-result.json --quit-after 35
+
+Mise en page et vrai clavier XTest à 1366x768 :
+
+  xvfb-run -a python3 frontend/tests/run_layout.py --zoom 1 --scale 1
+  xvfb-run -a python3 frontend/tests/run_layout.py --zoom 2 --scale 1
+  xvfb-run -a python3 frontend/tests/run_layout.py --zoom 1 --scale 2
+
+Les scripts écrivent leurs JSON et captures dans frontend/tests/. Les résultats
+doivent indiquer le mode demo ou fixture, et non une recette matérielle.
+
+Les scripts ui-dark-capture.js et ui-theme-persistence.js peuvent être injectés
+avec --test-script pour vérifier deux fenêtres successives partageant le même
+--state-dir. Les scripts *baseline* documentent d’anciens diagnostics visuels ;
+ils ne définissent pas un critère de livraison actuel. Les autres scripts JS
+ne sont pas exécutés automatiquement par npm test.
+
+6. Tests externes : options explicites et portée
+
+Les trois tests de test_docker_real.py sont en lecture seule et visent le
+contexte Docker default. Pour les demander volontairement :
+
+  AQUAHUB_TEST_DOCKER=1 PYTHONPATH=agent:desktop:tests python3 -m unittest test_docker_real -v
+
+Ils requièrent que l’utilisateur possède déjà le droit de lecture Docker et
+que l’environnement attendu existe. Ils ne démarrent, n’arrêtent et ne créent
+pas de services. Leur succès dépend du poste ; un environnement absent ne
+doit pas être remplacé par des données inventées.
+
+Les deux tests de contrat fournisseur lisent les scripts d’un bundle fourni
+localement. Le dépôt ne fournit pas ce bundle. Les clés utilisées sont
+synthétiques et les transports SSH/SCP/Docker/reboot sont interceptés :
+
+  AQUAHUB_SUPPLIER_BUNDLE=/chemin/absolu/du/bundle PYTHONPATH=agent:desktop:tests python3 -m unittest test_drone_supplier -v
+
+Le chemin doit être choisi explicitement ; aucun chemin du poste de l’auteur
+n’est recherché. Lire ce contrat externe et exercer son script dans la fixture
+ne qualifie pas un déploiement réel. N’ajouter aucun contenu de ce bundle à Git.
+
+ui-live-readonly.js est un parcours prévu pour un agent réel déjà configuré.
+Il n’est pas lancé par les commandes isolées ci-dessus et suppose un état de
+banc précis. Il ne constitue pas un scénario universel de CI. Ne pas associer
+par défaut un test frontend à /run/aquahub/agent.sock : utiliser une socket de
+fixture ou --demo pour les travaux qui n’exigent pas le matériel.
+
+7. Ce qui reste à qualifier hors de cette suite publique
+
+Les scripts et preuves privés de qualification du banc ne sont pas publiés.
+Ils peuvent contenir des configurations, captures ou identités propres au
+client. Leurs tests de garde dédiés ne font donc pas partie des 185 tests de
+cet export. Ne pas comparer ce nombre à celui d’une arborescence privée plus
+large sans tenir compte de cette différence de périmètre.
+
+Une livraison exige séparément des essais sur VM jetable : installation
+graphique hors ligne, reprise après erreur, réinstallation, mise à niveau,
+suppression/réinstallation, conservation des données, comptes et configurations,
+relance après reboot et coexistence avec les composants préexistants. Les
+mises à jour d’images doivent être essayées sur moteur réel avec restauration
+manuelle et automatique. Les perturbations telles que manque de disque ou
+coupure électrique ont leurs propres scénarios ; un mock ne les valide pas.
+
+La configuration d’un appareil physique, les contrôles matériels et la flotte
+de plusieurs appareils exigent un banc autorisé. Un scan réussi ou une réponse
+SSH ne suffisent pas. Le contrat réseau et l’absence de modifications des
+paramètres existants doivent être contrôlés avant et après toute opération.
+
+8. Ajouter et maintenir un test
+
+Tester une règle au niveau où elle peut être contournée : la validation UI
+n’exonère pas le handler agent. Pour un refus, vérifier qu’aucun transport
+mutant n’a été appelé. Injecter les adaptateurs et utiliser un répertoire
+temporaire ; ne pas faire dépendre un test unitaire du poste du développeur.
+
+Toute recette qui utilise un environnement réel doit annoncer son opt-in,
+sa portée de lecture ou de mutation et ses prérequis. Une recette destructive
+doit refuser les hôtes non jetables. Aucun secret, journal client, sauvegarde,
+capture réelle ou identifiant matériel ne doit rejoindre fixtures, résultats
+versionnés, commentaires de PR ou logs de CI.
+
+Après un changement, lancer les contrôles pertinents puis la suite de base.
+Conserver le mode et les limites du résultat : un test ignoré n’est pas réussi,
+un test simulé n’est pas matériel et une restauration partielle n’est pas une
+preuve de conservation de toutes les données applicatives.

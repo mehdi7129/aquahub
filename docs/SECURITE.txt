@@ -1,0 +1,184 @@
+AquaHub — frontières de confiance et invariants
+
+Ce document décrit les garde-fous implémentés, leur portée et les règles de
+contribution. Il ne constitue pas une certification ni une garantie contre
+un attaquant disposant déjà des droits root sur le poste. Pour les commandes
+de développement et de test, voir docs/REPRISE_DEVELOPPEMENT.txt et docs/TESTS.txt.
+
+1. Autorisation locale et interface
+
+L’agent écoute une socket Unix, pas un port TCP. server.py obtient UID et PID
+par SO_PEERCRED ; le client ne peut pas les déclarer dans le JSON. La socket
+est en mode 0600 et appartient à l’opérateur autorisé. Un agent root ne sert
+que l’UID configuré ; la simple connexion n’autorise pas toutes les mutations.
+
+AuthPolicy vérifie, pour une mutation root, l’identité PID/UID et l’instant de
+démarrage lu dans /proc. Il demande à PolicyKit l’action
+com.aquadrone.aquahub.maintain, puis vérifie à nouveau le processus après
+l’autorisation. Le paquet utilise une action séparée pour son helper fixe.
+Ne pas remplacer ces contrôles par une règle globale always-yes. Un agent de
+session non root n’utilise pas PolicyKit pour ses mutations : il opère avec
+les droits déjà détenus par l’utilisateur. L’accès au démon Docker reste donc
+un droit puissant ; le mode sources ne transforme pas Docker en sandbox.
+
+Le pont WebKit n’accepte que le fichier index.html exact de l’application,
+avec un nonce aléatoire propre à la fenêtre. Navigation distante, nouvelles
+fenêtres et permissions WebKit sont refusées. La CSP des ressources locales
+interdit les connexions réseau directes et les objets/frames/workers. Les
+liens GCS, Fleet et Portainer sont validés côté natif avant ouverture dans le
+navigateur du poste. Les ressources locales restent une partie de confiance :
+un script de l’application compromis peut appeler son pont ; le nonce n’est
+pas une protection contre un code déjà exécuté dans ce même document.
+
+Le renderer reçoit des données structurées et du texte échappé. Les messages,
+logs et noms venant de services ne doivent jamais devenir du HTML exécutable.
+Le serveur limite les requêtes à 1 Mio, les réponses à 2 Mio et les connexions
+simultanées à 16 ; le client et le pont ont leurs propres limites plus basses.
+Les champs inconnus, types invalides et méthodes non enregistrées sont refusés.
+Les exceptions internes ne renvoient pas de traceback au frontend.
+
+2. Exécution et cohérence des opérations
+
+L’agent n’expose aucune méthode de terminal libre. Les sous-processus reçoivent
+des listes d’arguments, des exécutables attendus, des délais et des sorties
+bornées. Docker utilise le contexte default et une sélection fermée de services.
+Une action ne doit pas viser un conteneur arbitraire simplement parce que son
+nom a été envoyé par la fenêtre.
+
+submit_job() sérialise les tâches longues. L’idempotence persistante empêche
+de rejouer une même demande compatible ; réutiliser une clé pour une autre
+demande est un conflit. Un verrou de fichier coordonne ces tâches avec les
+scripts Debian d’installation et de désinstallation. Le contrôle UI des
+doubles clics complète ces mesures, sans les remplacer.
+
+La fermeture de la fenêtre ne signifie pas l’annulation d’une tâche. Après
+un arrêt de l’agent, ses tâches inachevées deviennent interrupted. Il faut
+alors contrôler l’état réel avant de relancer ; le code ne devine pas qu’une
+opération distante est intégralement terminée.
+
+3. Réseau : respecter les configurations existantes
+
+Aucun formulaire ne permet de changer l’IP d’un drone. Le numéro désigne les
+cibles prévues par le contrat fournisseur actuel ; un scan cherche ces cibles,
+il ne reconfigure pas leurs interfaces. Toute évolution de ce contrat exige
+une décision et une qualification explicites.
+
+Les actions directes start/stop/restart de net_setup, wireguard et gcs_reactor
+sont bloquées, même si l’interface est contournée. Le moteur image-refresh-v1
+refuse les changements d’images de ces composants ainsi que les changements
+de Compose et des configurations protégées.
+
+Les précontrôles de configuration et de mise à jour comparent les fichiers
+pertinents et les observations réseau avant/après. network.stable_network()
+conserve les adresses IPv4, les IPv6 globales et les routes significatives.
+Il ignore uniquement certains éléments d’observation volatils : routes en
+cache, IPv6 temporaires sur interfaces non veth, et IPv6 link-local kernel_ll
+avec routes automatiques étroitement reconnues pour des endpoints veth Docker
+prouvés par leurs métadonnées. Sans preuve suffisante, la comparaison est plus
+stricte. Les ponts, VPN, interfaces physiques et changements d’adresses globales
+ne sont pas masqués par une simple règle sur le nom d’interface.
+
+Cette comparaison protège les paramètres existants ; elle n’affirme pas que
+Docker ne crée jamais d’interface ou d’adresse interne lors de son installation.
+Ne pas élargir les exclusions de comparaison pour faire passer une recette.
+
+4. SSH et configuration des Aqua_Drones
+
+L’association d’un appareil exige une confirmation explicite de l’empreinte
+SSH. Cette empreinte doit être vérifiée par un canal de confiance ; la présence
+d’une réponse sur une IP ne suffit pas à prouver le bon appareil. Le précontrôle
+et la configuration vérifient ensuite l’identité stable, le numéro et l’adresse.
+
+La connexion utilise BatchMode, StrictHostKeyChecking et un known_hosts épinglé
+pour l’opération. Les configurations SSH utilisateur implicites sont neutralisées.
+L’authentification par mot de passe et clavier interactif est désactivée. Les
+clés locales retenues doivent avoir propriétaire et permissions acceptables.
+Le profil sans secret est désactivé par défaut et nécessite un choix explicite
+pour un appareil qui le prend en charge ; il conserve les contrôles d’identité.
+
+Les scripts fournisseur ne sont pas téléchargés puis exécutés à l’aveugle.
+Leur empreinte doit correspondre au contrat connu. Le code est copié dans un
+répertoire privé et exécuté avec des garde-fous de transport. Les fichiers
+distants concernés sont sauvegardés et le retour après redémarrage est vérifié.
+Les contrôles de matériel ne sont pas déclarés réussis par une simulation.
+
+Ne jamais publier les fichiers known_hosts réels, identités machine, clés SSH,
+configurations VPN, sauvegardes distantes ni journaux de ce parcours. Ces
+données appartiennent à l’environnement client et ne sont pas des fixtures.
+
+5. Archives, images et sources de mise à jour
+
+L’import copie la livraison dans un espace privé, vérifie son contenu et refuse
+les chemins dangereux, liens et formats hors contrat. Les tailles, nombres
+d’entrées, données étendues et ratios d’expansion sont bornés. L’inspection
+n’exécute pas le install.sh d’une archive. « Reconnue » et « applicable » sont
+deux résultats distincts ; un nouveau format reste bloqué sans adaptateur.
+
+image-refresh-v1 impose un manifeste cohérent, des empreintes et des identités
+d’images vérifiables. image_identity.py contrôle les documents Docker/OCI et
+borne aussi le parcours des descripteurs. Les snapshots sont privés ; la
+restauration ne constitue pas un mécanisme universel de retour de migrations.
+
+Les URL de sources acceptées sont des dépôts HTTPS github.com ou gitlab.com,
+sans identifiant dans l’URL, port, paramètres ni fragment. Les jetons sont
+liés à leur fournisseur et la politique de redirection empêche de les envoyer
+à une autre origine. Les assets distants doivent avoir les éléments d’intégrité
+attendus avant de pouvoir être proposés au moteur. Un SHA-256 valide prouve
+la cohérence avec une référence, pas à lui seul l’identité de l’éditeur : la
+source et la chaîne de publication restent à établir pour chaque livraison.
+
+Le réglage de source actuel concerne les livraisons du bundle. Le futur canal
+de mise à jour d’AquaHub doit avoir son propre contrat de publication et ne
+doit pas ouvrir l’exécution générique d’un dépôt Git.
+
+6. Secrets et Portainer
+
+Les jetons Git et le premier mot de passe Portainer sont saisis dans des
+dialogues GTK natifs et ne sont pas renvoyés au renderer. Les jetons de source
+persistants sont actuellement stockés dans un JSON privé de l’état de l’agent,
+protégé par permissions ; il n’y a pas de chiffrement par un trousseau système.
+Ne pas confondre ces permissions avec une protection contre root.
+
+La création du premier compte Portainer cible uniquement l’instance gérée,
+vérifiée et publiée sur 127.0.0.1:9443. Son jeton d’initialisation est lu dans
+un tampon privé et n’est ni journalisé ni conservé dans l’audit. Le mot de
+passe n’est pas placé dans le payload de tâche. Un compte existant n’est pas
+remplacé et une instance Portainer étrangère n’est pas réinitialisée.
+
+L’API Portainer locale désactive proxies et redirections. La vérification du
+certificat autosigné est désactivée uniquement dans ce client à URL fixe,
+après contrôle de l’instance ; ne pas généraliser ce réglage au téléchargement
+des mises à jour ou à une adresse distante.
+
+7. Historique, journaux et diagnostic
+
+redact() et safe_value() filtrent des motifs de secrets, clés, identifiants
+d’URL et contrôles terminaux. C’est une défense supplémentaire, pas la preuve
+que toute chaîne sensible imaginable sera reconnue. Ne pas journaliser une
+valeur secrète sous prétexte qu’elle sera probablement masquée plus tard.
+
+L’audit events est limité à 365 jours et 100 000 événements, avec pagination.
+Les captures de panne sont distinctes des logs Docker en direct : au plus
+64 Kio par capture, 64 Mio au total, 1 024 enregistrements et 90 jours.
+Une capture peut manquer ou être expirée. Les logs courants restent soumis
+à la configuration et à la rotation Docker du service. AquaHub n’annonce donc
+pas un enregistrement illimité de tout stdout depuis toujours.
+
+Le diagnostic contient un état et des événements filtrés, au plus dix extraits
+de panne pour 256 Kio au total. Il n’inclut pas les configurations ni les clés
+privées, mais peut encore révéler noms de machines, IP et contexte opérationnel.
+Relire un diagnostic avant de l’envoyer ou de le joindre à une issue publique.
+Les exports restent des fichiers privés de mode 0600.
+
+8. Publication et modification des protections
+
+Le dépôt public exclut payloads, rapports du banc, captures réelles et historiques
+Git privés. Les tests utilisent des identités et secrets artificiels explicites.
+Les dépendances et contenus du bundle conservent leurs propres droits ; la
+licence AquaHub ne rend pas leur redistribution automatiquement autorisée.
+
+Toute modification d’autorisation, des cibles, des formats d’archive ou des
+exceptions réseau nécessite des tests négatifs : vérifier les refus autant
+que le cas nominal. Voir docs/TESTS.txt. Ne pas fournir une issue publique
+contenant une vulnérabilité exploitable et des accès réels ; utiliser le canal
+privé décrit dans les consignes de contribution lorsqu’il est disponible.

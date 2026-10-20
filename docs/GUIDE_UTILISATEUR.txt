@@ -1,0 +1,120 @@
+AquaHub — guide utilisateur
+Préproduction 0.1.2
+
+1. Disponibilité et installation
+
+Le dépôt public contient les sources. Aucun installateur public qualifié
+n’est encore publié. Un ZIP de sources GitHub ne s’installe pas comme une
+application. Le kit complet doit être préparé avec un bundle fournisseur
+et des configurations adaptés au poste ; voir PUBLICATION.txt.
+
+Avec un kit qualifié pour Debian 13 amd64 / GNOME, le parcours prévu est
+graphique : ouvrir le .deb avec Logiciels ou l’installateur de paquets,
+cliquer Installer, autoriser dans la boîte système, puis ouvrir AquaHub
+dans le menu des applications. L’assistant AquaHub installe ses composants
+depuis le kit local, puis propose Ouvrir AquaHub. Le client n’a pas besoin
+de Node, npm, pip ou d’une commande de développement.
+
+Ne pas interrompre une étape d’installation. En cas d’échec, lire le détail
+et résoudre sa cause avant de réessayer. Ne pas supprimer une configuration,
+un volume ou un service existant pour contourner un diagnostic.
+
+2. Supervision
+
+La liste affiche les composants reconnus sur le moteur Docker natif. En cours
+décrit l’état du conteneur. Validé décrit une sonde de santé définie qui
+réussit ; Non défini signifie qu’aucune sonde n’existe pour ce composant.
+Le bundle reconnu a deux sondes et six composants sans sonde. Ces informations
+ne valident pas les capteurs, moteurs ou conditions de navigation d’un drone.
+
+Sélectionner un composant pour lire son détail. Actualiser relit son état.
+La date de collecte et un avertissement identifient les informations périmées.
+Quand la collecte est indisponible, AquaHub conserve le dernier état connu
+sans prétendre qu’il est encore actuel.
+
+Aucune tâche de maintenance signifie qu’AquaHub ne pilote aucune tâche à cet
+instant. Les services du hub continuent leur activité indépendamment.
+
+3. Relancer un service
+
+Sélectionner le composant, choisir Redémarrer, puis vérifier le nom dans la
+confirmation. Autoriser l’action dans la boîte administrateur si elle est
+demandée et attendre le résultat. Une seule maintenance incompatible peut
+progresser à la fois. Fermer la fenêtre n’annule pas la tâche de l’agent.
+
+Les actions sur Réseau du bundle, WireGuard et GCS Reactor restent bloquées
+tant que leur précontrôle ne garantit pas la conservation des IP existantes.
+Lire le motif dans le détail ; ne pas chercher une autre voie pour contourner
+cette protection dans le cadre d’une opération AquaHub.
+
+4. Journaux et historique
+
+Logs techniques présente les dernières lignes disponibles du composant.
+Suivre active leur actualisation ; décocher permet une lecture stable.
+Les journaux contiennent ce que le service écrit : ils ne décrivent pas
+nécessairement toutes ses actions.
+
+Historique conserve les événements collectés par AquaHub. Le passé antérieur
+à la collecte et les périodes sans observation ne sont pas reconstitués.
+Choisir un composant ou rechercher un mot parmi les événements chargés.
+Charger les événements précédents ajoute les pages anciennes.
+
+Extrait de panne, lorsqu’il est disponible, ouvre une capture de l’incident.
+Cet extrait diffère des logs courants. Troncature, expiration et absence sont
+signalées. Les événements sont bornés à 365 jours et 100000 entrées ; les
+extraits à 90 jours et 64 Mio au total. Ce n’est pas un archivage illimité.
+
+5. Portainer et outils du hub
+
+GCS, Fleet Controller et Portainer s’ouvrent dans le navigateur du poste.
+Sur un Portainer neuf, choisir Réglages, Portainer, Créer le compte initial.
+Le formulaire natif demande l’identifiant et un mot de passe confirmé. Un
+compte déjà présent n’est pas réinitialisé.
+
+Si Portainer propose de créer un environnement, choisir Docker Standalone
+local avec le socket monté par le kit. Il n’est pas nécessaire de réimporter
+une deuxième stack du bundle. Le bouton de relance conserve le compte et
+les données d’une instance locale gérée reconnue.
+
+6. Aqua_Drones
+
+Les profils numérotés correspondent aux configurations du bundle ; leur
+présence ne signifie pas qu’un appareil physique est connecté.
+
+Connecter l’appareil au réseau déjà administré pour lui, puis choisir
+Rechercher les appareils. Vérifier l’identité SSH lors de la première
+association avec une source physique fiable. Une réponse à une IP ne prouve
+pas l’identité d’un drone.
+
+Choisir le numéro prévu, lancer Vérifier cet appareil et lire les contrôles.
+La configuration n’est disponible que si la cible, l’identité, les fichiers
+et le réseau sont compatibles. Confirmer ensuite l’identité physique avant
+de lancer le travail. Le drone peut redémarrer ; attendre son retour vérifié.
+
+Le numéro choisit les fichiers du bundle. AquaHub n’attribue pas d’adresse
+au drone et ne configure ni routeur ni DHCP. Les contrôles moteurs, GPS,
+firmware et autopilote restent manuels lorsqu’ils le demandent.
+
+Le profil SSH sans secret ne doit être activé que pour un firmware qui le
+prévoit. Il ne dispense jamais de vérifier l’empreinte SSH ni un changement
+d’identité. Les clés privées ne sont pas saisies dans le renderer.
+
+7. Archives et versions
+
+Choisir une archive de bundle lance son inspection. Une archive reconnue peut
+rester non applicable ; l’intégrité seule ne prouve pas sa compatibilité.
+Une application autorisée possède une confirmation distincte et peut
+interrompre les services. Lire le résultat et la disponibilité du retour
+arrière ; un échec restauré reste un échec de mise à jour.
+
+Le réglage Dépôt Git concerne actuellement une source de livraisons du bundle
+fournisseur. Ne pas y substituer le dépôt de code AquaHub pour mettre à jour
+l’application. Le futur bouton de mise à jour d’AquaHub n’existe pas encore.
+
+8. Diagnostic et signalement
+
+Réglages permet de créer un diagnostic local filtré. Son export n’est pas
+un envoi automatique à un service distant. Vérifier son contenu avant de
+le communiquer ; un secret dans un format inconnu peut échapper au filtre.
+Pour une issue publique, donner la version, le symptôme et une reproduction
+sans identité de matériel, configuration client ni journal brut privé.

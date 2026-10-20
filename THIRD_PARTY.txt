@@ -1,0 +1,20 @@
+AquaHub — composants tiers
+
+La licence MIT à la racine couvre le code AquaHub de ce dépôt. Elle ne
+relicencie pas les bibliothèques du système, les dépendances de compilation,
+Docker, Portainer, les images de conteneurs ni le bundle fournisseur.
+
+Dépendances de compilation frontend : esbuild et TypeScript, avec versions
+verrouillées dans frontend/package-lock.json. Leurs notices sont disponibles
+dans les distributions installées par npm et leurs dépôts respectifs :
+  https://github.com/evanw/esbuild
+  https://github.com/microsoft/TypeScript
+
+Le runtime utilise notamment Python, PyGObject, GTK, Cairo et WebKitGTK,
+fournis par les paquets du système. Les noms exacts sont indiqués dans le
+guide de développement et dans la préparation du payload hors ligne.
+
+Le code fournisseur et les images de conteneurs ne sont pas inclus dans ce
+dépôt. Toute distribution d’un kit complet doit vérifier les droits de chaque
+composant et inclure les notices applicables. La présence d’une licence sur
+AquaHub ne transforme pas un kit client privé en artefact redistribuable.
