@@ -34,6 +34,7 @@ from .updates import ArchiveReader, KNOWN_FILES, _atomic_json, _params, _private
 PREFLIGHT_TTL = 600
 DEPLOY_TIMEOUT = 600
 REBOOT_TIMEOUT = 300
+CONFIGURATION_STEPS = 12
 MAX_READ = 2 * 1024**2
 REMOTE_FILES = ("/etc/mavlink-router/main.conf", "/etc/wireguard/wg0.conf", "/etc/dmx/main.config")
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -61,6 +62,29 @@ def drone_address(number: int) -> str:
     number = drone_number(number)
     # This literal supplier rule is valid only for the six delivered configs.
     return str(ipaddress.IPv4Address(f"192.168.20{number}.2"))
+
+
+def manual_checklist(number: int) -> list[dict]:
+    """Explain the five supplier reminders without claiming they were checked.
+
+    The first two entries describe inspections of the existing installation.
+    AquaHub never executes the router/IP instructions from these reminders.
+    """
+    number = drone_number(number)
+    return [
+        {"id": "router_lan", "label": "RUTC50 : configuration LAN",
+         "details": "Vérifier sur le routeur la configuration LAN et le mode statique déjà installés, sans modifier les adresses IP."},
+        {"id": "router_route", "label": "RUTC50 : route vers la GCS",
+         "details": "Vérifier la route et le prochain saut déjà installés vers le réseau GCS, sans modifier les IP ni les routes."},
+        {"id": "autopilot_parameters", "label": "Paramètres du pilote automatique",
+         "details": f"Dans QGroundControl → Analyze Tools → MAVLink Console : vérifier MAV_SYS_ID = {number}, "
+                    "EKF2_GPS_POS_Y = distance en mètres entre les centres des antennes, EKF2_GPS_POS_X/Z = 0, "
+                    "BT_POS_XY_P/I/D et BT_POS_IMAX selon la configuration, puis la numérotation des moteurs selon les spécifications."},
+        {"id": "heron_versions", "label": "Versions Heron",
+         "details": "Relever les versions Firmware et BL (bootloader) Heron."},
+        {"id": "hardware_status", "label": "État CAN, GPS et moteurs",
+         "details": "Dans la console MAVLink de QGroundControl / nsh : contrôler les résultats de uavcan status, gps status et listener esc_status."},
+    ]
 
 
 def network_fields(text: str) -> tuple:
@@ -211,6 +235,7 @@ class DroneManager:
                 "reachable": reachable, "identity_verified": bool(entry.get("identity")),
                 "identity": entry.get("identity"), "configured": bool(entry.get("configured")),
                 "supported": supported, "last_seen": entry.get("last_seen"),
+                "manual_checklist": manual_checklist(number),
                 "message": "Adresse du bundle en lecture seule ; la présence SSH ne prouve pas l’identité."})
         return {"drones": drones, "address_read_only": True,
                 "message": "Recherche limitée aux six adresses déjà prévues par le bundle."}
@@ -434,14 +459,47 @@ class DroneManager:
             return {"id": token, "preflight_id": token, "number": number, "address": drone_address(number),
                 "allowed": True, "ok": True, "checks": checks, "identity": identity,
                 "needs_identity_confirmation": not bool(saved.get("identity")),
-                "manual_checks": "Les contrôles matériels resteront ignorés dans la checklist fournisseur. Aucun MAV_SYS_ID matériel n’est réglé automatiquement.",
+                "manual_checklist": manual_checklist(number),
+                "manual_checks": "Les cinq contrôles manuels resteront ignorés dans la checklist fournisseur. Aucun MAV_SYS_ID matériel n’est réglé automatiquement.",
                 "message": "Précontrôles réussis. Vérifier la correspondance physique de l’appareil avant de lancer la configuration."}
         except (ApiError, OSError, ValueError) as exc:
             message = exc.message if isinstance(exc, ApiError) else "Un fichier ou contrôle système nécessaire est indisponible. Aucune configuration envoyée."
             checks.append({"label": "Configuration autorisée", "ok": False, "message": message})
             return {"id": token, "preflight_id": token, "number": number, "address": drone_address(number),
                 "allowed": False, "ok": False, "checks": checks, "identity": identity,
+                "manual_checklist": manual_checklist(number),
                 "code": exc.code if isinstance(exc, ApiError) else "preflight_unavailable", "message": message}
+
+    def _progress(self, plan, completed, phase, label, *, indeterminate=True):
+        """Persist observed milestones only; elapsed time never advances progress."""
+        progress = {"completed": completed, "total": CONFIGURATION_STEPS,
+                    "percent": completed * 100 // CONFIGURATION_STEPS,
+                    "phase": phase, "label": label, "indeterminate": indeterminate}
+        if progress != plan.get("_last_progress"):
+            self.app.report_progress(progress)
+            plan["_last_progress"] = progress
+
+    def _supplier_progress(self, plan, trace):
+        number = plan["number"]
+        # Only exact completion lines emitted by the recognised supplier script
+        # count. A displayed prompt or the beginning of an upload does not count.
+        labels = (
+            ("Hub — IPv6 GCS fixée (f::1)", "Préparation MAVLink du hub"),
+            ("[hub] config.conf mavlink-router (IPv6 GCS + N drones)", "Envoi MAVLink au drone"),
+            (f"[aqua {number}] mavlink.conf → drone", "Rechargement des services du hub"),
+            ("[hub] recharger net_setup + mavlink_router + gcs_reactor", "Envoi de la configuration WireGuard existante"),
+            (f"[aqua {number}] wdg.conf → drone", "Envoi de la configuration MQTT existante"),
+            (f"[aqua {number}] IP(s) broker MQTT → drone", f"Redémarrage de Aqua_Drone_{number}"),
+            (f"[aqua {number}] reboot", f"Attente du redémarrage de Aqua_Drone_{number}"),
+        )
+        matched = plan.get("_supplier_completed", 0)
+        while matched < len(labels):
+            label, following = labels[matched]
+            if not re.search(r"(?m)^\s*✔ " + re.escape(label) + r" \(fait\)\s*$", trace):
+                break
+            matched += 1
+            plan["_supplier_completed"] = matched
+            self._progress(plan, 2 + matched, "reboot" if matched == 7 else "supplier", following)
 
     def _guard(self, plan):
         """Keep supplier deploy.py intact while enforcing pinned transports."""
@@ -562,6 +620,7 @@ else: refuse()
                     text = ANSI.sub("", chunks.decode("utf-8", "replace")).replace("\r\n", "\n")
                     if "(r)éessayer / (s)kip : " in text or "✘ échec :" in text or "non implémenté :" in text:
                         raise ApiError("deployment_partial", "Une étape fournisseur a échoué. Configuration interrompue ; les sauvegardes privées sont conservées.")
+                    self._supplier_progress(plan, text)
                     while index < len(prompts):
                         match = re.search(prompts[index][0], text)
                         if not match:
@@ -625,6 +684,7 @@ else: refuse()
                     raise ApiError("preflight_expired", "Ce précontrôle est expiré ou déjà utilisé.")
                 plan["used"] = True
             number, stage = plan["number"], plan["stage"]
+            self._progress(plan, 0, "preparing", f"Vérification de Aqua_Drone_{number}")
             self._recognised()
             if self._hashes(number) != plan["hashes"] or self._hub_network() != plan["hub_network"]:
                 raise ApiError("configuration_changed", "La configuration ou le réseau a changé depuis les précontrôles.")
@@ -632,6 +692,7 @@ else: refuse()
             keys = ("machine_id", "host_key_fingerprint", "boot_id", "wg_hash", "mqtt", "network", "mavlink")
             if any(before[key] != plan["remote"][key] for key in keys):
                 raise ApiError("target_changed", "L’état ou l’identité du drone a changé. Aucun fichier envoyé.")
+            self._progress(plan, 1, "backup", f"Sauvegarde de Aqua_Drone_{number}")
             backup = self.runner(["/usr/bin/ssh", *plan["credentials"]["options"], plan["credentials"]["host"],
                 "tar -czf - /etc/mavlink-router/main.conf /etc/wireguard/wg0.conf /etc/dmx/main.config"],
                 env=plan["credentials"]["env"], timeout=30, max_bytes=16 * 1024**2, binary=True)
@@ -651,7 +712,9 @@ else: refuse()
             hub_before = stage / "hub-before.conf"
             hub_before.write_bytes((self._bundle() / "config/mavlink/config.conf").read_bytes())
             hub_before.chmod(0o600)
+            self._progress(plan, 2, "supplier", f"Configuration de Aqua_Drone_{number} : procédure fournisseur")
             result = self._deploy(plan)
+            self._progress(plan, 9, "reboot", f"Attente du redémarrage de Aqua_Drone_{number}")
             # Observe the restart, rather than treating an accepted SSH reboot as completion.
             down, after, stable_observations = False, None, 0
             pending_checks = ["arrêt puis retour du drone"]
@@ -661,7 +724,9 @@ else: refuse()
                 if not self._reachable(number):
                     down = True
                     stable_observations = 0
+                    self._progress(plan, 10, "reboot", f"Aqua_Drone_{number} redémarre ; attente de son retour")
                 elif down:
+                    self._progress(plan, 10, "verification", f"Retour de Aqua_Drone_{number} : vérification des services et des configurations")
                     try:
                         candidate = self._remote(plan["credentials"])
                         if candidate["boot_id"] != before["boot_id"]:
@@ -683,6 +748,7 @@ else: refuse()
                                 stable_observations += 1
                                 if stable_observations >= 2:
                                     after = candidate
+                                    self._progress(plan, 11, "verification", f"Aqua_Drone_{number} disponible ; contrôles finaux")
                                     break
                             else:
                                 stable_observations = 0
@@ -708,9 +774,11 @@ else: refuse()
             saved[str(number)] = {"identity": plan["identity"], "configured": True, "last_seen": time.time()}
             _atomic_json(self.root / "inventory.json", saved)
             self.observed[number] = {"reachable": True, "checked": time.time()}
+            self._progress(plan, CONFIGURATION_STEPS, "complete", f"Configuration de Aqua_Drone_{number} vérifiée", indeterminate=False)
             return {**result, "configured": True, "verified": True, "number": number,
                 "address": drone_address(number), "reboot_verified": True, "ip_unchanged": True,
-                "message": "Configuration logicielle vérifiée. Les cinq contrôles matériels restent à effectuer manuellement."}
+                "manual_checklist": manual_checklist(number),
+                "message": f"Configuration logicielle de Aqua_Drone_{number} vérifiée. Les cinq contrôles manuels de la checklist fournisseur restent à effectuer."}
 
         return self.app.submit_job("configure_drone", f"Aqua_Drone_{plan['number']}",
             {"number": plan["number"], "preflight_id": token}, work)

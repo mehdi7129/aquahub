@@ -1,5 +1,6 @@
 """Code embedded in preinst: serialize package replacement with live jobs."""
 from pathlib import Path
+from contextlib import closing
 import fcntl
 import os
 import sqlite3
@@ -22,7 +23,7 @@ def guard(state=Path('/var/lib/aquahub/agent'), stop=None):
         if database.is_symlink():
             raise RuntimeError('La base AquaHub ne doit pas être un lien symbolique.')
         if database.is_file():
-            with sqlite3.connect(database.as_uri()+'?mode=ro', uri=True, timeout=5) as connection:
+            with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True, timeout=5)) as connection:
                 if connection.execute("SELECT count(*) FROM jobs WHERE status IN ('running','queued')").fetchone()[0]:
                     raise RuntimeError('Une opération AquaHub n’est pas terminée. Vérifiez son état dans l’application avant de relancer l’installation.')
         if stop is not None:

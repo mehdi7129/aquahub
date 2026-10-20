@@ -23,6 +23,7 @@
     await check('Le mode démonstration est explicitement signalé, avec huit composants', async () => {
       await wait(() => document.querySelectorAll('.service-row').length === 8, 'services chargés');
       assert(find('.demo-banner').textContent.includes('Données fictives'), 'Bandeau démonstration absent');
+      assert(!document.querySelector('.workspace-label'), 'Sous-titre espace de pilotage encore visible');
       assert(document.querySelectorAll('.health .icon').length === 2, 'Nombre de contrôles santé incohérent');
     });
     await check('Le thème sombre puis clair est appliqué et mémorisé', async () => {
@@ -63,6 +64,15 @@
       assert(!document.querySelector('.drone-config input'), 'Champ réseau modifiable exposé');
       assert(find('[data-action="configure-drone"]').disabled, 'Configuration disponible avant précontrôle');
     });
+    await check('Les cinq contrôles manuels sont accessibles au clavier et au clic', async () => {
+      const info=find('.drone-grid + .network-note [data-action="manual-checks"]');
+      info.focus(); const tooltip=find('#manual-help-drone');
+      assert(getComputedStyle(tooltip).display!=='none','Aide masquée au focus');
+      assert(tooltip.textContent.includes('RUTC50')&&tooltip.textContent.includes('listener esc_status'),'Contrôles fournisseur manquants');
+      info.click(); await wait(()=>find('#confirmation').open,'détail contrôles manuels');
+      assert(document.querySelectorAll('.manual-check-list>li').length===5,'Cinq contrôles attendus');
+      find('#confirmation button[value="cancel"]').click();
+    });
     await check('L’enregistrement SSH exige une confirmation manuelle explicite', async () => {
       click('[data-action="enroll-drone"]');
       await wait(() => document.querySelector('#confirmation').open, 'dialogue empreinte');
@@ -79,9 +89,16 @@
       assert(find('.identity-confirmation').textContent.includes('APPAREIL-DEMONSTRATION-5'), 'Identifiant machine invisible');
       const checkbox = find('#confirm-identity'); checkbox.checked = true; checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       click('#dialog-confirm');
-      await wait(() => document.querySelector('.job-banner'), 'configuration en cours');
+      await wait(() => document.querySelector('.job-progress progress'), 'configuration en cours');
+      assert(find('.job-banner').textContent.includes('Configuration de Aqua_Drone_5'),'Numéro absent du suivi');
+      assert(document.querySelector('.job-progress progress'),'Barre de progression absente');
+      await wait(()=>document.querySelector('.job-progress')?.textContent.includes('58 % validés'),'étape longue observée');
+      assert(!find('.job-progress progress').hasAttribute('value'),'Progression temporelle fictive pendant le redémarrage');
+      assert(find('.job-banner').textContent.includes('7/12 étapes validées'),'Étapes validées invisibles');
       await wait(() => !document.querySelector('.job-banner'), 'configuration terminée');
       await wait(() => find('.drone-item').textContent.includes('Configuration vérifiée'), 'inventaire actualisé après tâche');
+      assert(find('.completion-notice').textContent.includes('Aqua_Drone_5'),'Numéro absent de la réussite');
+      assert(find('.completion-notice [data-action="manual-checks"]'),'Détail des contrôles absent après configuration');
     });
     await check('L’archive est vérifiée avant de proposer son installation', async () => {
       click('[data-page="updates"]'); click('[data-action="import"]');
@@ -108,6 +125,26 @@
       await wait(() => !document.querySelector('.job-banner'), 'archive téléchargée et analysée');
       await wait(() => !find('[data-action="apply-update"]').disabled, 'inspection de la release présentée et active');
       assert(!find('#confirmation').open, 'Installation automatiquement proposée en confirmation');
+    });
+    await check('Les Releases AquaHub sont séparées des livraisons du bundle', async () => {
+      assert(find('.app-update-card').textContent.includes('github.com/mehdi7129/aquahub'),'Source officielle de l’application absente');
+      assert(find('.source-card').textContent.includes('https://github.com/exemple/aqua'),'Source fournisseur remplacée par source application');
+      click('[data-action="check-app-update"]');
+      await wait(()=>document.querySelector('[data-action="download-app-update"]'),'nouvelle version application');
+      assert(find('[data-action="install-app-update"]').disabled,'Application installable avant téléchargement');
+      click('[data-action="download-app-update"]');
+      await wait(()=>document.querySelector('.job-banner'),'téléchargement app suivi');
+      await wait(()=>!document.querySelector('.job-banner'),'fin téléchargement app');
+      await wait(()=>!find('[data-action="install-app-update"]').disabled,'application téléchargée et vérifiée');
+      click('[data-action="install-app-update"]');
+      assert(find('#confirmation').textContent.includes('conserve le bundle'),'Portée application non expliquée');
+      find('#confirmation button[value="cancel"]').click();
+      assert(!document.querySelector('.job-banner'),'Installation après annulation');
+      click('[data-action="install-app-update"]');click('#dialog-confirm');
+      await wait(()=>document.querySelector('.job-banner')?.textContent.includes('Installation d’AquaHub'),'installation app programmée');
+      assert(find('[data-action="check-app-update"]').disabled,'Autre maintenance permise pendant installation');
+      await wait(()=>find('.app-update-card').textContent.includes('Fermez puis rouvrez AquaHub'),'résultat vérifié de l’installation',10000);
+      assert(!document.querySelector('.job-banner'),'Installation app restée bloquée après succès');
     });
     await check('Le profil SSH sans secret est décoché par défaut et configurable explicitement', async () => {
       click('[data-page="settings"]'); click('[data-action="load-ssh"]');

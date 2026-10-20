@@ -391,7 +391,7 @@ def main(argv=None) -> int:
             box=dialog.get_content_area()
             box.set_spacing(10)
             box.set_border_width(24)
-            explanation=Gtk.Label(label='Choisissez le compte administrateur de Portainer.\nIl sera conservé lors des réinstallations.')
+            explanation=Gtk.Label(label='Ce compte protège la console Docker avancée Portainer.\nLes actions courantes d’AquaHub et l’historique n’en ont pas besoin.\nLe compte sera conservé lors des réinstallations.')
             explanation.set_line_wrap(True); explanation.set_xalign(0)
             box.pack_start(explanation,False,False,4)
             entries=[]

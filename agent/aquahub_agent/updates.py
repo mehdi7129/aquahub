@@ -813,7 +813,8 @@ class UpdateManager:
         path = self.root / "github.json"
         config = json.loads(path.read_text()) if path.is_file() else {}
         request = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "AquaHub/1"})
-        if config.get("token") and config.get("token_provider", "github") == "gitlab":
+        has_api_token = bool(config.get("token")) and config.get("token_provider", "github") == "gitlab"
+        if has_api_token:
             request.add_unredirected_header("PRIVATE-TOKEN", config["token"])
         try:
             with self.gitlab_opener.open(request, timeout=30) as response:
@@ -822,9 +823,17 @@ class UpdateManager:
                     raise ApiError("gitlab_limit", "Réponse GitLab trop volumineuse.")
                 return _strict_json(data)
         except urllib.error.HTTPError as exc:
-            messages = {401: "GitLab refuse l’accès API : utiliser un jeton avec permission read_api. Un jeton de déploiement Git ne suffit pas.",
-                        403: "Permission GitLab insuffisante ou limite atteinte.",
-                        404: "Projet ou livraison GitLab absent, privé ou non accessible.",
+            # GitLab deliberately hides a private project's existence with 404.
+            # Neither that response nor a successful Git clone establishes
+            # access to the separate Releases API used by this connector.
+            authentication = ("Le jeton de déploiement permet l’accès Git ou au registre Docker, mais pas à l’API des Releases GitLab. "
+                              if has_api_token and config["token"].startswith("gldt-") else
+                              "GitLab refuse le jeton API : il peut être invalide, expiré ou ne pas permettre l’accès aux Releases. ")
+            missing = ("Aucun jeton API GitLab n’est configuré dans AquaHub. " if not has_api_token else
+                       "Le jeton configuré ne permet pas de voir ce projet, ou l’URL du projet est incorrecte. ")
+            messages = {401: authentication + "Cette recherche consulte les Releases ; l’accès Git et au registre Docker est distinct. L’import d’une archive locale reste disponible.",
+                        403: "Accès à l’API des Releases GitLab refusé ou limite atteinte. Les droits Git et registre Docker ne garantissent pas cet accès API.",
+                        404: "Projet GitLab introuvable ou privé. " + missing + "Cette recherche consulte les Releases, distinctes du dépôt Git et du registre Docker.",
                         429: "Limite GitLab atteinte ; réessayer ultérieurement."}
             raise ApiError("gitlab_http_error", messages.get(exc.code, "GitLab n’a pas fourni les livraisons.")) from None
         except (urllib.error.URLError, TimeoutError, ValueError) as exc:
@@ -873,7 +882,8 @@ class UpdateManager:
             if len(data) < 20:
                 break
         return {"configured": True, "provider": "gitlab", "repository_url": repository, "releases": releases,
-                "message": "Livraisons GitLab consultées. Import local requis tant que le contrat fournisseur et les empreintes des fichiers ne sont pas vérifiés."}
+                "message": "Releases GitLab consultées. Import local requis tant que le contrat fournisseur et les empreintes des fichiers ne sont pas vérifiés." if releases else
+                           "Connexion à l’API GitLab réussie ; aucune Release publiée n’est disponible. Un dépôt Git et des images Docker peuvent exister sans Release. L’import d’une archive fournisseur reste disponible."}
 
     def _github(self, url, binary=False):
         config_path = self.root / "github.json"

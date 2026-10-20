@@ -101,6 +101,10 @@ Leur empreinte doit correspondre au contrat connu. Le code est copié dans un
 répertoire privé et exécuté avec des garde-fous de transport. Les fichiers
 distants concernés sont sauvegardés et le retour après redémarrage est vérifié.
 Les contrôles de matériel ne sont pas déclarés réussis par une simulation.
+La progression indique douze jalons observés, sans interpolation temporelle ;
+elle n’est pas une validation des cinq contrôles manuels. Les deux rappels
+réseau de cette liste sont uniquement consultatifs : AquaHub ne change pas
+la configuration LAN ni la route vers le GCS à cette occasion.
 
 Ne jamais publier les fichiers known_hosts réels, identités machine, clés SSH,
 configurations VPN, sauvegardes distantes ni journaux de ce parcours. Ces
@@ -127,9 +131,41 @@ attendus avant de pouvoir être proposés au moteur. Un SHA-256 valide prouve
 la cohérence avec une référence, pas à lui seul l’identité de l’éditeur : la
 source et la chaîne de publication restent à établir pour chaque livraison.
 
-Le réglage de source actuel concerne les livraisons du bundle. Le futur canal
-de mise à jour d’AquaHub doit avoir son propre contrat de publication et ne
-doit pas ouvrir l’exécution générique d’un dépôt Git.
+Le réglage de source fournisseur concerne uniquement les livraisons du bundle.
+Un jeton de déploiement autorisant Git et le registre Docker ne donne pas
+accès à l’API des Releases GitLab. Un 404 peut aussi masquer un projet privé ;
+ce résultat ne permet pas de conclure que le dépôt ou le jeton Git est invalide.
+Le flux Git + registre du fournisseur attend encore une procédure qualifiée.
+
+Le canal app_updates est fermé sur les Releases stables publiques de
+mehdi7129/aquahub. Il n’envoie aucun jeton et n’accepte ni URL libre ni chemin
+d’installation arbitraire. La livraison doit porter le nom exact attendu,
+un identifiant d’asset, une taille bornée et un digest SHA-256 GitHub valide.
+Les métadonnées sont relues avant téléchargement et avant installation ;
+un asset remplacé ou une somme différente provoque un refus.
+
+La confiance actuelle repose sur GitHub et HTTPS, puis sur le SHA-256 et
+les champs Package, Version, Architecture et X-AquaHub-Update du .deb.
+Ce mécanisme ne constitue pas une signature d’éditeur indépendante de GitHub.
+La protection du compte, du dépôt et de la publication fait partie de la
+chaîne de confiance. Un paquet Debian approuvé contient du code privilégié ;
+le hash n’en garantit pas la sûreté ni l’absence de bogue.
+
+Le téléchargement et l’installation exigent PolicyKit. Le paquet préparé et
+ses métadonnées résident dans un dossier root privé. L’installation utilise
+un helper indépendant à chemin fixe, sans argument libre, vérifie de nouveau
+permissions, hash et type de paquet, puis acquiert le verrou de maintenance.
+Elle arrête l’agent AquaHub pendant dpkg et le redémarre ; elle ne gère ni
+Docker ni les services du bundle. Le marqueur application-only et le refus
+d’un kit complet empêchent la confusion entre les deux types de livraisons.
+Le helper enregistre installed seulement après vérification de la version
+Debian et du code de l’agent. En échec, il tente de rétablir l’agent et publie
+failed ; ce n’est pas un rollback automatique du paquet applicatif.
+Un statut pending abandonné n’est pas rejoué : après un délai de grâce, si
+le service de mise à niveau n’est plus actif et si le verrou est libre,
+l’agent rapproche la version Debian installée de sa version exécutée. Il
+confirme installed ou failed ; un contrôle incertain garde la maintenance
+bloquée plutôt que de deviner un succès.
 
 6. Secrets et Portainer
 

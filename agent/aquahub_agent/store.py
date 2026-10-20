@@ -46,6 +46,9 @@ class Store:
             finished_at TEXT, payload TEXT NOT NULL, result TEXT, error TEXT,
             idempotency_key TEXT UNIQUE, fingerprint TEXT NOT NULL);
         """)
+        # Existing customer history survives application upgrades unchanged.
+        if "progress" not in {row[1] for row in self.db.execute("PRAGMA table_info(jobs)")}:
+            self.db.execute("ALTER TABLE jobs ADD COLUMN progress TEXT")
         self.db.commit()
 
     @contextmanager
@@ -119,7 +122,7 @@ class Store:
         result = dict(row)
         result.pop("fingerprint", None)
         result.pop("idempotency_key", None)
-        for key in ("payload", "result", "error"):
+        for key in ("payload", "result", "error", "progress"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
         return result
 
@@ -141,6 +144,14 @@ class Store:
             db.execute("UPDATE jobs SET status=?,started_at=COALESCE(?,started_at),finished_at=?,result=?,error=? WHERE id=?",
                        (status, start, finish, json.dumps(safe_value(result)) if result is not None else None,
                         json.dumps(safe_value(error)) if error is not None else None, job_id))
+
+    def set_job_progress(self, job_id: str, progress: dict):
+        """Keep the last observed milestone across polling and agent restarts."""
+        serialized = json.dumps(safe_value(progress), ensure_ascii=False)
+        if len(serialized.encode()) > 4096:
+            raise ValueError("Job progress exceeds its storage bound")
+        with self.transaction() as db:
+            db.execute("UPDATE jobs SET progress=? WHERE id=? AND status='running'", (serialized, job_id))
 
     def interrupt_jobs(self):
         with self.transaction() as db:

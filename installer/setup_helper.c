@@ -17,9 +17,11 @@
 #include <unistd.h>
 
 #define PAYLOAD "/usr/share/aquahub/offline"
+#define PRESERVED_PAYLOAD "/var/lib/aquahub/offline"
 #define INSTALLER_STATE "/var/lib/aquahub/installer"
 #define MAX_PACKAGES 512
 static int log_descriptor = -1;
+static const char *payload = PAYLOAD;
 
 static void write_all(int descriptor, const char *data, size_t length) {
     while (length) {
@@ -44,6 +46,22 @@ static void die(const char *message) {
         fsync(log_descriptor);
     }
     exit(EXIT_FAILURE);
+}
+
+static void resource(char *target, size_t size, const char *name) {
+    int length = snprintf(target, size, "%s/%s", payload, name);
+    if (length < 0 || (size_t)length >= size) die("Le chemin du kit hors ligne est trop long.");
+}
+
+static void select_payload(void) {
+    struct stat item;
+    if (lstat(PAYLOAD, &item)) {
+        if (errno != ENOENT) die("Impossible de vérifier le kit hors ligne.");
+        payload = PRESERVED_PAYLOAD;
+        if (lstat(payload, &item)) die("Ce paquet met à jour AquaHub. Le kit complet est requis pour une première installation.");
+    }
+    if (!S_ISDIR(item.st_mode) || item.st_uid || (item.st_mode & 0022))
+        die("Le kit hors ligne ne possède pas les permissions attendues.");
 }
 
 static void private_directory(const char *path) {
@@ -118,13 +136,17 @@ static void write_source(void) {
     const char *path = INSTALLER_STATE "/aquahub.sources.list";
     int descriptor = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0600);
     if (descriptor < 0) die("Impossible de préparer le dépôt hors ligne.");
-    const char *source = "deb [signed-by=" PAYLOAD "/repo-key.gpg] file:" PAYLOAD "/repository ./\n";
+    char source[PATH_MAX * 2 + 128];
+    int length = snprintf(source, sizeof source, "deb [signed-by=%s/repo-key.gpg] file:%s/repository ./\n", payload, payload);
+    if (length < 0 || (size_t)length >= sizeof source) die("Le chemin du dépôt hors ligne est trop long.");
     if (write(descriptor, source, strlen(source)) != (ssize_t)strlen(source) || close(descriptor))
         die("Impossible d’écrire le dépôt hors ligne.");
 }
 
 static size_t packages(char **result) {
-    FILE *stream = fopen(PAYLOAD "/package-list.txt", "re");
+    char path[PATH_MAX];
+    resource(path, sizeof path, "package-list.txt");
+    FILE *stream = fopen(path, "re");
     if (!stream) die("La liste des composants hors ligne est absente.");
     char line[512];
     size_t count = 0;
@@ -180,6 +202,7 @@ int main(int argc, char **argv) {
     if (mkdir("/var/lib/aquahub", 0755) && errno != EEXIST) die("Impossible de créer le dossier AquaHub.");
     if (lstat("/var/lib/aquahub", &parent) || !S_ISDIR(parent.st_mode) || parent.st_uid || parent.st_mode & 0022)
         die("Le dossier AquaHub n’est pas protégé.");
+    select_payload();
     private_directory(INSTALLER_STATE);
     int lock = open(INSTALLER_STATE "/setup.lock", O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
     if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB)) die("Une installation AquaHub est déjà en cours.");
@@ -191,11 +214,15 @@ int main(int argc, char **argv) {
     int maintenance = open("/var/lib/aquahub/agent/maintenance.lock", O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
     if (maintenance < 0 || flock(maintenance, LOCK_EX | LOCK_NB))
         die("Une opération AquaHub est en cours. Attendez sa fin avant de relancer l’installation.");
-    trusted_regular(PAYLOAD "/SHA256SUMS");
-    trusted_regular(PAYLOAD "/package-list.txt");
-    trusted_regular(PAYLOAD "/repo-key.gpg");
+    char resource_path[PATH_MAX];
+    resource(resource_path, sizeof resource_path, "SHA256SUMS");
+    trusted_regular(resource_path);
+    resource(resource_path, sizeof resource_path, "package-list.txt");
+    trusted_regular(resource_path);
+    resource(resource_path, sizeof resource_path, "repo-key.gpg");
+    trusted_regular(resource_path);
     trusted_regular("/usr/lib/aquahub/installer/finish.py");
-    if (chdir(PAYLOAD)) die("Le kit hors ligne est introuvable.");
+    if (chdir(payload)) die("Le kit hors ligne est introuvable.");
     phase("Vérification du kit hors ligne…");
     char *verify[] = {"/usr/bin/sha256sum", "--check", "--strict", "SHA256SUMS", NULL};
     if (run(verify)) die("Le kit est incomplet ou a été modifié. Aucune installation n’a été lancée.");

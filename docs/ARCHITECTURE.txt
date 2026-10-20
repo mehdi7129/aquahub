@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.1.2. Il complète
+Ce document décrit les sources de la préproduction 0.2.0. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -31,8 +31,8 @@ CLI Docker et n’utilise pas l’API Portainer pour leur maintenance courante.
 
 2. Interface : frontend/
 
-src/app.ts compose les cinq vues : supervision, mises à jour du bundle,
-Aqua_Drones, historique et réglages. Le fichier contient la navigation,
+src/app.ts compose les cinq vues : supervision, mises à jour de l’application
+et du bundle, Aqua_Drones, historique et réglages. Le fichier contient la navigation,
 les confirmations, les notifications, le suivi des tâches et les interactions
 DOM. styles.css porte les thèmes et la mise en page avec navigation latérale.
 src/icons.ts contient le système d’icônes local, sans chargement distant.
@@ -79,8 +79,8 @@ Utiliser le mode démo ou une fixture isolée pour les essais d’interface.
 4. Agent et protocole : agent/aquahub_agent/
 
 __main__.py parse les chemins, instancie Application et enregistre les modules
-drone, updates et portainer avant de servir la socket. Le protocole annoncé
-par app.version est 1. Les messages sont des objets JSON terminés par un saut
+drone, updates, portainer et app_updates avant de servir la socket.
+Le protocole annoncé par app.version est 1. Les messages sont des objets JSON terminés par un saut
 de ligne ; voir server.py et desktop/…/bridge.py pour les limites exactes.
 
 Exemple de requête de lecture :
@@ -97,6 +97,7 @@ Principales familles de méthodes :
   settings.get/save ; portainer.status/initialize/restart
   drones.list/scan/identity/enroll/ssh_settings/preflight/configure
   updates.inspect/check/download/apply/rollback/settings
+  app_updates.status/check/download/install
 
 core.py orchestre la collecte, l’état courant, les tâches et les erreurs.
 La collecte périodique observe les conteneurs et les événements Docker. Une
@@ -136,8 +137,14 @@ Les scripts fournisseur exécutables sont vérifiés par empreinte, copiés dans
 un espace privé et limités par des transports contrôlés. Une nouvelle version
 de script exige une nouvelle qualification, pas une simple mise à jour de hash.
 Les précontrôles expirent ; la configuration sauvegarde les fichiers distants
-concernés, suit le redémarrage et vérifie le résultat. Les contrôles matériels
-restent distincts des étapes automatiques. Voir docs/SECURITE.txt.
+concernés, suit le redémarrage et vérifie le résultat. Les contrôles manuels
+restent distincts des étapes automatiques. Chaque appareil et chaque résultat exposent
+manual_checklist. La tâche configure_drone nomme Aqua_Drone_N et publie
+douze jalons observés, avec phase et pourcentage persistant. Les attentes
+longues restent indéterminées ; 100 % attend les contrôles finaux.
+La configuration est séquentielle : le générateur modifie aussi un fichier
+partagé du hub, ce qui interdit de configurer plusieurs appareils en parallèle
+sans nouveau contrat. Voir docs/SECURITE.txt.
 
 updates.py inspecte les archives, valide un manifeste et prépare les tâches.
 Le contrat d’application implémenté est image-refresh-v1 : changement d’images
@@ -159,7 +166,22 @@ sont décrites dans docs/SECURITE.txt.
 Les connecteurs GitHub/GitLab de updates.py recherchent des Releases et leurs
 assets vérifiables. Ils ne constituent ni un exécuteur générique de dépôt Git,
 ni un client générique de registre fournisseur, ni une mise à jour d’AquaHub.
-Le futur bouton de mise à jour de l’application est un autre canal, à développer.
+Le canal de l’application est implémenté séparément dans app_updates.py.
+Il utilise uniquement les Releases stables publiques de mehdi7129/aquahub,
+sans jeton fournisseur, et recherche le fichier exact
+  aquahub-application_X.Y.Z_amd64.deb.
+Il contrôle les métadonnées, le SHA-256, la taille et le marqueur Debian
+X-AquaHub-Update: application-only. Le paquet ne contient ni bundle ni image.
+Le téléchargement est une tâche app.download ; son progrès compte des octets.
+L’installation confirmée écrit une préparation privée puis lance un service
+systemd indépendant, aquahub-application-upgrade. Le helper fixe
+installer/application_upgrade.py vérifie à nouveau le paquet et le verrou,
+remplace AquaHub avec dpkg, redémarre uniquement son agent, puis confirme
+la version installée. Il ne relance pas l’assistant complet ni les services
+Docker du fournisseur. Le résultat persistant se suit par app_updates.status,
+pas jobs.get. La fenêtre invite à rouvrir l’application pour charger sa
+nouvelle interface. Ce canal n’a pas de retour arrière applicatif automatique.
+La procédure fournisseur Git + registre reste indépendante et non qualifiée.
 
 portainer.py traite uniquement le premier compte de l’instance locale gérée.
 Il vérifie identité et port de cette instance, récupère son jeton d’initialisation
@@ -176,6 +198,8 @@ Installation système :
   /etc/aquahub/operator.conf : UID de l’opérateur autorisé
   /run/aquahub/agent.sock : communication locale
   /var/lib/aquahub/agent : base, préparations, snapshots et données privées
+  /var/lib/aquahub/agent/app-updates : paquet et suivi applicatif privés
+  /usr/lib/aquahub/application-upgrade.py : helper applicatif indépendant
   /var/lib/aquahub/installer : progression et journaux d’installation
   /var/lib/aquahub/setup.complete : version ayant terminé l’assistant
 
@@ -197,6 +221,8 @@ Le service aquahub-agent.service appartient à AquaHub. L’unité fournisseur
 reste distincte. Retirer AquaHub arrête son agent et conserve les services,
 volumes et configurations du bundle ainsi que Docker et Portainer. Le dépôt
 public n’inclut pas le payload nécessaire à un kit hors ligne complet.
+Le mode de construction --application-only est réservé à la mise à niveau
+d’un poste initialisé ; il ne remplace pas un kit de première installation.
 
 7. Où intervenir pour une évolution
 

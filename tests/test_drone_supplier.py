@@ -101,6 +101,9 @@ else: raise AssertionError(name)
             self.assertEqual([call[0] for call in calls], ["scp", "docker", "scp", "ssh", "scp", "ssh"])
             self.assertEqual(module.sha256_file(plan["runtime"] / "deploy.py"), module.KNOWN_FILES["deploy.py"])
             self.assertEqual(module.sha256_file(app.config.bundle_path / "deploy.py"), module.KNOWN_FILES["deploy.py"])
+            self.assertEqual([value["completed"] for value in app.progress], list(range(3, 10)))
+            self.assertTrue(all(value["percent"] < 100 for value in app.progress))
+            self.assertEqual(app.progress[-1]["phase"], "reboot")
 
     def test_production_guard_refuses_unexpected_ssh_scp_and_docker_commands(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.1.2.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.0.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -23,12 +23,16 @@ ses images et ses configurations privées doivent être obtenus séparément.
 - Accès aux interfaces GCS, Fleet Controller et Portainer.
 - Inventaire Aqua_Drones, identité SSH, précontrôles et configuration d’une cible
   à partir des fonctions du fournisseur.
+- Suivi de configuration par appareil, progression fondée sur les étapes
+  observées et rappel détaillé des cinq contrôles manuels.
+- Recherche, téléchargement et installation confirmée des mises à jour de
+  l’application depuis les Releases GitHub officielles, séparées du bundle.
 - Inspection d’archives de mise à jour et application des seules livraisons
   répondant au contrat `image-refresh-v1`.
 
 Les adresses IP existantes ne sont pas administrées par l’interface. Les actions
-réseau sans précontrôle suffisant restent bloquées. Les contrôles matériels des
-drones restent manuels.
+réseau sans précontrôle suffisant restent bloquées. Les contrôles manuels des
+drones ne sont pas validés automatiquement.
 
 ## Reprendre le développement
 
@@ -96,10 +100,25 @@ des chemins d’état distincts. Les invariants sont détaillés dans
 
 ## Mises à jour
 
-Ce dépôt accueillera les versions publiques d’AquaHub et leurs notes. Le bouton
-permettant de mettre à jour **l’application AquaHub elle-même** n’est pas encore
-implémenté. Ce futur canal sera distinct des mises à jour du bundle fournisseur
-et de la configuration des drones.
+L’onglet **Mises à jour** distingue deux canaux :
+
+- **Application AquaHub** consulte les Releases publiques de
+  `mehdi7129/aquahub`. Un commit, une branche ou une archive de sources ne
+  constitue pas une mise à jour installable. Le paquet attendu est
+  `aquahub-application_X.Y.Z_amd64.deb` ; il remplace uniquement AquaHub sur
+  un poste déjà initialisé. Le téléchargement est vérifié, puis
+  l’installation nécessite une confirmation et l’autorisation système.
+- **Bundle Aqua Hub** concerne les services et configurations du fournisseur.
+  Son URL et ses accès restent distincts. Un jeton de déploiement Git et
+  registre Docker ne donne pas accès à l’API des Releases GitLab. La procédure
+  fournisseur Git + registre reste à qualifier.
+
+Le canal applicatif vérifie le SHA-256 fourni dans les métadonnées GitHub
+reçues par HTTPS et les champs du paquet Debian. Il ne possède pas encore
+une signature d’éditeur indépendante de GitHub. Aucune Release publique ni
+installation complète publique qualifiée n’est annoncée par ces sources.
+Voir les [notes de version](CHANGELOG.md) et la
+[procédure de publication](docs/PUBLICATION.txt).
 
 Le constructeur actuel produit un kit d’installation complet à partir d’un
 payload externe. Un kit contenant des clés ou des configurations client reste

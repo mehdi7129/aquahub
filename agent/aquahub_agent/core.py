@@ -104,6 +104,9 @@ class Application:
             raise ApiError("invalid_params", "Les paramètres doivent être un objet JSON.")
         handler, mutation = self._handlers[method]
         self.policy.authorize(context, mutation)
+        application_update = getattr(self, "app_updates", None)
+        if mutation and application_update is not None and method != "app_updates.install" and application_update.installation_pending():
+            raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
         key = context.idempotency_key
         if key is not None and (not isinstance(key, str) or not 1 <= len(key) <= 128):
             raise ApiError("invalid_params", "La clé d’opération doit contenir de 1 à 128 caractères.")
@@ -326,6 +329,12 @@ class Application:
             raise ApiError("busy", "Une opération est déjà en cours. Attendre sa fin avant de continuer.")
         maintenance_fd = None
         try:
+            # A request may have passed dispatch just before an application
+            # upgrade was scheduled. Fence it again under the same mutex used
+            # by that scheduling operation before starting any work.
+            application_update = getattr(self, "app_updates", None)
+            if application_update is not None and application_update.installation_pending():
+                raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
             maintenance_fd = os.open(self._maintenance_path, os.O_RDWR | os.O_NOFOLLOW)
             try:
                 fcntl.flock(maintenance_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
@@ -354,6 +363,7 @@ class Application:
         job_id = job["id"]
         service = job["target"] if job["target"] in SERVICES else None
         try:
+            self._thread_context.job_id = job_id
             self.store.set_job(job_id, "running")
             result = work()
             self.store.set_job(job_id, "succeeded", result=result)
@@ -365,11 +375,37 @@ class Application:
             self.store.set_job(job_id, "failed", error={"code": "internal_error", "message": "L’opération a échoué. Vérifier l’état réel avant de relancer."})
             self.store.event("job_failed", f"Erreur interne pendant {job['kind']}.", service=service, severity="error", details={"job_id": job_id})
         finally:
+            self._thread_context.job_id = None
             if maintenance_fd is not None:
                 os.close(maintenance_fd)
             self._mutation_lock.release()
             with self._threads_lock:
                 self._threads.discard(threading.current_thread())
+
+    def report_progress(self, progress: dict):
+        """Report work observed by the current job; this is not a public RPC.
+
+        A blocked operation keeps its last completed milestone. In particular,
+        polling and elapsed time must never fabricate completion percentages.
+        """
+        job_id = getattr(self._thread_context, "job_id", None)
+        if job_id is None:
+            raise RuntimeError("Progress may only be reported inside a job worker")
+        if not isinstance(progress, dict) or set(progress) - {"phase", "label", "completed", "total", "percent", "indeterminate", "detail"}:
+            raise ValueError("Invalid job progress")
+        for key in ("phase", "label"):
+            if not isinstance(progress.get(key), str) or not 1 <= len(progress[key]) <= 500:
+                raise ValueError("Invalid progress label")
+        completed, total, percent = (progress.get(key) for key in ("completed", "total", "percent"))
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in (completed, total, percent)):
+            raise ValueError("Progress counters must be integers")
+        if not 0 <= completed <= total or total <= 0 or percent != completed * 100 // total:
+            raise ValueError("Progress percentage must match observed counters")
+        if "indeterminate" in progress and not isinstance(progress["indeterminate"], bool):
+            raise ValueError("Invalid progress wait state")
+        if "detail" in progress and (not isinstance(progress["detail"], str) or len(progress["detail"]) > 1000):
+            raise ValueError("Invalid progress detail")
+        self.store.set_job_progress(job_id, progress)
 
     def _settings(self, params, context):
         self._check_keys(params, ())

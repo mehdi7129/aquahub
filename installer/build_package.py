@@ -112,7 +112,7 @@ def compile_binaries(package: Path):
         (library/filename).chmod(0o755)
 
 
-def populate(package: Path, payload: Path, version: str, info: dict):
+def populate(package: Path, payload: Path | None, version: str, info: dict, *, application_only=False):
     compile_binaries(package)
     copy_sources(ROOT/"agent", package/"usr/lib/aquahub/agent")
     copy_sources(ROOT/"desktop", package/"usr/lib/aquahub/desktop")
@@ -125,6 +125,11 @@ def populate(package: Path, payload: Path, version: str, info: dict):
         raise ValueError("installer/finish.py est requis avant construction.")
     finish_source = re.sub(r'^VERSION = "[^"]+"', 'VERSION = ' + json.dumps(version), finish.read_text(), flags=re.M)
     write(package/"usr/lib/aquahub/installer/finish.py", finish_source)
+    upgrade_helper = ROOT/"installer/application_upgrade.py"
+    if application_only and not upgrade_helper.is_file():
+        raise ValueError("L’assistant indépendant de mise à jour de l’application est requis.")
+    if upgrade_helper.is_file():
+        write(package/"usr/lib/aquahub/application-upgrade.py", upgrade_helper.read_text())
     for filename in ("index.html", "app.js", "styles.css"):
         source = ROOT/"frontend/dist"/filename
         if not source.is_file():
@@ -133,28 +138,29 @@ def populate(package: Path, payload: Path, version: str, info: dict):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
         destination.chmod(0o644)
-    offline = package/"usr/share/aquahub/offline"
-    shutil.copytree(payload, offline)
-    offline.chmod(0o755)
-    for path in offline.rglob("*"):
-        relative = path.relative_to(offline)
-        if path.is_dir():
-            path.chmod(0o755)
-        else:
-            public = relative.parts[0] == "repository" or relative.as_posix() in {"repo-key.gpg", "package-list.txt", "SHA256SUMS"}
-            path.chmod(0o644 if public else 0o600)
+    if not application_only:
+        offline = package/"usr/share/aquahub/offline"
+        shutil.copytree(payload, offline)
+        offline.chmod(0o755)
+        for path in offline.rglob("*"):
+            relative = path.relative_to(offline)
+            if path.is_dir():
+                path.chmod(0o755)
+            else:
+                public = relative.parts[0] == "repository" or relative.as_posix() in {"repo-key.gpg", "package-list.txt", "SHA256SUMS"}
+                path.chmod(0o644 if public else 0o600)
     write(package/"usr/bin/aquahub", """#!/bin/sh
 if [ "${1-}" = "--setup" ]; then
     shift
     exec /usr/lib/aquahub/aquahub-bootstrap "$@"
 fi
-if [ ! -f /var/lib/aquahub/setup.complete ] || [ "$(cat /var/lib/aquahub/setup.complete)" != "__VERSION__" ]; then
+if [ ! -f /var/lib/aquahub/setup.complete ]; then
     exec /usr/lib/aquahub/aquahub-bootstrap "$@"
 fi
 export PYTHONPATH=/usr/lib/aquahub/desktop:/usr/lib/aquahub/agent
 export PYTHONDONTWRITEBYTECODE=1
 exec /usr/bin/python3 -m aquahub_desktop "$@"
-""".replace('__VERSION__',version), 0o755)
+""", 0o755)
     write(package/"usr/share/applications/com.aquadrone.aquahub.desktop", """[Desktop Entry]
 Type=Application
 Name=AquaHub
@@ -207,17 +213,23 @@ the license and source-distribution obligations for every included component.
 </policyconfig>
 """)
     installed_size = (sum(path.stat().st_size for path in package.rglob("*") if path.is_file())+1023)//1024
+    dependencies = "libc6 (>= 2.41), libgtk-4-1 (>= 4.18)"
+    description = " Contains a signed offline runtime repository and supplier payload."
+    if application_only:
+        dependencies += ", python3 (>= 3.13), python3-gi, python3-cairo, python3-gi-cairo, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, ca-certificates, openssh-client, iproute2, polkitd, pkexec"
+        description = " Application-only update; preserves the existing offline kit and supplier installation."
     write(package/"DEBIAN/control", f"""Package: aquahub-setup
 Version: {version}
 Architecture: amd64
 Maintainer: AquaHub Development <support@localhost>
 Section: admin
 Priority: optional
-Depends: libc6 (>= 2.41), libgtk-4-1 (>= 4.18)
+Depends: {dependencies}
+X-AquaHub-Update: {'application-only' if application_only else 'offline-kit'}
 Installed-Size: {installed_size}
-Description: AquaHub offline setup and desktop application (preproduction)
+Description: AquaHub desktop application and local maintenance (preproduction)
  Local graphical supervision and maintenance of Aqua Hub services.
- Contains a signed offline runtime repository and supplier payload.
+{description}
  Qualification is required before commercial distribution.
 """)
     write(package/"DEBIAN/postinst", """#!/bin/sh
@@ -236,15 +248,31 @@ fi
 exit 0
 """, 0o755)
     guard_source=(ROOT/'installer/upgrade_guard.py').read_text()
+    preservation = ''
+    prerequisite = ''
+    if application_only:
+        prerequisite = '''
+if [ ! -f /var/lib/aquahub/setup.complete ]; then
+    echo "AquaHub : ce paquet met à jour une installation existante. Utilisez le kit complet pour la première installation." >&2
+    exit 1
+fi
+'''
+        preservation = '''
+/usr/bin/python3 -I - <<'AQUAHUB_PRESERVE_OFFLINE_KIT'
+'''+(ROOT/'installer/preserve_payload.py').read_text()+'''
+AQUAHUB_PRESERVE_OFFLINE_KIT
+'''
     write(package/'DEBIAN/preinst', '''#!/bin/sh
 set -e
 case "${1-}" in
  upgrade|install)
+'''+prerequisite+'''
  if [ -f /var/lib/aquahub/setup.complete ] && [ -x /usr/bin/python3 ]; then
  /usr/bin/python3 -I - <<'AQUAHUB_UPGRADE_GUARD'
 '''+guard_source+'''
 AQUAHUB_UPGRADE_GUARD
- fi ;;
+ fi
+'''+preservation+''' ;;
 esac
 exit 0
 ''', 0o755)
@@ -274,7 +302,7 @@ exit 0
 """, 0o755)
 
 
-def build(payload: Path, output: Path, *, version="0.1.0", private_kit=False) -> dict:
+def build(payload: Path | None, output: Path, *, version="0.1.0", private_kit=False, application_only=False) -> dict:
     if not VERSION.fullmatch(version):
         raise ValueError("Numéro de version invalide.")
     if subprocess.check_output(["dpkg", "--print-architecture"], text=True).strip() != "amd64":
@@ -282,7 +310,11 @@ def build(payload: Path, output: Path, *, version="0.1.0", private_kit=False) ->
     platform=dict(row.split('=',1) for row in Path('/etc/os-release').read_text().splitlines() if '=' in row)
     if platform.get('ID','').strip('"')!='debian' or platform.get('VERSION_ID','').strip('"')!='13':
         raise ValueError("Construire ce paquet sur Debian 13 amd64.")
-    info = validate_payload(payload, private_kit)
+    if application_only and (payload is not None or private_kit):
+        raise ValueError("Une mise à jour de l’application ne doit inclure aucun payload ni kit privé.")
+    if not application_only and payload is None:
+        raise ValueError("Le kit complet requiert --payload ; utiliser --application-only pour une mise à jour de l’application.")
+    info = {"private": False} if application_only else validate_payload(payload, private_kit)
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -290,7 +322,7 @@ def build(payload: Path, output: Path, *, version="0.1.0", private_kit=False) ->
     with tempfile.TemporaryDirectory(prefix=".aquahub-package-", dir=output.parent) as directory:
         package = Path(directory)/"root"
         package.mkdir()
-        populate(package,payload,version,info)
+        populate(package,payload,version,info,application_only=application_only)
         unpublished=Path(directory)/'aquahub-setup.deb'
         subprocess.run(["dpkg-deb","--build","--root-owner-group","--threads-max=2","-Zzstd","-z3",str(package),str(unpublished)],check=True)
         unpublished.chmod(0o600 if info["private"] else 0o644)
@@ -298,18 +330,19 @@ def build(payload: Path, output: Path, *, version="0.1.0", private_kit=False) ->
         # concurrent build. The staging directory is private and on this disk.
         os.link(unpublished,output)
     return {"path":str(output),"sha256":digest(output),"bytes":output.stat().st_size,
-            "version":version,"private":info["private"],"stage":"preproduction"}
+            "version":version,"private":info["private"],"kind":"application" if application_only else "offline-kit","stage":"preproduction"}
 
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--payload",type=Path,required=True)
+    parser.add_argument("--payload",type=Path)
     parser.add_argument("--output",type=Path,required=True)
     parser.add_argument("--version",default="0.1.0")
     parser.add_argument("--private-kit",action="store_true",help="Kit local contenant des configurations privées, non redistribuable")
+    parser.add_argument("--application-only",action="store_true",help="Mise à jour publique de l’application, sans bundle ni images Docker")
     args=parser.parse_args(argv)
     try:
-        print(json.dumps(build(args.payload,args.output,version=args.version,private_kit=args.private_kit),ensure_ascii=False,indent=2))
+        print(json.dumps(build(args.payload,args.output,version=args.version,private_kit=args.private_kit,application_only=args.application_only),ensure_ascii=False,indent=2))
     except (ValueError,OSError,subprocess.CalledProcessError,tarfile.TarError) as error:
         parser.exit(1,f"AquaHub : construction refusée : {error}\n")
 

@@ -1,4 +1,4 @@
-import type { Drone, HubStatus, Job, Preflight, Service, Inspection } from './types';
+import type { Drone, HubStatus, Job, Preflight, Service, Inspection, JobProgress } from './types';
 
 export function escape(value: unknown): string { return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!)); }
 export function plainLog(text: string): string { return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').slice(-200000); }
@@ -44,4 +44,30 @@ export class ActionGate {
   private pending = false;
   get busy() { return this.pending; }
   async run<T>(operation: () => Promise<T>): Promise<T | undefined> { if (this.pending) return undefined; this.pending = true; try { return await operation(); } finally { this.pending = false; } }
+}
+
+export function jobLabel(job: Job): string {
+  const droneKind = ['drone.configure', 'drone_configure', 'configure_drone', 'configure'].includes(job.kind ?? '');
+  const target = String(job.target ?? '');
+  const droneNumber = target.match(/^(?:Aqua_Drone_)?([1-9][0-9]*)$/i)?.[1];
+  if (droneKind && droneNumber) return `Configuration de Aqua_Drone_${droneNumber}`;
+  return job.label ?? ({ restart: 'Redémarrage du service', service_restart: 'Redémarrage du service', 'service.restart': 'Redémarrage du service', 'portainer.restart': 'Relance de Portainer', 'portainer.initialize': 'Initialisation Portainer', 'app.download': 'Téléchargement d’AquaHub', 'app.install': 'Mise à jour de l’application AquaHub', 'app_updates.download': 'Téléchargement d’AquaHub', 'app_updates.install': 'Mise à jour de l’application AquaHub', download: 'Téléchargement de la livraison', update: 'Installation de la livraison', rollback: 'Restauration de la livraison', drone_configure: 'Configuration Aqua_Drone', configure_drone: 'Configuration Aqua_Drone', configure: 'Configuration Aqua_Drone' } as Record<string, string>)[job.kind ?? ''] ?? 'Tâche de maintenance';
+}
+export function jobProgress(job: Job): JobProgress {
+  const progress = job.progress;
+  if (typeof progress === 'number' && Number.isFinite(progress)) return { percent: Math.max(0, Math.min(100, progress)), indeterminate: false };
+  if (progress && typeof progress === 'object') {
+    const percent = typeof progress.percent === 'number' && Number.isFinite(progress.percent) ? Math.max(0, Math.min(100, progress.percent)) : undefined;
+    return { ...progress, percent, indeterminate: progress.indeterminate === true || percent === undefined };
+  }
+  return { indeterminate: true };
+}
+
+export function progressCaption(progress: JobProgress): string {
+  if (!Number.isSafeInteger(progress.completed) || !Number.isSafeInteger(progress.total) || Number(progress.total) <= 0) return '';
+  if (progress.phase === 'download') {
+    const size = (bytes: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
+    return `${size(Number(progress.completed))} / ${size(Number(progress.total))} Mo reçus`;
+  }
+  return `${progress.completed}/${progress.total} étapes validées`;
 }

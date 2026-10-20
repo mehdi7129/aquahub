@@ -30,7 +30,7 @@ def main(argv=None):
         app = Application(Config(socket_path=args.socket, state_dir=args.state_dir,
                                  bundle_path=args.bundle, docker_context=args.docker_context,
                                  allow_uid=args.allow_uid, no_poll=args.no_poll))
-        for name in ("drone", "updates", "portainer"):
+        for name in ("drone", "updates", "portainer", "app_updates"):
             try:
                 module = importlib.import_module(f"aquahub_agent.{name}")
             except ModuleNotFoundError as error:

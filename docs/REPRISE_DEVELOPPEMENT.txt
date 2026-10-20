@@ -1,5 +1,5 @@
 AquaHub — reprendre le développement
-Référence : préproduction 0.1.2, publication initiale des sources
+Référence : préproduction 0.2.0
 
 1. Commencer ici
 
@@ -109,8 +109,12 @@ Docker natif : docker.py ; bootstrap du compte Portainer : portainer.py.
 Configuration Aqua_Drones : drone.py ; archivage d’incidents : health_history.py.
 Historique SQLite : store.py ; comparaisons réseau : network.py.
 Archives/mises à jour du bundle : updates.py et image_identity.py.
+Mises à jour de l’application : app_updates.py ; installation indépendante
+dans installer/application_upgrade.py. Ces deux canaux restent séparés.
 Paquet hors ligne : installer/build_package.py, bootstrap.c, setup_helper.c,
-finish.py et upgrade_guard.py.
+finish.py et upgrade_guard.py. Le mode --application-only construit un
+petit paquet de mise à niveau sans payload fournisseur ; consulter
+PUBLICATION.txt pour son contrat et ses préconditions.
 
 8. Ajouter une action sans contourner les contrôles
 
@@ -144,12 +148,40 @@ une nouvelle qualification ; changer une empreinte seule ne suffit pas.
 
 Le réglage de source Git actuel concerne les Releases d’un bundle compatible.
 Il ne met pas AquaHub à jour et ne réalise pas un flux fournisseur Git + registre.
-Le bouton de mise à jour de l’application est un chantier futur distinct.
+Le canal app_updates est implémenté séparément pour les Releases publiques
+fixes de mehdi7129/aquahub ; il ne clone ni ne lance un dépôt Git. Voir
+API_ET_DONNEES.txt pour ses paramètres et son suivi d’installation séparé
+des tâches génériques. Un poste doit déjà être initialisé pour utiliser
+le paquet application-only. Aucune Release publique n’est encore annoncée.
 
 Les trois services configurant le réseau restent protégés. La présence d’un
 conteneur running et les deux seules sondes du bundle ne valident pas la
-préparation physique des drones. Les contrôles manuels restent manuels.
+préparation physique des drones. Les contrôles manuels ne sont pas
+validés automatiquement.
 
 Les recettes réelles initiales ont été réalisées sur un banc privé. Leurs
 identités, configurations et résultats bruts ne sont pas distribués ici.
 Reproduire les vérifications sur son propre banc avant de publier un binaire.
+
+11. Reprendre la version 0.2.0
+
+Lire CHANGELOG.md. La progression de configuration est persistée dans la
+tâche sous forme d’un objet progress : phase, label, completed, total,
+percent et indeterminate. Ses douze jalons reposent sur des observations ;
+le temps écoulé n’augmente pas le pourcentage. Pendant le redémarrage,
+la barre peut attendre sans que cela signifie une panne. Les cinq rappels
+manual_checklist viennent de drone.py et ne valident aucun matériel.
+
+Le téléchargement d’AquaHub utilise également progress, avec phase=download
+et completed/total en octets ; l’interface doit afficher des volumes reçus,
+pas un nombre d’étapes. L’installation applicative renvoie scheduled puis
+se suit avec app_updates.status, car l’agent s’arrête pendant son remplacement.
+Après résultat installed, fermer puis rouvrir la fenêtre pour charger
+les nouvelles ressources frontend. Ne jamais déduire le succès d’une simple
+perte de connexion ou programmer automatiquement une seconde installation.
+
+Le helper système indépendant n’a pas de paramètre fourni par le renderer.
+Les tests de ses refus et des paquets sont indispensables avant de publier
+un binaire. Une somme SHA-256 GitHub/HTTPS est le contrôle actuel ; elle
+n’est pas une signature d’éditeur indépendante. La qualification réelle
+d’un nouveau paquet reste distincte des tests de fixtures.

@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Publication initiale des sources, préproduction 0.1.2
+Préproduction 0.2.0 — état du code et qualification à poursuivre
 
 Développé
 
@@ -8,6 +8,17 @@ latérale ; thèmes clair/sombre ; vues supervision, mises à jour, Aqua_Drones,
 historique et réglages. Supervision Docker native, logs, incidents persistants,
 tâches sérialisées, configuration d’une cible vérifiée, préparation d’archives,
 dialogues privés et assistant hors ligne sont présents dans les sources.
+
+La version 0.2.0 ajoute le canal de mise à jour de l’application depuis les
+Releases GitHub publiques fixes, son paquet application-only et un helper
+indépendant. Recherche, téléchargement vérifié, confirmation, installation
+et résultat persistant sont implémentés. Les sources et tests ne signifient
+pas qu’une Release publique ou un kit complet client sont déjà disponibles.
+
+Le suivi de configuration nomme l’appareil et expose douze jalons réellement
+observés. Les cinq contrôles manuels ont une aide détaillée, utilisable au
+survol, au clavier et au clic. Le travail reste séquentiel pour conserver
+la cohérence de la configuration partagée du hub.
 
 Le pilote actuel connaît huit services. Deux ont un healthcheck ; six sont
 sans sonde. Les relances de net_setup, wireguard et gcs_reactor sont bloquées.
@@ -26,6 +37,12 @@ L’export public est testé séparément. Les tests génériques n’exigent pa
 bundle, les identifiants ou les résultats privés. Les préconditions et les
 tests ignorés sont décrits dans TESTS.txt.
 
+La recette 0.2.0 a aussi validé une mise à niveau réelle en VM et sur le poste
+existant, la conservation du kit hors ligne et sa réparation. Le parcours
+gestionnaire → helper a installé un paquet de recette avec source HTTP
+synthétique et installation système réelle. Les services du fournisseur et
+le réseau sont restés identiques. Le détail et les limites sont dans TESTS.txt.
+
 Priorité 1 : terminer le contrat fournisseur
 
 Obtenir et qualifier une procédure de mise à jour d’un Hub déjà installé,
@@ -40,7 +57,8 @@ La recherche de Releases GitHub/GitLab n’est pas cet adaptateur.
 
 Priorité 2 : créer une livraison publique propre
 
-Séparer le paquet de l’application et le kit complet hors ligne. Préparer
+La séparation du paquet applicatif et du kit hors ligne est implémentée.
+Qualifier et publier les artefacts issus de cette séparation. Préparer
 un payload redistribuable sans secret du banc ni donnée client. Finaliser
 les notices des composants et la signature de publication. Vérifier depuis
 une VM GNOME propre le parcours graphique complet, les autorisations,
@@ -51,14 +69,20 @@ présence de ressources Docker tierces et cohabitation Docker Desktop. Garder
 le moteur natif explicite. Le code contient des refus et simulations ; la
 recette d’un artefact livré doit aussi observer les effets réels.
 
-Priorité 3 : mise à jour d’AquaHub depuis ce dépôt
+Priorité 3 : durcir et qualifier le canal applicatif
 
-Ce bouton n’existe pas encore. Le développer séparément des mises à jour du
-bundle et de la configuration des drones. Prévoir découverte de versions,
-compatibilité OS/architecture, notes, téléchargement contrôlé, signature,
-confirmation, installation privilégiée et retour arrière. Conserver un
-parcours hors ligne. Ne pas exécuter un ZIP de sources téléchargé comme une
-mise à jour applicative.
+Le bouton est implémenté dans la 0.2.0. Le contrat accepte les versions
+stables X.Y.Z, les métadonnées GitHub et le petit paquet applicatif marqué,
+pas une branche Git ni un ZIP de sources. Le SHA-256 publié par GitHub et
+HTTPS sont la référence actuelle ; il reste à décider et déployer une
+signature d’éditeur indépendante, sa gestion de clés et leur rotation.
+
+La recette VM de mise à niveau doit vérifier le paquet effectivement livré,
+l’arrêt/redémarrage de l’agent et la conservation du bundle et des données.
+Les tests unitaires et les fixtures d’interface ne suffisent pas. Étendre
+ensuite les scénarios de panne, définir une restauration applicative et
+qualifier un parcours de mise à niveau hors ligne. Ne pas annoncer ces
+chantiers comme couverts par le rollback d’images du bundle.
 
 Priorité 4 : qualification de flotte et exploitation
 

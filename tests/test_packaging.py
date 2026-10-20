@@ -41,6 +41,22 @@ def fixture_payload(base:Path,private=False)->Path:
     return payload
 
 
+def fixture_source(base:Path)->Path:
+    source=base/'source'
+    (source/'installer').mkdir(parents=True)
+    shutil.copyfile(ROOT/'LICENSE',source/'LICENSE')
+    for filename in ('bootstrap.c','setup_helper.c','finish.py','upgrade_guard.py','preserve_payload.py','application_upgrade.py'):
+        shutil.copyfile(ROOT/'installer'/filename,source/'installer'/filename)
+    for module in ('agent','desktop'):
+        package=source/module/('aquahub_agent' if module=='agent' else 'aquahub_desktop')
+        package.mkdir(parents=True)
+        (package/'__init__.py').write_text('__version__ = "0.0.0"\n')
+    (source/'frontend/dist').mkdir(parents=True)
+    for filename in ('index.html','app.js','styles.css'):
+        (source/'frontend/dist'/filename).write_text('fixture')
+    return source
+
+
 class PayloadValidationTests(unittest.TestCase):
     def setUp(self):
         self.directory=tempfile.TemporaryDirectory()
@@ -96,6 +112,49 @@ class PayloadValidationTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("cc") and shutil.which("pkg-config") and shutil.which("dpkg-deb"),"Debian build tools unavailable")
 class DebianPackageTests(unittest.TestCase):
+    def test_public_application_update_has_no_supplier_payload_and_preserves_setup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory)
+            output=base/'aquahub-setup_0.2.0_amd64.deb'
+            source=fixture_source(base)
+            with patch.object(builder,'ROOT',source):
+                result=builder.build(None,output,version='0.2.0',application_only=True)
+            self.assertFalse(result['private'])
+            self.assertEqual(result['kind'],'application')
+            self.assertEqual(output.stat().st_mode & 0o777,0o644)
+            self.assertLess(result['bytes'],20*1024**2)
+            unpacked=base/'unpacked'
+            subprocess.run(['dpkg-deb','-x',str(output),str(unpacked)],check=True)
+            self.assertFalse((unpacked/'usr/share/aquahub/offline').exists())
+            self.assertFalse(list(unpacked.rglob('*.tar.gz')))
+            self.assertTrue((unpacked/'usr/lib/aquahub/application-upgrade.py').is_file())
+            launcher=(unpacked/'usr/bin/aquahub').read_text()
+            self.assertIn('if [ ! -f /var/lib/aquahub/setup.complete ]; then',launcher)
+            self.assertNotIn('$(cat /var/lib/aquahub/setup.complete)',launcher)
+            self.assertIn('__version__ = "0.2.0"',(unpacked/'usr/lib/aquahub/agent/aquahub_agent/__init__.py').read_text())
+            kind=subprocess.check_output(['dpkg-deb','-f',str(output),'X-AquaHub-Update'],text=True).strip()
+            self.assertEqual(kind,'application-only')
+            dependencies=subprocess.check_output(['dpkg-deb','-f',str(output),'Depends'],text=True)
+            for dependency in ('python3-gi','gir1.2-gtk-3.0','gir1.2-webkit2-4.1','pkexec'):
+                self.assertIn(dependency,dependencies)
+            self.assertNotIn('docker',dependencies)
+            control=base/'control'
+            subprocess.run(['dpkg-deb','-e',str(output),str(control)],check=True)
+            preinst=(control/'preinst').read_text()
+            self.assertIn('AQUAHUB_PRESERVE_OFFLINE_KIT',preinst)
+            self.assertIn("Path('/var/lib/aquahub/offline')",preinst)
+            self.assertLess(preinst.index('AQUAHUB_UPGRADE_GUARD'),preinst.index('AQUAHUB_PRESERVE_OFFLINE_KIT'))
+            for name in ('preinst','postinst','prerm','postrm'):
+                subprocess.run(['sh','-n',str(control/name)],check=True)
+
+    def test_public_application_update_cannot_accidentally_embed_private_kit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory)
+            with self.assertRaisesRegex(ValueError,'aucun payload'):
+                builder.build(base/'payload',base/'no.deb',version='0.2.0',application_only=True)
+            with self.assertRaisesRegex(ValueError,'aucun payload'):
+                builder.build(None,base/'no.deb',version='0.2.0',application_only=True,private_kit=True)
+
     def test_build_extract_permissions_and_maintainer_script_scope(self):
         with tempfile.TemporaryDirectory() as directory:
             base=Path(directory)

@@ -502,6 +502,49 @@ class GitHubTests(unittest.TestCase):
             with self.subTest(target=target), self.assertRaises(ApiError):
                 GitLabNoRedirect().redirect_request(request, None, 302, "Found", {}, target)
 
+    def test_gitlab_hidden_project_explains_missing_api_credentials(self):
+        self.manager.settings({"repository_url": "https://gitlab.com/group/project"})
+        self.manager.gitlab_opener = SimpleNamespace(open=unittest.mock.Mock(side_effect=
+            urllib.error.HTTPError("https://gitlab.com/api/v4/projects/group%2Fproject/releases", 404, "Not Found", {}, None)))
+        with self.assertRaises(ApiError) as caught:
+            self.manager.check({})
+        self.assertEqual(caught.exception.code, "gitlab_http_error")
+        self.assertIn("Aucun jeton API GitLab", caught.exception.message)
+        self.assertIn("distinctes du dépôt Git", caught.exception.message)
+
+    def test_gitlab_deployment_token_error_distinguishes_git_registry_from_releases(self):
+        secret = "gldt-synthetic-deployment-token"
+        self.manager.settings({"repository_url": "https://gitlab.com/group/project", "token": secret})
+        self.manager.gitlab_opener = SimpleNamespace(open=unittest.mock.Mock(side_effect=
+            urllib.error.HTTPError("https://gitlab.com/api/v4/projects/group%2Fproject/releases", 401, "Unauthorized", {}, None)))
+        with self.assertRaises(ApiError) as caught:
+            self.manager.check({})
+        self.assertIn("jeton de déploiement", caught.exception.message)
+        self.assertIn("pas à l’API des Releases", caught.exception.message)
+        self.assertIn("archive locale", caught.exception.message)
+        self.assertNotIn(secret, caught.exception.message)
+
+    def test_gitlab_hidden_project_with_api_token_does_not_claim_no_releases(self):
+        secret = "synthetic-api-token"
+        self.manager.settings({"repository_url": "https://gitlab.com/group/project", "token": secret})
+        self.manager.gitlab_opener = SimpleNamespace(open=unittest.mock.Mock(side_effect=
+            urllib.error.HTTPError("https://gitlab.com/api/v4/projects/group%2Fproject/releases", 404, "Not Found", {}, None)))
+        with self.assertRaises(ApiError) as caught:
+            self.manager.check({})
+        self.assertIn("ne permet pas de voir ce projet", caught.exception.message)
+        self.assertNotIn("Aucun jeton", caught.exception.message)
+        self.assertNotIn("aucune Release", caught.exception.message)
+        self.assertNotIn(secret, caught.exception.message)
+
+    def test_gitlab_accessible_project_without_releases_is_an_explicit_success(self):
+        self.manager.settings({"repository_url": "https://gitlab.com/group/project"})
+        with patch.object(self.manager, "_gitlab", return_value=[]):
+            result = self.manager.check({})
+        self.assertTrue(result["configured"])
+        self.assertEqual(result["releases"], [])
+        self.assertIn("Connexion à l’API GitLab réussie", result["message"])
+        self.assertIn("sans Release", result["message"])
+
     def test_gitlab_pagination_and_api_targets_are_bounded(self):
         self.manager.settings({"repository_url": "https://gitlab.com/group/project"})
         with patch.object(self.manager, "_gitlab", return_value=[{}] * 20) as get:

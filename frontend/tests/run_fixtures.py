@@ -25,6 +25,7 @@ class Handler(socketserver.StreamRequestHandler):
             result = {"ok": True}
         elif method == "fixture.stats":
             result = fixture
+        elif method == 'app_updates.status': result = {'current_version':'test-synthetique','repository':'https://github.com/mehdi7129/aquahub','available':False,'message':'Banc isolé.'}
         elif method == "app.version":
             result = {"version": "test-synthetique"}
         elif method == "status.get":

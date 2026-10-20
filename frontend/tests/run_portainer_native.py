@@ -32,6 +32,7 @@ class Handler(socketserver.StreamRequestHandler):
         elif method == 'jobs.get':
             # Prevent the native watcher from opening any browser on this host.
             result = {'id': 'portainer-native-fixture', 'status': 'failed', 'error': {'code': 'fixture_only', 'message': 'Banc synthétique : aucune action sur un Portainer réel.'}}
+        elif method == 'app_updates.status': result = {'current_version':'test-synthetique','repository':'https://github.com/mehdi7129/aquahub','available':False,'message':'Banc isolé.'}
         elif method == 'app.version': result = {'version': 'test-isole'}
         elif method == 'settings.get': result = {'github_url': ''}
         elif method == 'drones.list': result = {'drones': [], 'warnings': ['Banc de test isolé.']}

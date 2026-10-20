@@ -5,24 +5,36 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-1. Résultat vérifié pour cet export
+1. Résultat vérifié pour les sources 0.2.0
 
-La suite Python publique a découvert 185 tests : 180 ont été exécutés avec
+La suite Python publique a découvert 242 tests : 237 ont été exécutés avec
 succès et cinq ont été ignorés. Ces cinq cas sont les trois lectures Docker
 réelles, désactivées sans option, et les deux tests de contrat fournisseur,
-ignorés sans bundle local explicitement fourni. TypeScript et la construction
-frontend ont réussi après une installation npm propre. Les 16 tests de
-domaine JavaScript ont réussi.
+ignorés sans bundle local explicitement fourni. TypeScript, la construction
+frontend et les 19 tests de domaine JavaScript ont réussi.
 
-Les commandes natives de ce document ont aussi été vérifiées dans cet export :
-17 scénarios de pannes synthétiques, deux scénarios du dialogue Portainer et
-deux du dialogue d’accès à la source ont réussi sous Xvfb. Leurs sockets sont
-privées et temporaires ; ces 21 scénarios sont distincts des tests unitaires.
+Les cinq tests optionnels ont aussi été exécutés séparément avec les
+préconditions du banc : trois lectures du moteur Docker réel et deux
+exécutions du script fournisseur sur transports interceptés ont réussi.
+Ces deux derniers cas n’ont pas configuré d’appareil physique.
 
-Ces nombres décrivent cet export et cette exécution, pas une promesse que
-chaque poste possède les outils de construction facultatifs. Ils ne prouvent
-ni une installation complète sur un poste vierge, ni une configuration physique
-de drone, ni la conformité d’une livraison fournisseur future.
+Les recettes graphiques natives ont vérifié séparément :
+  19 scénarios fonctionnels en mode démonstration ;
+  17 scénarios de panne avec socket synthétique ;
+  7 scénarios du canal applicatif avec socket synthétique ;
+  12 contrôles de disposition et clavier, à 100 % et 200 % ;
+  2 scénarios du dialogue GTK Portainer ;
+  2 scénarios du dialogue GTK d’accès à la source.
+
+Les fixtures restent privées, sans GitHub, Docker, installation de paquet ou
+configuration de drone réels. Leurs résultats ne qualifient pas l’ensemble
+du matériel ni la mise à niveau d’un paquet livré. Les preuves de VM et de
+banc, lorsqu’elles existent pour un artefact donné, sont consignées
+séparément et ne sont pas déduites de ces nombres.
+
+Ces résultats décrivent cette exécution des sources, pas une promesse que
+chaque poste possède les outils facultatifs. Ils ne prouvent ni une première
+installation complète, ni une flotte, ni une future livraison fournisseur.
 
 2. Préparation
 
@@ -71,6 +83,10 @@ Familles principales :
   test_drone_supplier.py : contrat du script externe sur transports simulés.
   test_health_history.py : captures de panne, persistance, quotas et expiration.
   test_updates.py : archives, manifestes, sources et scénarios de restauration.
+  test_app_updates.py : Releases publiques, métadonnées, intégrité, paquets,
+                        concurrence, préparations et reprise d’état interrompu.
+  test_application_upgrade.py : helper indépendant, droits, verrou, reprise
+                                de l’agent et vérification de version simulées.
   test_image_identity.py : identités Docker/OCI et rejets de contenus incohérents.
   test_portainer.py : premier compte, instance attendue et refus de remplacement.
   test_installer_finish.py : adoption/installation avec opérations simulées.
@@ -86,13 +102,15 @@ Familles principales :
   cd ..
 
 npm test construit les ressources frontend et le module de domaine avant
-d’exécuter les 16 tests Node. Un simple npm run build construit les ressources
+d’exécuter les 19 tests Node. Un simple npm run build construit les ressources
 sans les tests. TypeScript est vérifié séparément par npm run check ; esbuild
 ne remplace pas ce contrôle des types.
 
 Les tests de domaine couvrent état/santé, identité de cible, précontrôles,
 éligibilité des archives, verrou d’action, double clic, normalisation des URL,
-texte inerte, limites de logs et validation des réponses. Ils n’ont pas besoin
+texte inerte, limites de logs et validation des réponses. Ils distinguent
+également le nom du drone, la progression indéterminée et les unités d’un
+téléchargement de celles des étapes de configuration. Ils n’ont pas besoin
 de GTK, d’un navigateur, de Docker ou d’une connexion fournisseur.
 
 5. Recettes graphiques isolées
@@ -112,6 +130,16 @@ frontend/tests/ui-fixtures-result.json et ses données sous frontend/tests/.runt
 Les sockets des fixtures utilisent un dossier temporaire court sous /tmp,
 supprimé à la sortie, pour respecter la limite de longueur des chemins Unix.
 
+Mise à jour de l’application, avec backend synthétique :
+
+  python3 frontend/tests/run_updates_feedback.py
+
+Ce banc ne contacte pas GitHub et n’installe aucun .deb. Il vérifie la source
+applicative séparée du bundle, les erreurs de recherche, le téléchargement
+avant installation, l’annulation, la confirmation, les doubles actions,
+la perte/reprise de connexion à l’agent et les résultats installé ou échoué.
+Il vérifie aussi que les notes de version sont du texte inerte.
+
 Dialogue natif du premier compte Portainer, avec backend synthétique :
 
   xvfb-run -a python3 frontend/tests/run_portainer_native.py
@@ -125,7 +153,7 @@ isolé. Ils vérifient aussi que le renderer ne reçoit pas les secrets.
 
 Parcours fonctionnel en démonstration :
 
-  PYTHONPATH=desktop xvfb-run -a python3 -m aquahub_desktop --demo --no-agent --frontend frontend/dist --state-dir frontend/tests/.runtime/demo --test-script frontend/tests/ui-webkit.js --test-output frontend/tests/ui-webkit-result.json --quit-after 35
+  PYTHONPATH=desktop xvfb-run -a python3 -m aquahub_desktop --demo --no-agent --frontend frontend/dist --state-dir frontend/tests/.runtime/demo --test-script frontend/tests/ui-webkit.js --test-output frontend/tests/ui-webkit-result.json --quit-after 60
 
 Mise en page et vrai clavier XTest à 1366x768 :
 
@@ -135,6 +163,9 @@ Mise en page et vrai clavier XTest à 1366x768 :
 
 Les scripts écrivent leurs JSON et captures dans frontend/tests/. Les résultats
 doivent indiquer le mode demo ou fixture, et non une recette matérielle.
+Le parcours de démonstration vérifie la cible Aqua_Drone_N, ses jalons,
+l’attente indéterminée et le détail des cinq contrôles manuels. Voir aussi
+frontend/tests/README.txt pour les commandes et leurs limites.
 
 Les scripts ui-dark-capture.js et ui-theme-persistence.js peuvent être injectés
 avec --test-script pour vérifier deux fenêtres successives partageant le même
@@ -174,9 +205,9 @@ fixture ou --demo pour les travaux qui n’exigent pas le matériel.
 
 Les scripts et preuves privés de qualification du banc ne sont pas publiés.
 Ils peuvent contenir des configurations, captures ou identités propres au
-client. Leurs tests de garde dédiés ne font donc pas partie des 185 tests de
-cet export. Ne pas comparer ce nombre à celui d’une arborescence privée plus
-large sans tenir compte de cette différence de périmètre.
+client. Leurs outils de garde dédiés ne font pas nécessairement partie de
+la suite publique. Ne pas comparer le nombre de tests d’une arborescence
+privée à celui-ci sans vérifier leur périmètre.
 
 Une livraison exige séparément des essais sur VM jetable : installation
 graphique hors ligne, reprise après erreur, réinstallation, mise à niveau,
@@ -186,12 +217,45 @@ mises à jour d’images doivent être essayées sur moteur réel avec restaurat
 manuelle et automatique. Les perturbations telles que manque de disque ou
 coupure électrique ont leurs propres scénarios ; un mock ne les valide pas.
 
-La configuration d’un appareil physique, les contrôles matériels et la flotte
+La configuration d’un appareil physique, les contrôles manuels et la flotte
 de plusieurs appareils exigent un banc autorisé. Un scan réussi ou une réponse
 SSH ne suffisent pas. Le contrat réseau et l’absence de modifications des
 paramètres existants doivent être contrôlés avant et après toute opération.
 
-8. Ajouter et maintenir un test
+8. Recette du paquet applicatif 0.2.0
+
+Artefact testé : aquahub-application_0.2.0_amd64.deb, 139192 octets.
+SHA-256 : 77d59da99b3dc81817196b87d1d2584661c583bf73f85e15263d48e29226f539.
+
+En VM Debian hors ligne, la mise à niveau 0.1.2 → 0.2.0 a conservé le kit,
+les configurations du fournisseur, son unité de démarrage, les neuf
+conteneurs et les adresses/routes observées. Le kit est transféré vers
+/var/lib/aquahub/offline et reste disponible pour la réparation. L’ancien
+marqueur de première installation ne force pas la réouverture de l’assistant.
+
+Une version 0.2.1 construite uniquement pour la recette a exercé le parcours
+complet gestionnaire → téléchargement → assistant indépendant → dpkg →
+redémarrage de l’agent. Les métadonnées et le transport HTTP étaient
+synthétiques ; le paquet Debian, les processus système et l’installation
+étaient réels. Aucune fausse Release publique n’a été créée. Le résultat
+installed et la conservation des configurations, conteneurs et du réseau
+ont été vérifiés. La réparation depuis le kit conservé a ensuite réussi,
+sans réinstaller de paquet ni redéployer le bundle.
+
+Sur le poste existant, le même paquet 0.2.0 est installé et l’agent est actif.
+Les quinze fichiers de configuration surveillés, les neuf conteneurs et le
+réseau normalisé sont identiques avant et après. Onze contrôles de lecture
+de l’interface installée ont réussi ; la lecture des réglages SSH a utilisé
+une autorisation de recette limitée au processus de test, supprimée ensuite.
+La recherche réelle sur GitHub a renvoyé l’absence de Release publique avec
+le message attendu, sans action d’installation.
+
+Cette recette ne valide pas une coupure électrique réelle, une flotte,
+une nouvelle livraison fournisseur ni une première installation à partir
+du petit paquet applicatif : celui-ci nécessite une installation initialisée.
+Les rapports bruts et données du banc restent privés.
+
+9. Ajouter et maintenir un test
 
 Tester une règle au niveau où elle peut être contournée : la validation UI
 n’exonère pas le handler agent. Pour un refus, vérifier qu’aucun transport

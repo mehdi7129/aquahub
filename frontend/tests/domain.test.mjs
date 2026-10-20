@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ActionGate, counts, escape, healthState, identifiedDrones, inspectionAllowed, isActive, jobSucceeded, normalizeRepository, plainLog, preflightAllowed, restartAllowed, rpcResultError, validateStatus } from './.runtime/domain.mjs';
+import { ActionGate, counts, escape, healthState, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobSucceeded, normalizeRepository, plainLog, preflightAllowed, progressCaption, restartAllowed, rpcResultError, validateStatus } from './.runtime/domain.mjs';
 
 const drone = { number: 5, name: 'Aqua_Drone_5', address: '192.168.205.2', reachable: true, identity_verified: false, configured: false, supported: true };
 const preflight = { preflight_id: 'p-5', number: 5, address: drone.address, allowed: true, checks: [{ label: 'Réseau', ok: true }] };
@@ -133,4 +133,25 @@ test('les profils du bundle ne sont pas comptés comme appareils réellement ide
 test('une réponse de supervision partielle est refusée avant de remplacer les données visibles', () => {
   for (const invalid of [null, {}, { services: null }, { services: [{ name: 'GCS' }] }, { services: [{ ...service, id: null }] }, { ...status, active_job: { status: 'running' } }]) assert.throws(() => validateStatus(invalid), /réponse de supervision est incomplète/);
   assert.equal(validateStatus(status), status);
+});
+
+
+test('la configuration nomme toujours le numéro de l’appareil de la tâche', () => {
+  assert.equal(jobLabel({id:'j', status:'running', kind:'configure_drone', target:'Aqua_Drone_5', label:'Configuration de Aqua_Drone'}), 'Configuration de Aqua_Drone_5');
+  assert.equal(jobLabel({id:'j', status:'running', kind:'configure_drone', target:'17'}), 'Configuration de Aqua_Drone_17');
+  assert.equal(jobLabel({id:'j', status:'running', kind:'service.restart', target:'Aqua_Drone_5', label:'GCS'}), 'GCS');
+});
+test('la progression reste indéterminée pendant une étape sans acquittement', () => {
+  assert.deepEqual(jobProgress({id:'j',status:'running'}), {indeterminate:true});
+  const stage=jobProgress({id:'j',status:'running',progress:{completed:5,total:12,percent:41,indeterminate:true,label:'Attente du redémarrage'}});
+  assert.equal(stage.indeterminate,true); assert.equal(stage.percent,41); assert.equal(stage.completed,5);
+  assert.equal(jobProgress({id:'j',status:'running',progress:Infinity}).indeterminate,true);
+  assert.equal(jobProgress({id:'j',status:'running',progress:120}).percent,100);
+  assert.equal(jobProgress({id:'j',status:'running',progress:{percent:NaN}}).indeterminate,true);
+});
+
+test('le téléchargement distingue les octets des étapes de configuration', () => {
+  assert.equal(progressCaption({phase:'download', completed:1024*1024,total:2*1024*1024}), '1 / 2 Mo reçus');
+  assert.equal(progressCaption({phase:'reboot',completed:7,total:12}), '7/12 étapes validées');
+  assert.equal(progressCaption({completed:0,total:0}), '');
 });

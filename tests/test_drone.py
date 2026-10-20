@@ -79,6 +79,10 @@ class App:
         self.config.state_dir.mkdir()
         self.config.bundle_path.mkdir()
         self.jobs = []
+        self.progress = []
+
+    def report_progress(self, progress):
+        self.progress.append(progress)
 
     def submit_job(self, kind, target, payload, work):
         self.jobs.append((kind, target, payload))
@@ -171,6 +175,14 @@ class DroneManagerTests(unittest.TestCase):
         self.assertTrue(all(drone["reachable"] is None for drone in result["drones"]))
         self.assertTrue(all(not drone["identity_verified"] and not drone["configured"] for drone in result["drones"]))
         self.assertEqual(result["drones"][4]["name"], "Aqua_Drone_5")
+        checklist = result["drones"][4]["manual_checklist"]
+        self.assertEqual(len(checklist), 5)
+        self.assertEqual(len({check["id"] for check in checklist}), 5)
+        self.assertIn("MAV_SYS_ID = 5", checklist[2]["details"])
+        self.assertIn("sans modifier", checklist[0]["details"])
+        self.assertIn("sans modifier", checklist[1]["details"])
+        self.assertIn("listener esc_status", checklist[4]["details"])
+        self.assertIn("MAV_SYS_ID = 6", result["drones"][5]["manual_checklist"][2]["details"])
 
     def test_scan_only_six_known_ssh_addresses_and_presence_is_not_identity(self):
         calls = []
@@ -196,6 +208,7 @@ class DroneManagerTests(unittest.TestCase):
         self.assertTrue(result["allowed"], result)
         self.assertEqual(result["identity"], IDENTITY)
         self.assertTrue(result["needs_identity_confirmation"])
+        self.assertEqual(result["manual_checklist"], self.manager.list()["drones"][4]["manual_checklist"])
         plan = self.manager.preflights[result["preflight_id"]]
         self.assertEqual(stat.S_IMODE(plan["stage"].stat().st_mode), 0o700)
         self.assertEqual(plan["remote"]["mqtt"], "192.0.2.10,192.0.2.11")
@@ -284,6 +297,14 @@ class DroneManagerTests(unittest.TestCase):
         self.assertTrue(output["result"]["reboot_verified"])
         self.assertTrue(output["result"]["ip_unchanged"])
         self.assertEqual(output["result"]["manual_skipped"], 5)
+        self.assertIn("Aqua_Drone_5", output["result"]["message"])
+        self.assertEqual(len(output["result"]["manual_checklist"]), 5)
+        progress = self.app.progress
+        self.assertEqual([value["completed"] for value in progress], [0, 1, 2, 9, 10, 10, 11, 12])
+        self.assertTrue(all(value["percent"] < 100 for value in progress[:-1]))
+        self.assertEqual(progress[-1]["percent"], 100)
+        self.assertFalse(progress[-1]["indeterminate"])
+        self.assertIn("Aqua_Drone_5", progress[-1]["label"])
         backup = self.manager.preflights[result["preflight_id"]]["stage"] / "drone-before.tar.gz"
         self.assertEqual(stat.S_IMODE(backup.stat().st_mode), 0o600)
         inventory = self.manager.list()["drones"][4]
@@ -343,6 +364,24 @@ class DroneManagerTests(unittest.TestCase):
         self.assertEqual(error.exception.code, "reboot_unverified")
         self.assertIn("IP et routes du drone", error.exception.message)
         self.assertFalse(self.manager.list()["drones"][4]["configured"])
+        self.assertLess(self.app.progress[-1]["percent"], 100)
+        self.assertTrue(self.app.progress[-1]["indeterminate"])
+
+    def test_supplier_progress_requires_exact_success_lines_in_order(self):
+        preflight = self.preflight()
+        plan = self.manager.preflights[preflight["preflight_id"]]
+        self.manager._supplier_progress(plan, "[hub] config.conf mavlink-router (IPv6 GCS + N drones)\n")
+        self.assertEqual(self.app.progress, [])
+        first = "  ✔ Hub — IPv6 GCS fixée (f::1) (fait)\n"
+        second = "  ✔ [hub] config.conf mavlink-router (IPv6 GCS + N drones) (fait)\n"
+        self.manager._supplier_progress(plan, second)
+        self.assertEqual(self.app.progress, [])  # no out-of-order inference
+        self.manager._supplier_progress(plan, first + second)
+        self.assertEqual([value["completed"] for value in self.app.progress], [3, 4])
+        self.manager._supplier_progress(plan, first + second)
+        self.assertEqual(len(self.app.progress), 2)  # cumulative output does not replay milestones
+        self.manager._supplier_progress(plan, first + second + "  ✔ [aqua 4] mavlink.conf → drone (fait)\n")
+        self.assertEqual(len(self.app.progress), 2)  # another drone never advances this target
 
     def test_changed_ssh_key_never_silently_reenrolled(self):
         key1 = base64.b64encode(b"synthetic-public-key-one").decode()

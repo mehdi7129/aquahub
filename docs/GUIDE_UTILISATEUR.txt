@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.1.2
+Préproduction 0.2.0
 
 1. Disponibilité et installation
 
@@ -67,6 +67,10 @@ extraits à 90 jours et 64 Mio au total. Ce n’est pas un archivage illimité.
 5. Portainer et outils du hub
 
 GCS, Fleet Controller et Portainer s’ouvrent dans le navigateur du poste.
+Portainer est la console avancée de Docker : conteneurs, images, volumes et
+journaux. Son compte administrateur protège cette console. Il n’est pas
+nécessaire pour les opérations courantes d’AquaHub ni pour consulter
+l’historique. Créer ce compte est utile si l’on souhaite utiliser Portainer.
 Sur un Portainer neuf, choisir Réglages, Portainer, Créer le compte initial.
 Le formulaire natif demande l’identifiant et un mot de passe confirmé. Un
 compte déjà présent n’est pas réinitialisé.
@@ -91,15 +95,72 @@ La configuration n’est disponible que si la cible, l’identité, les fichiers
 et le réseau sont compatibles. Confirmer ensuite l’identité physique avant
 de lancer le travail. Le drone peut redémarrer ; attendre son retour vérifié.
 
+Le suivi nomme toujours Aqua_Drone_N. Sa barre indique les douze jalons
+confirmés, avec un pourcentage fondé sur ce qui a réellement été vérifié.
+Pendant une étape longue ou le redémarrage, une barre d’attente peut rester
+sur le même pourcentage. Cela n’indique pas à lui seul une panne. Le résultat
+final attend le retour stable et les contrôles logiciels ; fermer la fenêtre
+n’arrête pas le travail.
+
+Configurer les appareils l’un après l’autre. Attendre la fin et vérifier le
+résultat du premier avant de sélectionner le suivant. La procédure utilise
+aussi une configuration partagée du hub : le travail parallèle n’est pas
+proposé et une seconde maintenance est bloquée pendant la première.
+
 Le numéro choisit les fichiers du bundle. AquaHub n’attribue pas d’adresse
-au drone et ne configure ni routeur ni DHCP. Les contrôles moteurs, GPS,
-firmware et autopilote restent manuels lorsqu’ils le demandent.
+au drone et ne configure ni routeur ni DHCP.
+
+Le message de fin distingue le logiciel configuré des cinq contrôles manuels.
+Le petit bouton « i » en donne le détail au survol et au focus clavier ;
+un clic ouvre la liste complète :
+
+  1. RUTC50 : vérifier la configuration LAN déjà installée, sans modifier
+     les adresses IP.
+  2. RUTC50 : vérifier la route et le prochain saut existants vers le GCS,
+     sans modifier les IP ni les routes.
+  3. Pilote automatique : contrôler MAV_SYS_ID = numéro de l’appareil,
+     l’écartement des antennes EKF2_GPS_POS_Y, EKF2_GPS_POS_X/Z = 0,
+     BT_POS_XY_P/I/D, BT_POS_IMAX et la numérotation des moteurs selon
+     les spécifications du matériel et du fournisseur.
+  4. Heron : relever les versions Firmware et BL (bootloader).
+  5. Console MAVLink / nsh : contrôler uavcan status, gps status et
+     listener esc_status pour le CAN, le GPS et les moteurs.
+
+Les deux premiers éléments sont des rappels consultatifs. AquaHub n’exécute
+aucune modification réseau pour les réaliser. Les cinq éléments ne sont pas
+validés automatiquement par la réussite de la configuration logicielle.
 
 Le profil SSH sans secret ne doit être activé que pour un firmware qui le
 prévoit. Il ne dispense jamais de vérifier l’empreinte SSH ni un changement
 d’identité. Les clés privées ne sont pas saisies dans le renderer.
 
-7. Archives et versions
+7. Mettre l’application AquaHub à jour
+
+Dans Mises à jour, le premier bloc Application AquaHub concerne l’interface
+et son agent, depuis les Releases publiques GitHub de mehdi7129/aquahub.
+Ce canal est fixé dans l’application ; aucune URL fournisseur ni aucun jeton
+n’est nécessaire pour cette recherche publique. Une connexion Internet est
+requise pour rechercher et télécharger une nouvelle version.
+
+Choisir Rechercher une mise à jour AquaHub. Une branche, un commit ou une
+archive de sources ne vaut pas une Release installable. Si une version
+stable compatible est proposée, lire ses notes puis choisir Télécharger.
+Le paquet est vérifié avant que le bouton Installer ne soit disponible.
+Confirmer ensuite l’installation et autoriser la demande système.
+
+AquaHub et son agent seront remplacés ; les services du bundle, ses données
+et les configurations réseau restent indépendants de cette opération.
+L’agent peut se déconnecter pendant sa mise à jour. Attendre le résultat
+contrôlé sans relancer une deuxième installation, puis fermer et rouvrir
+AquaHub pour charger la nouvelle interface. En échec, lire le message et
+le diagnostic ; il n’existe pas encore de retour automatique à l’ancienne
+version de l’application.
+
+Aucune Release publique n’est encore annoncée avec ces sources. Le paquet
+applicatif est une mise à niveau pour un poste déjà initialisé, pas un kit
+de première installation. Le kit complet hors ligne reste un autre artefact.
+
+8. Mettre le bundle fournisseur à jour
 
 Choisir une archive de bundle lance son inspection. Une archive reconnue peut
 rester non applicable ; l’intégrité seule ne prouve pas sa compatibilité.
@@ -107,11 +168,20 @@ Une application autorisée possède une confirmation distincte et peut
 interrompre les services. Lire le résultat et la disponibilité du retour
 arrière ; un échec restauré reste un échec de mise à jour.
 
-Le réglage Dépôt Git concerne actuellement une source de livraisons du bundle
-fournisseur. Ne pas y substituer le dépôt de code AquaHub pour mettre à jour
-l’application. Le futur bouton de mise à jour d’AquaHub n’existe pas encore.
+Le réglage Source du bundle Aqua Hub concerne les livraisons du fournisseur.
+Ne pas y substituer le dépôt AquaHub pour mettre l’application à jour.
+La recherche de ce bloc consulte une API de Releases, et non le dépôt Git
+ou le registre Docker. Un jeton de déploiement autorisant Git et le registre
+Docker ne suffit pas à l’API des Releases GitLab. Un message projet absent
+ou privé peut signifier qu’aucun accès API adapté n’a été enregistré.
 
-8. Diagnostic et signalement
+Le fournisseur peut distribuer du code et des images Docker sans publier
+de Release. Son flux Git + registre attend une procédure de mise à jour
+qualifiée ; il ne faut pas lancer install.sh ni modifier les IP pour
+contourner cette limite. L’import d’une archive fournisseur reste disponible,
+avec les mêmes contrôles de compatibilité avant application.
+
+9. Diagnostic et signalement
 
 Réglages permet de créer un diagnostic local filtré. Son export n’est pas
 un envoi automatique à un service distant. Vérifier son contenu avant de

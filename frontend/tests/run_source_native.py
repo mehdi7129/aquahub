@@ -28,6 +28,7 @@ class Handler(socketserver.StreamRequestHandler):
             stats['settings_calls'] += 1
             stats['native_credentials_match'] = params == {'token': FIXTURE_PASSWORD}
             result = {'configured': True}
+        elif method == 'app_updates.status': result = {'current_version':'test-synthetique','repository':'https://github.com/mehdi7129/aquahub','available':False,'message':'Banc isolé.'}
         elif method == 'app.version': result = {'version': 'test-isole'}
         elif method == 'settings.get': result = {'github_url': ''}
         elif method == 'drones.list': result = {'drones': [], 'warnings': ['Banc de test isolé.']}

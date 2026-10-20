@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.1.2","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.0","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -47,12 +47,14 @@ Maintenance générale, autorisation requise :
   portainer.restart         confirmed=true, instance locale gérée uniquement.
 
 Aqua_Drones :
-  drones.list/scan    Pas de paramètre ; profils et présence observée.
+  drones.list/scan    Pas de paramètre ; profils, présence observée et
+                      manual_checklist propres au numéro de chaque appareil.
   drones.identity     number ; empreinte observée, pas encore approuvée.
   drones.enroll       number, host_key_fingerprint, confirmed=true.
   drones.ssh_settings Réglages du transport SSH, autorisation requise même
                       en lecture dans le contrat actuel.
-  drones.preflight    number ; contrôles et identifiant temporaire de plan.
+  drones.preflight    number ; contrôles, manual_checklist et identifiant
+                      temporaire de plan.
   drones.configure    number, preflight_id, confirmed_identity.
 
 enroll, ssh_settings, preflight et configure sont enregistrés comme protégés.
@@ -71,6 +73,44 @@ Mises à jour du bundle :
 Toutes ces méthodes sauf check exigent l’autorisation. La récupération ou
 l’inspection d’une livraison ne vaut pas confirmation d’application. Les
 assets doivent rester rattachés au fournisseur et aux métadonnées recherchées.
+
+Mises à jour de l’application AquaHub, canal distinct et à dépôt fixe :
+  app_updates.status    Aucun paramètre ; état local, sans requête GitHub.
+  app_updates.check     Aucun paramètre ; consulte les Releases publiques
+                        stables de mehdi7129/aquahub, sans installation.
+  app_updates.download  release_id, asset_id d’une recherche récente ;
+                        méthode protégée, renvoie une tâche app.download.
+  app_updates.install   version, confirmed=true ; méthode protégée,
+                        renvoie scheduled, pas une tâche générique.
+
+status et check renvoient current_version, repository, available, message,
+download et installation ; release est présent lorsqu’une version compatible
+plus récente est retenue. release contient version, tag, notes, published_at,
+release_id, asset_id, asset_name, asset_size et sha256. download décrit version,
+ready et sha256. Ces réponses ne contiennent pas le chemin privé du paquet.
+installation vaut null ou contient status, version, message et updated_at.
+Ses états sont scheduled, installing, installed et failed.
+
+Seuls des tags X.Y.Z ou vX.Y.Z stables sont acceptés ; le fichier exact attendu
+est aquahub-application_X.Y.Z_amd64.deb, au plus 256 Mio. L’asset doit posséder
+le digest GitHub sha256:..., la taille et les URL officielles cohérentes.
+La recherche est valable dix minutes pour demander le téléchargement.
+Un commit, un ZIP de sources, un kit complet ou un bundle ne convient pas.
+Le hash est vérifié à partir des métadonnées HTTPS ; ce n’est pas une
+signature d’éditeur indépendante de GitHub.
+
+Le frontend suit jobs.get pour le téléchargement seulement. install confirme
+à nouveau les métadonnées, prend le verrou et lance un helper système fixe.
+Pendant le remplacement, le socket de l’agent peut disparaître ; continuer
+à relire app_updates.status sans redemander install. Une réponse scheduled
+ou une déconnexion n’est pas un succès. Seul installed confirme le résultat
+contrôlé par le helper. Inviter ensuite à fermer et rouvrir l’application.
+Ce canal ne fournit pas de restauration automatique de la version applicative.
+Un statut pending abandonné n’est pas rejoué : après un délai de grâce, si
+le service de mise à niveau n’est plus actif et si le verrou est libre,
+l’agent rapproche la version Debian installée de sa version exécutée. Il
+confirme installed ou failed ; un contrôle incertain garde la maintenance
+bloquée plutôt que de deviner un succès.
 
 Portainer :
   portainer.status      Disponibilité, instance gérée et initialisation.
@@ -105,6 +145,29 @@ transmise au contexte et aux tâches. Elle permet de reconnaître une même
 demande. Elle ne remplace ni les précontrôles, ni PolicyKit, ni le verrou de
 maintenance. Une nouvelle clé n’autorise pas une seconde mutation concurrente.
 
+La configuration d’un drone utilise kind=configure_drone et
+target=Aqua_Drone_N. Le champ progress est facultatif ; un ancien client peut
+rencontrer un nombre, tandis que les nouveaux parcours exposent un objet :
+
+  {"phase":"supplier","label":"Configuration de Aqua_Drone_N",
+   "completed":2,"total":12,"percent":16,"indeterminate":true}
+
+Les douze jalons sont observés : contrôle initial, sauvegarde, sept étapes
+fournisseur acquittées, redémarrage constaté, retour stable et contrôles finaux.
+Le compteur n’avance pas avec le temps. indeterminate signale une opération
+en attente : afficher une barre d’attente avec le pourcentage déjà validé,
+sans inventer d’estimation de durée ou atteindre 100 avant la fin vérifiée.
+Pour phase=download, completed et total comptent des octets reçus ; les autres
+phases de configuration comptent des étapes. Ne pas utiliser le même libellé
+d’unité pour ces deux progressions.
+
+manual_checklist est une liste de {id,label,details}, avec details sous forme
+de texte. Elle existe sur les profils de drones, les précontrôles et les
+résultats de configuration. Les cinq éléments sont des contrôles manuels ;
+les deux rappels réseau sont consultatifs. Les présenter en texte échappé,
+avec aide accessible au survol, au focus et au clic. manual_skipped ne
+signifie ni échec de la configuration logicielle ni validation matérielle.
+
 5. Historique et pagination
 
 events.list prend limit entre 1 et 500 et before_id pour lire les pages
@@ -124,6 +187,9 @@ Les réglages, tâches et événements restent privés. Des fichiers privés
 distincts portent les identités SSH, la préparation de livraisons et les
 accès aux fournisseurs ; voir SECURITE.txt. Ne pas exporter un dossier d’état
 dans une issue publique pour illustrer un problème.
+Le canal applicatif conserve son état privé dans app-updates : ready.json,
+pending.json, status.json et package.deb. Le helper application_upgrade.py
+utilise ces chemins fixes et écrit un journal installation.log privé.
 
 Il n’existe pas encore de framework général de migrations de schéma ou de
 négociation de versions de protocole. Pour faire évoluer les données ou les

@@ -53,6 +53,55 @@ C’est le contrat actuel du bundle, pas une erreur de rendu. Running ne veut
 pas dire healthy et l’absence de sonde ne signifie pas panne. Développer une
 nouvelle sonde avec le fournisseur et vérifier le comportement métier réel.
 
+Projet ou livraison GitLab absent, privé ou inaccessible
+
+La source du bundle consulte l’API des Releases GitLab. Vérifier l’URL du
+projet et l’accès API configuré dans AquaHub. Un jeton de déploiement Git /
+registre Docker n’autorise pas cette API ; un clone réussi ne prouve pas
+l’accès aux Releases. GitLab peut renvoyer 404 pour masquer un projet privé.
+Ne pas en conclure automatiquement que le jeton Git fourni est invalide.
+
+Il est aussi possible qu’aucune Release ne soit publiée, même si le dépôt
+et les images existent. Le flux fournisseur Git + registre reste distinct
+et attend sa procédure qualifiée. Ne pas remplacer la source du bundle par
+le dépôt AquaHub et ne pas lancer le script fournisseur pour contourner
+une archive non applicable.
+
+Aucune mise à jour AquaHub proposée après un commit Git
+
+Le bloc Application AquaHub recherche des Releases stables publiques du dépôt
+fixe mehdi7129/aquahub, pas la dernière branche ou le dernier commit. Il faut
+un tag X.Y.Z ou vX.Y.Z et l’asset exact aquahub-application_X.Y.Z_amd64.deb,
+avec taille et digest SHA-256 GitHub disponibles. Brouillons, préversions,
+ZIP de sources, kits complets et fichiers sans intégrité vérifiable sont
+ignorés. Vérifier aussi la connexion Internet et une éventuelle limite API.
+Aucune Release publique n’est encore annoncée avec les sources 0.2.0.
+
+L’agent disparaît pendant la mise à jour de l’application
+
+Le helper indépendant remplace AquaHub et redémarre son agent. La fenêtre
+suit app_updates.status ; une coupure transitoire est attendue. Ne pas
+réenvoyer install à chaque échec de connexion. scheduled ou installing ne
+prouve pas un succès ; attendre installed ou failed. Fermer puis rouvrir
+la fenêtre après installed pour recharger la nouvelle interface.
+
+Sur un banc autorisé, le résultat et le journal privé sont sous
+/var/lib/aquahub/agent/app-updates/ ; le service transitoire est
+  aquahub-application-upgrade.service.
+Ne pas publier ces fichiers bruts. Si le paquet échoue, le helper tente
+de relancer l’agent et écrit failed ; il n’effectue pas de restauration
+automatique de l’ancien paquet. Le rollback d’images du bundle ne s’applique
+pas à l’application.
+
+La progression d’un drone reste au même pourcentage
+
+Le pourcentage compte les jalons validés, pas le temps écoulé. Pendant une
+copie, une commande fournisseur ou l’attente du redémarrage, la barre peut
+rester indéterminée. Lire le nom de l’appareil et l’étape. Un résultat
+logiciel réussi ne valide pas les cinq contrôles manuels. Le bouton « i »
+donne la liste. Deux éléments sont consultatifs : vérifications du LAN et
+de la route existants, sans modification des IP par AquaHub.
+
 Retour arrière refusé
 
 Lire si la sauvegarde est corrompue, la configuration ou le réseau ont changé,

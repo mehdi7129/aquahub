@@ -24,7 +24,7 @@ import tarfile
 import tempfile
 import time
 
-VERSION = "0.1.2"
+VERSION = "0.2.0"
 PROJECT = "aqua-hub-bundle"
 SERVICES = {"mosquitto", "dmx_fleet_controller", "gcs", "gcs_reactor", "net_setup", "mavlink_router", "rtcm_mavlink", "wireguard"}
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "HOME": "/root", "DOCKER_CONFIG": "/etc/aquahub/docker-client"}
@@ -387,7 +387,9 @@ def finish(resources: Path, operator_uid: int):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Finalisation locale du kit AquaHub")
     parser.add_argument("--operator-uid", required=True, type=int)
-    parser.add_argument("--resources", type=Path, default=Path("/usr/share/aquahub/offline"))
+    current_kit = Path("/usr/share/aquahub/offline")
+    preserved_kit = Path("/var/lib/aquahub/offline")
+    parser.add_argument("--resources", type=Path, default=current_kit if current_kit.exists() else preserved_kit)
     args = parser.parse_args(argv)
     try:
         finish(args.resources, args.operator_uid)

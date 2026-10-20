@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import os
 from pathlib import Path
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -142,6 +144,55 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertNotIn("never-export-me", json.dumps(result))
 
+    def test_job_progress_is_durable_observed_and_bound_to_its_worker(self):
+        observed = threading.Event()
+        release = threading.Event()
+        progress = {"phase": "reboot", "label": "Aqua_Drone_5 redémarre", "completed": 10,
+                    "total": 12, "percent": 83, "indeterminate": True, "detail": "password=not-exported"}
+        def work():
+            self.app.report_progress(progress)
+            observed.set()
+            release.wait(2)
+            raise ApiError("reboot_unverified", "Retour non confirmé")
+        with self.assertRaises(RuntimeError):
+            self.app.report_progress(progress)
+        job = self.app.submit_job("configure_drone", "Aqua_Drone_5", {"number": 5}, work)
+        self.assertTrue(observed.wait(1))
+        try:
+            first = self.call("jobs.get", {"id": job["id"]})
+            second = self.call("status.get")["active_job"]
+            self.assertEqual(first["progress"], second["progress"])
+            self.assertEqual(first["progress"]["percent"], 83)
+            self.assertNotIn("not-exported", json.dumps(first))
+        finally:
+            release.set()
+        terminal = self.wait_job(job["id"])
+        self.assertEqual(terminal["status"], "failed")
+        self.assertEqual(terminal["progress"]["percent"], 83)
+        self.app.store.set_job_progress(job["id"], {**progress, "completed": 12, "percent": 100})
+        self.assertEqual(self.app.store.job(job["id"])["progress"]["percent"], 83)
+        self.app.close()
+        self.app = Application(self.config, docker=self.fake, policy=AuthPolicy(os.getuid(), privileged=False))
+        self.assertEqual(self.call("jobs.get", {"id": job["id"]})["progress"], terminal["progress"])
+
+    def test_job_progress_rejects_fabricated_percent_and_invalid_values(self):
+        base = {"phase": "download", "label": "Téléchargement", "completed": 10, "total": 20, "percent": 50}
+        rejected = []
+        def work():
+            for replacement in ({"percent": 99}, {"completed": True}, {"total": 0},
+                                {"completed": 21}, {"indeterminate": "yes"}, {"detail": "x" * 1001}, {"command": "id"}):
+                try:
+                    self.app.report_progress({**base, **replacement})
+                except ValueError:
+                    rejected.append(replacement)
+            self.app.report_progress(base)
+            return {}
+        job = self.app.submit_job("test.progress", "test", {}, work)
+        result = self.wait_job(job["id"])
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(len(rejected), 7)
+        self.assertEqual(result["progress"]["percent"], 50)
+
     def test_network_actions_are_explicitly_blocked(self):
         for service in ("net_setup", "wireguard", "gcs_reactor"):
             for operation in ("restart", "start", "stop"):
@@ -232,6 +283,27 @@ class ApplicationTests(unittest.TestCase):
 
 
 class DurabilityAndSecurityTests(unittest.TestCase):
+    def test_progress_migrates_existing_database_without_losing_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "aquahub.sqlite3"
+            with closing(sqlite3.connect(path)) as db, db:
+                db.execute("CREATE TABLE jobs(id TEXT PRIMARY KEY,kind TEXT NOT NULL,target TEXT NOT NULL,status TEXT NOT NULL,created_at TEXT NOT NULL,started_at TEXT,finished_at TEXT,payload TEXT NOT NULL,result TEXT,error TEXT,idempotency_key TEXT UNIQUE,fingerprint TEXT NOT NULL)")
+                db.execute("INSERT INTO jobs(id,kind,target,status,created_at,payload,fingerprint) VALUES('legacy','configure_drone','Aqua_Drone_5','succeeded','2026-01-01T00:00:00Z','{}','old-fingerprint')")
+            store = Store(Path(directory))
+            self.assertIsNone(store.job("legacy")["progress"])
+            self.assertEqual(store.job("legacy")["status"], "succeeded")
+            job, _ = store.create_job("configure_drone", "Aqua_Drone_5", {})
+            store.set_job(job["id"], "running")
+            progress = {"phase": "backup", "label": "Sauvegarde", "completed": 1, "total": 12, "percent": 8}
+            store.set_job_progress(job["id"], progress)
+            store.close()
+            store = Store(Path(directory))
+            self.assertEqual(store.interrupt_jobs(), 1)
+            self.assertEqual(store.job(job["id"])["status"], "interrupted")
+            self.assertEqual(store.job(job["id"])["progress"], progress)
+            self.assertEqual(store.job("legacy")["status"], "succeeded")
+            store.close()
+
     def test_inflight_jobs_are_never_replayed_or_marked_successful_after_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             store = Store(Path(directory))

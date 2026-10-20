@@ -3,12 +3,13 @@ AquaHub — construction et publication
 1. Trois livraisons différentes
 
 Sources : ce dépôt, licence MIT, sans bundle client ni dépendances vendues.
-Application : futur paquet de mise à jour AquaHub seul, pas encore séparé.
+Application : paquet de mise à jour AquaHub seul, sans bundle ni images.
 Kit complet : installateur graphique, runtime, Docker, Portainer et bundle.
 
-Le constructeur actuel fabrique le kit complet. Le futur bouton de mise à
-jour d’AquaHub n’est pas développé et ne doit pas être confondu avec l’import
-d’une archive de bundle dans la GUI.
+Le constructeur propose deux modes distincts. Une mise à jour de l’application
+met à jour AquaHub seulement ; l’import d’une archive fournisseur concerne
+le bundle Aqua Hub et ses conteneurs. Les sources, authentifications et
+conditions de compatibilité de ces deux flux sont indépendantes.
 
 2. Préparer les ressources de l’interface
 
@@ -39,6 +40,41 @@ recette, le cache, les exports Docker et les configurations restent privés.
 Le script ne remplace pas le processus futur de production d’un kit public.
 
 4. Construire un paquet
+
+Pour une mise à jour publique de l’application seule :
+
+  python3 installer/build_package.py \
+    --application-only \
+    --output dist/aquahub-application_0.2.0_amd64.deb \
+    --version 0.2.0
+
+Ce mode n’accepte ni --payload ni --private-kit. Le paquet garde le nom Debian
+aquahub-setup afin de mettre à niveau l’installation 0.1.2 existante, sans
+migration d’appartenance de fichiers entre deux paquets. Son champ de contrôle
+X-AquaHub-Update vaut application-only. Il contient les sources d’exécution,
+l’interface, les dialogues et les assistants AquaHub ; aucun kit fournisseur,
+export d’image ou configuration du banc n’est ajouté. Les dépendances natives
+de l’interface sont déclarées dans le contrôle Debian. Le paquet requiert
+une installation AquaHub déjà terminée ; il ne remplace pas le kit complet
+pour équiper un nouveau poste. Il peut être installé graphiquement avec le
+gestionnaire de paquets Debian ou depuis le bouton de mise à jour AquaHub.
+
+Lors du premier passage d’un kit complet vers ce paquet léger, preinst
+arrête uniquement l’agent AquaHub après avoir refusé toute opération active.
+Il conserve l’ancien /usr/share/aquahub/offline sous /var/lib/aquahub/offline,
+hors des fichiers possédés par dpkg. Ainsi, dpkg peut retirer son ancien
+inventaire sans supprimer le kit privé de réparation. Le déplacement conserve
+les permissions et les octets. Si /usr et /var sont sur des partitions
+différentes, une copie vérifiée par SHA-256 est publiée avant suppression de
+l’original ; un manque de place ou deux kits différents interrompent la
+migration en conservant les données. L’assistant de réparation sait lire
+les deux emplacements. Aucun dossier privé existant n’est rendu public.
+
+Le marqueur setup.complete atteste que l’installation initiale a réussi ;
+il n’est plus comparé à la version de l’application à chaque lancement.
+Une mise à jour ne doit donc jamais relancer le déploiement du bundle.
+
+Pour un kit complet :
 
 Exemple avec un payload externe déjà vérifié, depuis la racine du dépôt :
 
@@ -88,3 +124,29 @@ https://docs.github.com/en/repositories/releasing-projects-on-github/about-relea
 
 Une archive de sources automatique de GitHub ne contient ni les dépendances,
 ni les images, ni un installateur complet. Ne pas la présenter comme tel.
+
+7. Assistant de mise à jour de l’application
+
+L’agent prépare exclusivement /var/lib/aquahub/agent/app-updates, dossier
+root 0700 : package.deb, ready.json, pending.json et status.json sont privés.
+pending.json fixe schema=1, version, sha256 et bytes. Après autorisation,
+l’agent lance une unité systemd séparée qui exécute sans argument :
+
+  /usr/bin/python3 /usr/lib/aquahub/application-upgrade.py
+
+L’assistant recontrôle propriétaire, permissions, taille (256 Mio maximum), SHA-256, architecture,
+nom du paquet, version et X-AquaHub-Update. Il vérifie l’absence de tâche active
+et effectue un précontrôle dpkg sans installation ; un échec de dépendance ou
+de verrou à ce stade ne coupe pas l’agent. Il arrête ensuite uniquement
+aquahub-agent.service, libère le verrou de maintenance pour
+le propre preinst de dpkg, puis installe le paquet sans lancer finish.py.
+Le processus indépendant reste actif lorsque l’agent est remplacé. Le succès
+est enregistré seulement après vérification de la version dpkg, de la version
+Python installée et du service actif. En cas d’échec, il tente de redémarrer
+l’agent et conserve un état failed et un journal local privé. Les données et
+les services fournisseur ne sont pas manipulés par cet assistant.
+
+La version affichée dans une fenêtre déjà ouverte peut rester celle de
+l’interface chargée en mémoire : fermer puis rouvrir AquaHub après la réussite.
+Ne pas annoncer une restauration automatique de l’application : ce flux
+conserve les données mais ne dispose pas d’un paquet précédent automatique.
