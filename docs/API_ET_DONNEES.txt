@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.1","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.2","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -27,6 +27,12 @@ d’affirmer son rôle ou son identité. Les interventions passent par PolicyKit
 Le précontrôle drones.preflight est exempté d’autorisation interactive ; il
 reste authentifié et incompatible avec une maintenance en cours.
 
+Les tâches exposent notamment created_at, started_at et finished_at.
+status.collected_at date le début de collecte. L’interface 0.2.2 utilise
+ces champs déjà existants pour attendre une observation postérieure à une
+relance, plutôt que réafficher un ancien état vert. Les contrats backend
+ne changent pas pour ce correctif.
+
 2. Méthodes disponibles
 
 Le registre de core.py et les register() des adaptateurs sont la référence.
@@ -35,7 +41,8 @@ contenir des informations complémentaires selon l’état réellement observé.
 
 Lecture générale :
   app.version       Version de l’application et numéro de protocole.
-  status.get        Services, santé, fraîcheur, outils et tâche active.
+  status.get        Services, santé, fraîcheur, outils, tâche active et
+                    vingt dernières tâches persistantes.
   service.logs      service, tail facultatif ; logs courants bornés.
   events.list       service facultatif, limit et before_id facultatifs.
   events.logs       snapshot_id ; extrait associé à une panne.

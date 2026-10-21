@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.1.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.2.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -101,6 +101,8 @@ des chemins d’état distincts. Les invariants sont détaillés dans
 | Exécuter les tests et comprendre leur portée | [Tests](docs/TESTS.txt) |
 | Comprendre le protocole local et les tâches | [API et données](docs/API_ET_DONNEES.txt) |
 | Raccorder une livraison fournisseur | [Contrat du bundle](docs/CONTRAT_BUNDLE.txt) |
+| Préparer l’intégration fournisseur v1.0.1 | [Plan complémentaire](docs/PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt) |
+| Comprendre les corrections d’affichage 0.2.2 | [Plan des corrections visuelles](docs/PLAN_CORRECTIONS_VISUELLES_2026-10-21.txt) |
 | Construire un paquet et préparer une publication | [Construction et publication](docs/PUBLICATION.txt) |
 | Résoudre un problème sur le poste de dev | [Dépannage](docs/DEPANNAGE.txt) |
 | Choisir le prochain chantier | [État et feuille de route](docs/ETAT_ET_FEUILLE_DE_ROUTE.txt) |

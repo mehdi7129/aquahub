@@ -93,7 +93,7 @@
       assert(find('.job-banner').textContent.includes('Configuration de Aqua_Drone_5'),'Numéro absent du suivi');
       assert(document.querySelector('.job-progress progress'),'Barre de progression absente');
       await wait(()=>document.querySelector('.job-progress')?.textContent.includes('58 % validés'),'étape longue observée');
-      assert(!find('.job-progress progress').hasAttribute('value'),'Progression temporelle fictive pendant le redémarrage');
+      assert(find('.job-progress progress').value === 58 && Math.abs(find('.job-progress progress').position - .58) < .001,'La barre ne représente pas les 58 % réellement validés pendant le redémarrage');
       assert(find('.job-banner').textContent.includes('7/12 étapes validées'),'Étapes validées invisibles');
       await wait(() => !document.querySelector('.job-banner'), 'configuration terminée');
       await wait(() => find('.drone-item').textContent.includes('Configuration vérifiée'), 'inventaire actualisé après tâche');

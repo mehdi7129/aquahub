@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ActionGate, counts, escape, healthState, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobSucceeded, normalizeRepository, observationFresh, plainLog, preflightAllowed, progressCaption, restartAllowed, rpcResultError, serviceTone, validateStatus } from './.runtime/domain.mjs';
+import { ActionGate, counts, escape, healthState, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobSucceeded, normalizeRepository, observationFresh, plainLog, preflightAllowed, progressCaption, restartAllowed, rpcResultError, servicePresentation, serviceTone, validateStatus } from './.runtime/domain.mjs';
 
 const drone = { number: 5, name: 'Aqua_Drone_5', address: '192.168.205.2', reachable: true, identity_verified: false, configured: false, supported: true };
 const preflight = { preflight_id: 'p-5', number: 5, address: drone.address, allowed: true, checks: [{ label: 'Réseau', ok: true }] };
@@ -23,6 +23,72 @@ test('les contours séparent exécution, arrêt, transition et état inconnu san
   for (const state of ['restarting', 'paused', 'created']) assert.equal(serviceTone({ ...service, state }, true), 'transition');
   assert.equal(serviceTone({ ...service, state: 'future-state' }, true), 'unknown');
   for (const state of ['running', 'exited', 'restarting']) assert.equal(serviceTone({ ...service, state }, false), 'unknown');
+});
+
+const restartNow = Date.parse('2026-10-21T12:00:00Z');
+const iso = offset => new Date(restartNow + offset).toISOString();
+const restartJob = { id: 'restart-1', kind: 'service.restart', target: 'gcs', status: 'running', created_at: iso(-5000), started_at: iso(-4000) };
+const observed = { ...status, collected_at: iso(-1000) };
+const present = (changedStatus = observed, options = {}, changedService = service) => servicePresentation(changedService, changedStatus, true, { now: restartNow, ...options });
+
+test('la demande et la tâche de relance colorent uniquement leur service cible', () => {
+  assert.equal(present(observed, { requesting: 'gcs' }).operation, 'requesting');
+  assert.equal(present(observed, { requesting: 'gcs' }).tone, 'transition');
+  assert.equal(present(observed, { requesting: 'mqtt' }).tone, 'running');
+  assert.equal(present(observed, { job: restartJob }).label, 'Redémarrage en cours');
+  assert.equal(present(observed, { job: { ...restartJob, status: 'queued' } }).label, 'Relance en attente');
+  assert.equal(present(observed, { job: { ...restartJob, target: 'gcs-old' } }).tone, 'running');
+  assert.equal(present(observed, { job: { ...restartJob, kind: 'configure_drone' } }).tone, 'running');
+});
+
+test('une tâche connue ne rétablit pas une couleur courante pendant une coupure ou une erreur de suivi', () => {
+  for (const changed of [{ stale: true }, { docker_available: false }, { collected_at: iso(-31000) }]) assert.equal(present({ ...observed, ...changed }, { job: restartJob }).operation, 'uncertain');
+  assert.equal(servicePresentation(service, observed, false, { job: restartJob, now: restartNow }).tone, 'unknown');
+  assert.equal(present(observed, { job: restartJob, jobError: 'Suivi indisponible' }).tone, 'unknown');
+});
+
+test('la fin du job attend une collecte commencée après sa fin avant de rétablir le badge Docker', () => {
+  const job = { ...restartJob, status: 'succeeded', finished_at: iso(-500) };
+  const cached = present(observed, { job });
+  assert.equal(cached.tone, 'unknown'); assert.equal(cached.label, 'Actualisation');
+  assert.equal(present({ ...observed, collected_at: job.finished_at }, { job }).operation, 'refreshing');
+  const refreshed = present({ ...observed, collected_at: iso(-100) }, { job });
+  assert.equal(refreshed.tone, 'running'); assert.equal(refreshed.operation, undefined);
+});
+
+test('un échec de commande ne prétend pas que le conteneur encore observé en cours est arrêté', () => {
+  const job = { ...restartJob, status: 'failed', finished_at: iso(-2000) };
+  assert.equal(present(observed, { job }).tone, 'running');
+  assert.equal(present(observed, { job }, { ...service, state: 'exited' }).tone, 'failed');
+});
+
+test('des dates absentes, invalides ou futures imposent un état à vérifier', () => {
+  for (const finished_at of [undefined, '', 'date-invalide', iso(6000)]) {
+    const result = present(observed, { job: { ...restartJob, status: 'succeeded', finished_at } });
+    assert.equal(result.tone, 'unknown'); assert.equal(result.label, 'État à vérifier');
+  }
+  assert.equal(present({ ...observed, collected_at: 'date-invalide' }, { job: restartJob }).operation, 'uncertain');
+  assert.equal(present({ ...observed, collected_at: iso(-32000) }, { job: { ...restartJob, status: 'succeeded', finished_at: iso(-31000) } }).label, 'État à vérifier');
+});
+
+test('la réouverture retrouve une relance récente même terminée sans stockage supplémentaire', () => {
+  const ended = { ...restartJob, status: 'succeeded', finished_at: iso(-500) };
+  assert.equal(present({ ...observed, jobs: [ended] }).operation, 'refreshing');
+  assert.equal(present({ ...observed, jobs: [ended], collected_at: iso(-100) }).tone, 'running');
+  assert.equal(present({ ...observed, active_job: restartJob }).operation, 'active');
+  const newer = { ...ended, id: 'restart-2', created_at: iso(-1000), finished_at: iso(-500) };
+  const older = { ...ended, created_at: iso(-9000), finished_at: iso(-8000) };
+  assert.equal(present({ ...observed, jobs: [newer] }, { job: older }).operation, 'refreshing');
+  assert.equal(present({ ...observed, active_job: restartJob, jobs: [restartJob] }, { job: ended }).operation, 'refreshing');
+});
+
+test('une réponse perdue conserve l’incertitude jusqu’à un job retrouvé ou une observation postérieure', () => {
+  const unconfirmed = { requestedAt: restartNow - 2000, failedAt: restartNow - 500 };
+  assert.equal(present(observed, { unconfirmed }).operation, 'uncertain');
+  assert.equal(present({ ...observed, collected_at: iso(-100) }, { unconfirmed }).tone, 'running');
+  const recovered = { ...restartJob, created_at: iso(-1500) };
+  assert.equal(present(observed, { unconfirmed, job: recovered }).operation, 'active');
+  assert.equal(present(observed, { unconfirmed, job: { ...restartJob, status: 'succeeded', finished_at: iso(-3000) } }).operation, 'uncertain');
 });
 
 test('un service en cours sans contrôle de santé ne devient pas sain', () => {

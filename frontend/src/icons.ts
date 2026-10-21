@@ -1,6 +1,6 @@
 const paths: Record<string, string> = {
   monitor: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
-  refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/>',
+  refresh: '<path d="M6.2 8.8a6.6 6.6 0 0 1 11.5 0l1.8 2.2M19.5 7v4h-4M17.8 15.2a6.6 6.6 0 0 1-11.5 0L4.5 13M4.5 17v-4h4"/>',
   drone: '<circle cx="12" cy="12" r="3"/><path d="m10 10-5-5m9 5 5-5m-9 9-5 5m9-5 5 5"/><rect x="1.5" y="1.5" width="6" height="6" rx="2.5"/><rect x="16.5" y="1.5" width="6" height="6" rx="2.5"/><rect x="1.5" y="16.5" width="6" height="6" rx="2.5"/><rect x="16.5" y="16.5" width="6" height="6" rx="2.5"/>',
   history: '<path d="M14 2H5a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8Z"/><path d="M14 2v6h6M8 12h8M8 16h8"/>',
   settings: '<path d="m9 3-1 3-3 1v4l-2 1 2 1v4l3 1 1 3h6l1-3 3-1v-4l2-1-2-1V7l-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/>',
@@ -28,5 +28,5 @@ const paths: Record<string, string> = {
   shield: '<path d="m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6Z"/><path d="m8 12 3 3 5-6"/>',
   chevron: '<path d="m9 5 7 7-7 7"/>',
 };
-export function icon(name: string, className = ''): string { return `<svg class="icon ${className}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.server}</svg>`; }
+export function icon(name: string, className = ''): string { return `<svg class="icon ${name === 'refresh' ? 'icon-refresh ' : ''}${className}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.server}</svg>`; }
 export function serviceIcon(id: string): string { const key = id.toLowerCase(); if (key.includes('mqtt') || key.includes('mosquitto')) return 'wifi'; if (key.includes('fleet')) return 'server'; if (key.includes('reactor')) return 'settings'; if (key.includes('gcs')) return 'monitor'; if (key.includes('wire')) return 'lock'; if (key.includes('rtcm')) return 'radio'; if (key.includes('mavlink')) return 'route'; return 'network'; }

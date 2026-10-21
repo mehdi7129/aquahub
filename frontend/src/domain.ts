@@ -15,6 +15,58 @@ export function serviceTone(service: Service, fresh: boolean): 'running' | 'fail
   if (['restarting', 'paused', 'created'].includes(service.state)) return 'transition';
   return 'unknown';
 }
+
+interface ServicePresentationOptions { requesting?: string; job?: Job | null; jobError?: string; unconfirmed?: { requestedAt: number; failedAt: number }; now?: number; }
+interface ServicePresentation { tone: ReturnType<typeof serviceTone>; label: string; shortLabel?: string; description: string; operation?: 'requesting' | 'active' | 'refreshing' | 'uncertain'; }
+
+function restartFor(service: Service, job: Job | null | undefined): job is Job {
+  return Boolean(job && job.kind === 'service.restart' && job.target === service.id);
+}
+function timestamp(value: string | undefined): number { return typeof value === 'string' && value.trim() ? Date.parse(value) : NaN; }
+
+function latestRestart(service: Service, status: HubStatus | null, current?: Job | null): Job | undefined {
+  // The agent supplies recent jobs newest first. The polled job may be more
+  // recent than the cached status, including after an almost immediate restart.
+  for (const candidate of [current, status?.active_job]) {
+    if (candidate?.id === current?.id && current && !isActive(current)) continue;
+    if (restartFor(service, candidate) && isActive(candidate)) return candidate;
+  }
+  const saved = Array.isArray(status?.jobs) ? status.jobs.find(job => restartFor(service, job)) : undefined;
+  if (!restartFor(service, current)) return saved;
+  if (!saved || current.id === saved.id) return current;
+  const currentAt = timestamp(current.created_at ?? current.finished_at);
+  const savedAt = timestamp(saved.created_at ?? saved.finished_at);
+  return Number.isFinite(currentAt) && Number.isFinite(savedAt) && currentAt > savedAt ? current : saved;
+}
+
+export function servicePresentation(service: Service, status: HubStatus | null, connected: boolean, options: ServicePresentationOptions = {}): ServicePresentation {
+  const now = options.now ?? Date.now();
+  const fresh = observationFresh(status, connected, now);
+  const job = latestRestart(service, status, options.job);
+  const requested = options.requesting === service.id;
+  const uncertain = (): ServicePresentation => ({ tone: 'unknown', label: 'État à vérifier', description: 'Le résultat de la relance et l’état actuel de ce service restent à vérifier.', operation: 'uncertain' });
+  const unconfirmed = options.unconfirmed;
+  const recovered = job && unconfirmed && timestamp(job.created_at) >= unconfirmed.requestedAt;
+  if (unconfirmed && !recovered && (!fresh || !Number.isFinite(unconfirmed.failedAt) || timestamp(status?.collected_at) <= unconfirmed.failedAt)) return uncertain();
+  if ((job || requested) && !fresh) return uncertain();
+  if (requested) return { tone: 'transition', label: 'Relance demandée', shortLabel: 'Relance', description: 'Demande de redémarrage envoyée ; attente de sa prise en compte par l’agent.', operation: 'requesting' };
+  if (job) {
+    if (isActive(job)) {
+      if (options.jobError && options.job?.id === job.id) return uncertain();
+      return { tone: 'transition', label: ['queued', 'pending'].includes(job.status) ? 'Relance en attente' : 'Redémarrage en cours', shortLabel: 'Relance', description: 'La tâche de redémarrage de ce service est suivie par AquaHub.', operation: 'active' };
+    }
+    const finished = timestamp(job.finished_at);
+    const collected = timestamp(status?.collected_at);
+    if (!Number.isFinite(finished) || finished > now + 5000 || !Number.isFinite(collected)) return uncertain();
+    // collected_at is the START of collection. Only an observation begun after
+    // completion can safely replace the maintenance indicator with Docker state.
+    if (collected <= finished) {
+      if (now - finished > 30000) return uncertain();
+      return { tone: 'unknown', label: 'Actualisation', description: 'Relance terminée ; attente d’une observation du service postérieure à la tâche.', operation: 'refreshing' };
+    }
+  }
+  return { tone: serviceTone(service, fresh), label: serviceState(service.state), description: fresh ? '' : 'Dernier état observé ; état actuel non confirmé' };
+}
 export function healthState(health: string | null): string { if (!health || ['none', 'not_defined', 'undefined'].includes(health)) return 'Non défini'; return ({ healthy: 'Validé', unhealthy: 'En échec', starting: 'Vérification' } as Record<string, string>)[health] ?? 'Inconnu'; }
 export function counts(services: Service[]) { return { total: services.length, running: services.filter(s => s.state === 'running').length, healthy: services.filter(s => s.health === 'healthy').length, unhealthy: services.filter(s => s.health === 'unhealthy').length, undefined: services.filter(s => healthState(s.health) === 'Non défini').length }; }
 export function identifiedDrones(drones: Drone[]): Drone[] { return drones.filter(drone => drone.reachable === true || drone.identity_verified === true || drone.configured === true).sort((a, b) => Number(b.reachable === true) - Number(a.reachable === true) || a.number - b.number); }

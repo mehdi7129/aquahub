@@ -31,6 +31,11 @@
     await check('Le délai de fraîcheur grise les données même quand la requête de supervision reste bloquée', async () => {
       const now = Date.now;
       try {
+        // Let the timer observe stale data, then render a fresh response between
+        // ticks. Expiry must compare against the actually rendered state.
+        await mode('old'); await pause(1100);
+        await window.aquahub.request('fixture.set', {mode:'fresh'}); click('[data-action="refresh"]');
+        await wait(() => find('[data-service="service-0"] .service-state').classList.contains('state-running'), 'rendu frais entre deux contrôles de durée');
         await window.aquahub.request('fixture.set', {mode:'slow'}); click('[data-action="refresh"]'); await pause(120);
         Date.now = () => now() + 31000;
         await pause(1300);
@@ -46,7 +51,7 @@
       click('[data-action="go-updates"]');
       const app = find('.app-update-card'), online = find('.bundle-online'), local = find('.bundle-local');
       assert(!app.textContent.includes('github.com') && !app.textContent.includes('Source :') && !app.textContent.includes('Releases'), 'Source technique application visible');
-      assert(app.textContent.includes('test-isolé'), 'Version application absente');
+      assert(find('.update-section-title').textContent.includes('test-isolé'), 'Version application absente du titre de section');
       assert(online.compareDocumentPosition(local) & Node.DOCUMENT_POSITION_FOLLOWING, 'Archive avant le parcours en ligne');
       let stats = await window.aquahub.request('fixture.stats');
       assert(stats.app_checks === 0 && stats.bundle_checks === 0 && stats.mutations === 0, 'Recherche ou installation automatique');

@@ -1,0 +1,159 @@
+AquaHub — complément de plan après la réponse de Benoît
+21 octobre 2026 — analyse et proposition pour le lot fournisseur
+
+1. Décision de périmètre
+
+Le plan de corrections visuelles validé reste applicable et indépendant.
+Ce document prépare le prochain lot d’intégration du bundle v1.0.1 ;
+il n’annonce ni son installation ni un bouton de mise à jour opérationnel
+avec ce nouveau parcours. La réponse fournisseur ne justifie pas de mêler
+une évolution du bundle au correctif d’affichage 0.2.2.
+
+Instruction du propriétaire : ne pas modifier les scripts de Benoît.
+AquaHub conserve son code dans son dépôt et n’écrit pas de branche gui/
+dans le dépôt fournisseur. Une future installation d’une version officielle
+emploiera ses fichiers tels que livrés ; nous ne les réécrivons pas.
+Les adresses IP restent hors du périmètre de gestion d’AquaHub.
+
+2. Réponse recoupée avec les fichiers et les registres
+
+Le tag fournisseur v1.0.1 a été lu dans un dépôt privé isolé, à la révision
+2ff7e4b4645ab796b93a187b6eb277cc37141265. Aucun checkout du bundle installé,
+script fournisseur, conteneur ni appareil réel n’a été modifié.
+
+Confirmé :
+- install.sh ne lance plus deploy.py.
+- deploy.py et mavlink-config-generator sont identiques à ceux déjà utilisés
+  par l’adaptateur AquaHub. Le CHANGELOG ne demande pas de reconfiguration
+  des drones pour cette version.
+- Le correctif WireGuard annoncé est présent et monté en lecture seule ;
+  les commandes de suppression de la route par défaut ont été retirées
+  du script run livré dans config/wireguard/.
+- Les sept digests annoncés correspondent aux métadonnées des registres,
+  avec des manifests linux/amd64. Les cinq images privées sont identiques
+  entre les tags v1.0.0 et v1.0.1. GCS est partagée entre deux services.
+
+Précision : les deux images publiques sont réellement figées par digest dans
+Compose. Les cinq privées utilisent encore TAG, avec latest par défaut.
+.env.example change de version, mais ne met pas automatiquement à jour
+le .env du poste existant. Ne pas déduire la version réellement démarrée
+du seul nom du tag Git ou d’un docker compose pull réussi.
+
+Ces lectures ne qualifient pas le démarrage complet de WireGuard ni un
+retour arrière des données. Aucun pull, load ou exec Docker ni SSH n’a été
+nécessaire pour cette vérification de métadonnées.
+
+3. Faut-il réécrire les scripts de configuration ?
+
+Recommandation : pas de réécriture complète maintenant.
+
+AquaHub possède déjà son orchestrateur : choix d’un appareil, précontrôles,
+identité SSH, transports bornés, progression et contrôles de résultat.
+Il réutilise les scripts fournisseur vérifiés sans les modifier et traite
+un numéro à la fois. Les copies correspondantes dans v1.0.1 sont inchangées.
+Dupliquer leur logique métier créerait deux implémentations à maintenir.
+
+Une adaptation de nos profils de compatibilité reste nécessaire : les
+empreintes de Compose et install.sh changent. Conserver un catalogue des
+versions connues, avec tests de contrat pour chaque profil ; ne pas simplement
+remplacer KNOWN_FILES ou désactiver cette garde pour accepter une archive.
+
+À terme, un point d’entrée fournisseur stable et non interactif, avec
+paramètres explicites et résultat structuré, réduirait la dépendance aux
+invites CLI. Sa définition relève d’un accord avec Benoît. Notre adaptateur
+resterait responsable de l’interface et de l’orchestration. Cette amélioration
+ne bloque pas la préparation du lot et n’autorise pas une modification de
+ses scripts par notre équipe.
+
+4. Parcours de mise à jour à intégrer
+
+Benoît confirme : Git, puis docker compose pull et docker compose up -d
+pour le hub seul. install.sh et deploy.py restent hors de ce parcours.
+Une mise à jour des images ne configure ni ne redémarre un drone.
+
+Le connecteur actuel de Releases GitHub/GitLab ne réalise pas ce flux.
+Créer un adaptateur Git + registre dédié, sans le confondre avec les
+Releases GitHub de l’application AquaHub.
+
+Étape A — catalogue et préparation sans bascule
+
+- Lire les tags, leur révision exacte et le CHANGELOG, dont la mention
+  d’éventuels changements de configuration des drones.
+- Préparer le candidat dans un espace AquaHub privé séparé du bundle actif.
+  Ne pas lancer un git pull aveugle dans les configurations client modifiées.
+- Reconnaître le profil fournisseur et comparer fichiers, services, images,
+  montages et effets attendus. Refuser une divergence non prise en charge.
+- Résoudre les sept digests et leurs variantes amd64. Générer un override
+  Compose propre à AquaHub pour figer les images, sans modifier le Compose
+  ni les scripts fournisseur. Garder explicites projet, répertoire et .env.
+- Qualifier la reprise de cet override à chaque démarrage du hub, réparation
+  et restauration ; ne pas perdre les références figées après un reboot.
+  Les bind mounts doivent viser les configurations client actives, jamais
+  les exemples du staging. Conserver les fichiers fournisseur intacts.
+- Télécharger et vérifier les images avant l’interruption. Un échec de
+  téléchargement ne doit pas remplacer l’installation active.
+
+Étape B — préservation des données et bascule du hub
+
+- Sauvegarder docker-compose.yml, .env, config/, références d’images,
+  chaque volume nommé, clés de déploiement, unité aqua-hub.service et
+  override AquaHub. Garder ces sauvegardes privées et vérifier leur intégrité,
+  leurs modes et propriétaires, notamment pour les clés et scripts exécutables.
+- Distinguer configurations client, fichiers fournisseur versionnés et
+  nouveau correctif WireGuard. Ne pas écraser config/ en bloc ni régénérer
+  les configurations de drones. Refuser les conflits non résolus, y compris
+  une modification locale au chemin du nouveau script WireGuard.
+- Qualifier la cohérence des sauvegardes de volumes et l’arrêt éventuel des
+  écrivains ; une simple archive d’un volume actif peut être incohérente.
+- Après confirmation, appliquer le parcours Compose du hub avec les images
+  préparées, puis vérifier les huit services, les digests, montages,
+  configurations et réseau. Ne pas masquer un échec derrière running seul.
+- Vérifier explicitement l’absence de deploy.py, de SCP et de reboot drone
+  dans la mise à jour du hub.
+
+Étape C — qualification et reprise
+
+- Recette en VM : installation existante, préparation interrompue, image
+  absente, conflit config/, manque d’espace, échec de démarrage et reprise.
+- Aller-retour contrôlé avec volumes et configurations sauvegardés.
+  Le fournisseur ne garantit pas encore leur compatibilité entre versions :
+  ne pas annoncer un rollback universel ou automatique avant qualification.
+- Recette sur le banc autorisé après la VM ; comparer configurations,
+  adresses, routes, volumes et appareils avant/après. AquaHub ne réécrit
+  aucune IP ou route pour masquer une différence.
+- Une éventuelle restauration du hub ne restaure pas un drone : conserver
+  les parcours séparés et rendre toute reprise partielle explicite.
+
+5. Relance de WireGuard : qualification distincte
+
+Le correctif fournisseur est pertinent : il supprime la commande qui pouvait
+toucher la route par défaut du poste. Il ne suffit pas de constater sa présence
+dans Git pour activer la relance dans AquaHub.
+
+Vérifier le montage et les octets du run réellement exécuté ; tester le
+conteneur complet, les autres scripts de l’image et les hooks des configurations.
+Exercer en VM le redémarrage nominal, la configuration absente/invalide et
+l’échec de wg-quick up, avec observations réseau avant/après. Qualifier ensuite
+sur un hub réel autorisé. Conserver la protection actuelle tant que ces
+parcours ne sont pas validés ; ne pas fabriquer un correctif réseau local.
+
+6. Livrables et conditions de passage au développement
+
+- Contrat documenté du tag et des sept images, sans identifiants privés.
+- Catalogue de profils compatible avec le bundle historique et v1.0.1.
+- Préparation Git + registre et paquet local équivalent pour le hors ligne.
+  Cet artefact fournisseur/client reste privé, séparé des Releases publiques
+  MIT de l’application AquaHub. Le kit commercial générique reste à définir.
+- Plan de sauvegarde/restauration testé et résultats de recette limités
+  aux versions réellement exercées.
+- Adaptation de la page Bundle et documentation des erreurs/reprises.
+- Activation séparée de WireGuard après sa qualification complète.
+
+Les réponses sont assez claires pour préparer ce lot ; pas de nouvelle
+question bloquante pour Benoît à ce stade. Le kit client générique et la
+création des configurations propres à chaque client restent à définir
+avec lui avant une distribution commerciale complète.
+
+Ce plan complémentaire est proposé à la validation. Il n’autorise ni une
+réécriture des scripts fournisseur ni l’installation immédiate de v1.0.1
+sur le poste d’exploitation.

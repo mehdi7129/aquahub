@@ -20,6 +20,13 @@ Enregistrer sous sont synthétiques pour vérifier annulation, succès et
 résultat partiel sans choisir un fichier du poste. Les tests desktop
 vérifient séparément l’écriture protégée et le dialogue GTK.
 
+Corrections visuelles 0.2.2 et retour d’état des relances :
+  python3 frontend/tests/run_visual_feedback.py
+Socket Unix et moteur WebKit réels, réponses synthétiques : cible de relance,
+requête retardée, cache ancien après fin de tâche, reprise après rechargement,
+réponses perdues sans réessai et remplissage natif du pourcentage pendant
+l’attente. Aucun Docker, drone ou téléchargement réel n’est contacté.
+
 Mise à jour de l’application (Releases GitHub séparées du bundle) :
   python3 frontend/tests/run_updates_feedback.py
 Ce banc vérifie téléchargement avant installation, annulation, confirmation,
@@ -42,7 +49,7 @@ Le parcours ui-webkit.js s’exécute dans l’application avec --demo,
 --test-script et --test-output. Les configurations, redémarrages et mises
 à jour sont des simulations explicitement signalées. Il vérifie aussi
 le numéro du drone, la progression observée de la configuration, l’attente
-indéterminée pendant le redémarrage et les cinq contrôles manuels
+séparée du remplissage acquis pendant le redémarrage et les cinq contrôles manuels
 accessibles au survol, au focus clavier et au clic.
 
 ui-live-readonly.js lit une installation réelle sans lancer de maintenance.

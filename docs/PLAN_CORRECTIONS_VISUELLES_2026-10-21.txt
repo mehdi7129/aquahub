@@ -1,0 +1,237 @@
+AquaHub — plan des corrections d’affichage
+21 octobre 2026 — plan validé, correctif 0.2.2 développé et vérifié
+Base examinée : AquaHub 0.2.1, commit public 2b6d11a.
+
+1. Objet et état de cette revue
+
+Corriger la progression des configurations, rendre les relances et les
+états des services plus visibles, harmoniser les mises à jour et aérer les
+réglages. Examiner également le changement de thème et l’icône à deux flèches.
+
+Ce document conserve l’analyse et le plan initiaux. Pendant cette première
+revue, le code produit, l’application installée, les services et les appareils
+n’ont pas été modifiés. Le correctif a ensuite été validé et développé ;
+sa qualification et ses limites sont consignées dans TESTS.txt. Les essais utilisent des données fictives dans une fenêtre
+WebKitGTK isolée, le moteur réellement utilisé par AquaHub.
+
+Les trois fichiers de l’interface compilée installée ont été comparés à ceux
+du dépôt : contenu identique. Les captures portent donc sur la même interface
+que celle installée, avec des données de démonstration.
+
+Deux lectures indépendantes du code ont été croisées avec les captures et
+les mesures natives. Les points reproduits sont distingués de ceux qui
+nécessitent encore une reproduction dans la session graphique habituelle.
+Les captures et les scripts d’audit restent hors du dépôt public.
+
+Recette visuelle initiale : 66 captures, dont les cinq onglets dans les deux
+thèmes à 1440 x 940 / 100 %, 1366 x 768 / 100 % et 1366 x 768 / 200 %, les
+bas de pages défilantes et des états de progression. Les 102 bascules rapides
+de thème et les rechargements n’ont révélé aucune erreur JavaScript ni
+débordement horizontal dans cet environnement isolé.
+
+2. Constats confirmés
+
+Progression : pendant certaines attentes, le backend fournit à la fois un
+pourcentage acquis et indeterminate=true. L’interface affiche le pourcentage,
+mais retire alors l’attribut value de la barre. À 58 % validés, le moteur
+reçoit ainsi une barre indéterminée, position=-1, dont la piste apparaît vide.
+Une barre déterminée à 25 % ou 58 % se remplit correctement dans le même moteur.
+Le défaut ne justifie donc pas une réécriture générale des styles WebKit.
+Un test d’interface existant impose même aujourd’hui l’absence de value :
+il devra être corrigé avec le comportement.
+
+Relances : le badge utilise uniquement le dernier état Docker observé,
+sans tenir compte de la tâche de redémarrage du service. La collecte agent
+et l’actualisation de l’interface sont respectivement espacées de 5 et
+8 secondes ; une relance courte peut passer entre deux lectures. Une tâche
+simulée de relance de GCS laisse effectivement son badge vert « En cours ».
+Cela ne prouve pas que la commande est ignorée : le backend exécute la
+relance puis vérifie le conteneur, son image et l’état attendu avant succès.
+Cette revue n’a pas exécuté de nouveau redémarrage réel.
+
+Contours : les badges d’état ont actuellement une bordure de 1 px.
+
+Mises à jour : « Application AquaHub » est un titre interne de carte à 17 px,
+avec icône ; « Bundle Aqua Hub » est un titre de section externe à 21 px.
+Les structures diffèrent et ne réagissent donc pas pareil à une réduction
+de largeur. Le retour à la ligne signalé n’a pas été reproduit aux trois
+réglages testés. En revanche, la ligne
+de résultat de recherche est visuellement trop proche du bas du bouton.
+
+Réglages : l’espace mesuré entre « Enregistrer la source » et
+« Configurer les accès » est de 0 px. Les boutons sont dans deux éléments
+frères, sans espacement entre ces éléments.
+
+Nom : la marque de l’application est AquaHub. L’en-tête secondaire
+« AQUA HUB · EXPLOITATION » est une variation visible à harmoniser.
+
+3. Points encore à reproduire précisément
+
+Thème : les premières bascules natives sur les cinq onglets conservent
+des couleurs, un libellé, un état du switch et une préférence enregistrée
+cohérents ; aucune erreur JavaScript n’a été relevée. Le défaut graphique
+signalé n’est pas encore reproduit dans l’environnement isolé.
+
+Après validation du plan, le reproduire dans une instance de démonstration
+distincte sur la session graphique réelle, avec captures avant/après et
+pendant la transition : les deux sens, bascules rapides, défilement, fenêtre
+redimensionnée, progression active et dialogue ouvert. Contrôler aussi le
+retour après fermeture/réouverture. Corriger ensuite la cause observée,
+qu’elle concerne la mise à jour de l’interface ou le rendu WebKit.
+Ne pas annoncer ce défaut résolu sur la seule vérification de data-theme.
+Si la reproduction échoue encore, demander une capture ciblée du défaut.
+
+Icône : les dimensions natives mesurées sont bornées (16, 17 ou 21 px selon
+le contexte) et le tracé reste dans son viewBox de 24 px. Aucun zoom ou
+découpage anormal n’a été reproduit. Le ressenti de taille est néanmoins
+pris en compte dans la proposition graphique ci-dessous. Vérifier également
+l’icône pendant la rotation, pas seulement à l’arrêt.
+
+4. Solution recommandée
+
+A — Progression fidèle aux étapes validées
+
+Renseigner value dès qu’un pourcentage réel est disponible, même pendant
+une attente. Conserver le spinner et le libellé de l’étape pour indiquer
+que l’opération continue. Réserver la barre indéterminée à l’absence de
+pourcentage. Ne pas faire avancer une barre à partir du temps écoulé.
+
+Exemple attendu : « Configuration de Aqua_Drone_5 », barre remplie à 58 %,
+« 58 % validés », puis texte d’attente du redémarrage. Le remplissage reste
+stable jusqu’à la prochaine étape réellement validée. Le backend conserve
+son contrat ; 100 % reste associé à la validation finale.
+
+B — États des services et relances
+
+Passer les contours à 2 px, en ajustant le padding pour conserver les
+dimensions. Garder les libellés : la couleur seule ne suffit pas.
+
+- Vert : service observé en cours, avec données récentes.
+- Rouge : arrêt, absence ou échec du conteneur effectivement observé.
+- Orange : transition observée ou relance demandée pour ce service.
+- Gris : état inconnu, observation périmée ou agent indisponible.
+
+Après confirmation de la relance, afficher « Relance demandée » pendant
+l’envoi, puis « Redémarrage en cours » lorsque la tâche est reconnue.
+Seul le service ciblé change ainsi de présentation, dans la liste comme
+dans son détail. Changer de service sélectionné ne doit pas déplacer cet
+indicateur vers le mauvais composant.
+Dans la liste, adapter la grille ou employer le libellé court « Relance »
+si nécessaire ; garder l’explication complète dans le détail et le nom
+accessible. Un libellé long ne doit pas dépasser la colonne d’état.
+Vérifier les colonnes actuelles de 105, 95 et 85 px selon la largeur :
+le padding seul ne suffit pas ; autoriser deux lignes sur le badge ciblé
+si l’on conserve une formulation longue.
+
+À la fin, rétablir le badge normal à partir d’une observation postérieure
+à la tâche. Si la réponse de supervision contient encore l’ancien cache,
+afficher provisoirement « Actualisation » en gris jusqu’à réception de
+l’observation suivante. Employer les horodatages existants ; ne pas
+accélérer en permanence toute la collecte pour produire un effet visuel.
+Le backend fournit déjà jobs.finished_at et status.collected_at. Ce dernier
+date le début de collecte : exiger une collecte commencée après la fin
+de tâche constitue un contrôle conservateur. Compléter leurs types côté
+interface et rattacher l’indicateur au couple tâche/service, pas à la
+sélection courante. Si les dates manquent, sont invalides ou qu’aucune
+observation ne suit, rester explicitement au gris « État à vérifier »,
+sans orange indéfini ni retour vert fondé sur l’ancien cache.
+À la réouverture, exploiter aussi les dernières tâches déjà fournies par
+status.get pour retrouver une relance terminée dont l’observation est encore
+antérieure ; ne pas ajouter d’API ou de stockage pour ce besoin.
+
+Un échec de commande affiche une erreur et le dernier état vérifiable ;
+il ne signifie pas automatiquement que le conteneur est arrêté. En cas
+de perte de connexion, revenir au gris avec résultat à vérifier. Aucun
+clignotement rouge artificiel pour une interruption trop brève à observer.
+
+C — Titres, icônes et espacements
+
+Reprendre la présentation de « Bundle Aqua Hub » pour « Application
+AquaHub » : même titre de section, même typographie et même rythme vertical,
+avec la version alignée à côté lorsque la place le permet. La carte de
+recherche et les éventuels résultats restent en dessous. Conserver les
+retours naturels aux petites largeurs, sans imposer nowrap ni tronquer.
+Prévoir aussi un espacement vertical explicite entre la commande et la
+ligne de résultat, dans les états initial, recherche, succès et erreur.
+
+Conserver l’ordre Application AquaHub, Bundle Aqua Hub en ligne, puis
+archive locale. Le bouton de recherche de l’application reste simple et
+sa source technique reste masquée dans le parcours habituel.
+
+Normaliser l’icône à deux flèches avec un tracé plus aéré dans son cadre,
+des tailles de 16–18 px dans les commandes et une rotation centrée.
+Conserver une taille de navigation cohérente avec les autres onglets.
+Ne pas réduire globalement toutes les icônes de l’application.
+
+Ajouter 12 px d’espace entre les deux actions de la source dans Réglages,
+avec une règle locale ou un groupe d’actions explicite. Préserver le
+comportement de soumission du formulaire. Vérifier les autres groupes de
+boutons et les bas de page à l’aide des captures, sans refonte générale.
+
+Employer AquaHub dans les mentions de l’application, dont l’en-tête
+secondaire « AquaHub · Exploitation ». Garder Aqua Hub pour le bundle
+fournisseur et Aqua_Drones/Aqua_Drone_N pour les appareils. Les chemins,
+noms de paquet, identifiants techniques et configurations restent inchangés.
+
+5. Ordre de réalisation après accord
+
+1) Corriger le rendu de progression et les tests qui imposent l’ancienne
+   barre vide. Vérifier immédiatement dans WebKitGTK.
+2) Ajouter les états de relance ciblés et la transition vers une observation
+   réellement actualisée ; épaissir les contours.
+3) Harmoniser les deux sections de mise à jour, l’icône et les actions
+   de Réglages ; effectuer la revue des libellés AquaHub.
+4) Compléter la reproduction du changement de thème et appliquer le
+   correctif correspondant aux preuves recueillies.
+5) Comparer les captures de chaque onglet, corriger les espacements
+   restant visibles, puis faire une seconde revue indépendante.
+6) Exécuter les contrôles de non-régression appropriés, compiler et
+   produire un installateur correctif avec notes de version.
+
+Le travail porte principalement sur frontend/src/app.ts, domain.ts,
+types.ts, icons.ts, styles.css et les recettes natives d’interface. Le backend
+n’a pas besoin de changer le déroulement des configurations de drones.
+Un éventuel ajustement du transport du thème doit être motivé par une
+reproduction ; pas de changement préventif global du moteur graphique.
+Les brouillons URL et SSH sont déjà synchronisés pendant la saisie :
+vérifier leur conservation plutôt qu’ajouter une nouvelle persistance.
+
+6. Critères de validation
+
+- Barre : scénarios 0, 25, 58 et 100 %, attente à 58 %, absence de
+  pourcentage, échec et déconnexion. Vérifier la valeur native et le
+  remplissage sur les captures, dans les deux thèmes.
+- Relance : requête en attente, tâche active, relance très rapide,
+  annulation, échec, ancien cache reçu après la fin, changement du service
+  sélectionné, fermeture/réouverture et déconnexion. Vérifier la cible,
+  les libellés, la couleur et le retour à une observation récente.
+- Couleurs : bordures de 2 px, contraste clair/sombre, dimensions stables,
+  noms de services et badges longs sans chevauchement ni coupure.
+- Captures : cinq onglets en clair et sombre, haut et bas des pages
+  défilantes, fenêtres 1440 x 940 et 1366 x 768, puis zoom 200 % et fenêtre
+  plus étroite. Les retours de texte restent permis ; les titres et
+  actions doivent rester entièrement accessibles, sans défilement horizontal.
+- Thème : couleurs réellement calculées et rendu visible, les deux sens
+  du switch et les choix dans Réglages, conservation des brouillons,
+  de la sélection, du défilement utile et de la préférence enregistrée.
+- Icône : comparaison à l’arrêt et animée, sans agrandissement, déformation
+  ni découpe ; taille de clic et focus clavier conservés.
+- Réglages : séparation mesurable de 12 px au minimum entre les actions,
+  aucun changement involontaire de soumission ou de valeur des champs.
+- Mises à jour : état initial, recherche, résultat disponible, téléchargement,
+  installation en cours et erreur. Le titre et la version restent lisibles.
+- Installation : vérifier le paquet correctif dans un environnement isolé,
+  puis l’interface réellement installée. L’audit visuel ne justifie pas
+  de reconfigurer un drone ni de relancer tous les services physiques.
+
+Les cas d’interface sont d’abord simulés. Tout essai matériel retenu ensuite
+doit servir une vérification fonctionnelle précise déjà autorisée, et non
+simplement provoquer une couleur sur une capture.
+
+7. Conditions de livraison
+
+Livrer le correctif avec un rapport court : problèmes reproduits et résolus,
+captures comparables, contrôles effectués et limites éventuelles. Si le
+défaut de thème reste non reproduit, le signaler explicitement au lieu de
+le déclarer corrigé. Documenter les changements et fournir l’installateur
+après validation ; la présente revue ne publie aucune nouvelle version.

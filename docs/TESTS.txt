@@ -5,6 +5,53 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
+0. Correctif 0.2.2 — vérification du 21 octobre 2026
+
+Suite Python : 278 cas découverts, 270 exécutés avec succès et huit ignorés
+sans opt-in ; aucun changement de logique backend. TypeScript, compilation
+et 28 tests de domaine JavaScript réussis.
+
+Recettes du dernier frontend : démonstration 19/19, pannes 17/17, mises à
+jour applicatives 7/7, retours phase1 renforcés 8/8, nouveau banc de corrections
+visuelles 12/12, disposition/clavier 6/6 à 100 % et 6/6 à 200 %.
+Le banc run_visual_feedback.py utilise une socket synthétique et teste la
+requête lente, la cible de relance, le cache antérieur à sa fin, la reprise
+après rechargement, l’échec, les dates invalides et les réponses perdues sans
+réessai automatique. Le remplissage natif de la barre reste à 58 % pendant
+l’attente. Les transports ne contactent aucun matériel.
+
+Revue graphique : 61 captures après correction et 93 contrôles de géométrie,
+avec les cinq onglets dans les deux thèmes à 1440 x 940, 1366 x 768 et 200 %.
+Le bouton de thème a ensuite été contrôlé séparément dans la session Wayland
+réelle, à 100 % et 200 %, avant/pendant/après bascule. Son apparence native,
+sa transformation et ses animations locales ont été retirées au profit d’une
+géométrie explicite ; rôle, ARIA et focus restent présents. L’artefact signalé
+n’a pas été reproduit sur les captures avant/après : ne pas présenter sa cause
+comme démontrée ou sa disparition chez l’utilisateur comme déjà confirmée.
+
+Deux premiers essais ont révélé des intermittences : expiration de fraîcheur
+et activation du thème au clavier. Le premier a permis d’identifier et de
+corriger une course entre rendu et timer ; le test a été renforcé. Le second
+n’a pas récidivé ; les recettes finales de clavier passent dans les deux zooms.
+
+Paquet applicatif 0.2.2 : 146388 octets,
+SHA-256 b1c0d899ae656e1672901891bc0d85be423b44f3502729d78cc1ffcb69efac11.
+Ses trois ressources frontend sont identiques au build testé. Le paquet
+extrait dans un espace privé a réussi le parcours natif de démonstration
+19/19 ; aucune installation complète hors ligne n’est déduite de cet essai.
+
+Le même paquet a mis à niveau le poste de 0.2.1 vers 0.2.2. Huit contrôles
+natifs en lecture seule ont confirmé version, services, contours, titres,
+icône, espacement, switch et accès aux cinq vues. Comparaisons avant/après :
+15 fichiers du bundle/configurations, neuf conteneurs (identités, images,
+états, démarrages, montages), réseau IPv4/IPv6 et 363 fichiers du kit de
+réparation inchangés. Aucun drone reconfiguré ni service fournisseur relancé
+pour ce correctif ; l’agent AquaHub seul redémarre pour la mise à niveau.
+Ce lot n’a pas refait la recette VM complète de première installation.
+
+Les rapports et captures restent privés ; ils ne sont pas ajoutés au dépôt.
+Le plan v1.0.1 est une analyse séparée, sans installation de cette livraison.
+
 1. Résultat vérifié pour les sources 0.2.1
 
 La suite Python publique a découvert 278 tests : 270 ont été exécutés avec
@@ -104,7 +151,7 @@ Familles principales :
   cd ..
 
 npm test construit les ressources frontend et le module de domaine avant
-d’exécuter les 21 tests Node. Un simple npm run build construit les ressources
+d’exécuter les tests Node. Un simple npm run build construit les ressources
 sans les tests. TypeScript est vérifié séparément par npm run check ; esbuild
 ne remplace pas ce contrôle des types.
 
@@ -166,7 +213,7 @@ Mise en page et vrai clavier XTest à 1366x768 :
 Les scripts écrivent leurs JSON et captures dans frontend/tests/. Les résultats
 doivent indiquer le mode demo ou fixture, et non une recette matérielle.
 Le parcours de démonstration vérifie la cible Aqua_Drone_N, ses jalons,
-l’attente indéterminée et le détail des cinq contrôles manuels. Voir aussi
+le remplissage conservé pendant l’attente et le détail des cinq contrôles manuels. Voir aussi
 frontend/tests/README.txt pour les commandes et leurs limites.
 
 Couleurs, neutralisation d’une observation âgée même si le RPC reste bloqué,

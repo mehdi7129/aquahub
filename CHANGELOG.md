@@ -3,6 +3,21 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.2 — correctif d’interface, préproduction
+
+- Barre de configuration conservant le pourcentage acquis pendant les
+  attentes, avec indication d’activité séparée et sans estimation fictive.
+- Relance visible sur le service concerné ; ancien cache neutralisé jusqu’à
+  une observation postérieure à la tâche. Contours des états à 2 px.
+- Titres Application AquaHub et Bundle Aqua Hub harmonisés, résultats de
+  recherche et actions de Réglages espacés, icône d’actualisation plus aérée.
+- Mentions de l’application harmonisées en AquaHub. Switch de thème au
+  rendu explicite, sans apparence native ni animation de transformation ;
+  artefact utilisateur non reproduit pendant les captures de vérification.
+- Analyse de la réponse fournisseur v1.0.1 et plan complémentaire séparé :
+  aucune modification de ses scripts ni intégration de ce nouveau bundle
+  dans ce correctif.
+
 ## 0.2.1 — préproduction
 
 - États des services avec contours colorés, neutralisés lorsque les données

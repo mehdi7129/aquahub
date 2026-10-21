@@ -17,7 +17,7 @@ export async function request<T>(method: string, params: Record<string, unknown>
 
 const serviceNames = [ ['mqtt', 'MQTT'], ['fleet-controller', 'Fleet Controller'], ['gcs', 'GCS'], ['reactor', 'Reactor'], ['net-setup', 'Réseau'], ['mavlink-router', 'Routeur MAVLink'], ['rtcm', 'Corrections RTCM'], ['wireguard', 'WireGuard'] ];
 const mockStatus: HubStatus = {
-  version: '0.2.1-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
+  version: '0.2.2-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
   bundle_path: '/opt/exemple/aqua-hub-bundle', active_job: null,
   services: serviceNames.map(([id, name], index) => ({ id, name, state: 'running', health: index < 2 ? 'healthy' : null, image_id: `sha256:demo-${id}`, restarts: 0, started_at: new Date(Date.now() - 3600000).toISOString() })),
 };
@@ -37,7 +37,7 @@ const demoManualChecks = [
   {id:'firmware',label:'Versions Heron',details:'Relever les versions du firmware Heron et du chargeur de démarrage (BL).'},
   {id:'console',label:'Diagnostic matériel MAVLink',details:'Dans la console MAVLink de QGroundControl : uavcan status, gps status et listener esc_status.'},
 ];
-let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.1-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
+let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.2-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
 let demoInstallationStarted = 0;
 
 
@@ -49,7 +49,7 @@ function syncJob() {
     const elapsed = Date.now() - jobStarted;
     job.progress = demoJobTarget === 'drone' ? {label:elapsed<1300?'Envoi des configurations existantes':'Attente du redémarrage de Aqua_Drone_5',completed:elapsed<1300?3:7,total:12,percent:elapsed<1300?25:58,indeterminate:elapsed>=1300,phase:elapsed<1300?'supplier':'reboot'} : Math.min(95, Math.round(elapsed / 28));
     if (elapsed > 2800) {
-      job.status = 'succeeded'; job.progress = 100; job.message = 'Opération simulée terminée.';
+      job.status = 'succeeded'; job.finished_at = new Date().toISOString(); job.progress = 100; job.message = 'Opération simulée terminée.';
       if (demoJobTarget === 'drone') { demoConfigured = true; job.result={manual_skipped:5,manual_checklist:demoManualChecks,message:'Configuration logicielle de Aqua_Drone_5 vérifiée. Cinq contrôles manuels restent à effectuer manuellement.'}; }
       if (demoJobTarget === 'app-download' && demoAppUpdate.release) demoAppUpdate.download = {version:demoAppUpdate.release.version,ready:true,sha256:'f'.repeat(64)};
       if (demoJobTarget === 'download') job.result = { downloaded: true, inspection: demoInspection() };
@@ -64,8 +64,9 @@ function startJob(label: string, target: string) {
   syncJob();
   if (mockStatus.active_job) throw new Error('Une tâche de démonstration est déjà en cours.');
   sequence += 1; demoJobTarget = target; jobStarted = Date.now();
-  job = { id: `demo-${sequence}`, label, ...(target === 'drone' ? {kind:'configure_drone',target:'Aqua_Drone_5'} : target==='app-download'?{kind:'app.download',target:'AquaHub 0.3.0-démo'}:{}), status: 'running', message: 'Simulation en cours…', progress: 0 };
+  job = { id: `demo-${sequence}`, label, created_at: new Date().toISOString(), started_at: new Date().toISOString(), ...(target === 'drone' ? {kind:'configure_drone',target:'Aqua_Drone_5'} : target==='app-download'?{kind:'app.download',target:'AquaHub 0.3.0-démo'}:mockStatus.services.some(service=>service.id===target)?{kind:'service.restart',target}:{}), status: 'running', message: 'Simulation en cours…', progress: 0 };
   mockStatus.active_job = job;
+  mockStatus.jobs = [job, ...(mockStatus.jobs ?? [])].slice(0, 20);
   return structuredClone(job);
 }
 function demoInspection(path?: string) { return { inspection_id: 'demo-inspection', version: 'Démonstration', allowed: true, compatible: true, can_apply: true, path, checks: [{ label: 'Intégrité de l’archive', ok: true, message: 'Vérification simulée.' }, { label: 'Compatibilité du bundle', ok: true }, { label: 'Adresses IP inchangées', ok: true }], message: 'Archive fictive. Aucune installation réelle ne sera exécutée.' }; }

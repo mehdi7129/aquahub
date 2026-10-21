@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.1 — état du code et qualification à poursuivre
+Préproduction 0.2.2 — état du code et qualification à poursuivre
 
 Développé
 
@@ -24,9 +24,16 @@ La version 0.2.1 simplifie la supervision et la page de mise à jour, ajoute
 les exports de journaux et retire l’autorisation interactive du précontrôle
 Aqua_Drone sans retirer ses gardes d’identité et de maintenance.
 
+La version 0.2.2 conserve le remplissage de la progression pendant les
+attentes, rend la relance du service ciblé visible et attend une collecte
+postérieure à sa fin avant le retour à l’état Docker. Elle harmonise titres,
+icône et espacements ; le switch de thème utilise une géométrie explicite.
+L’artefact initial n’a pas été reproduit pendant la qualification graphique.
+
 Le pilote actuel connaît huit services. Deux ont un healthcheck ; six sont
 sans sonde. Les relances de net_setup et gcs_reactor sont possibles avec
-comparaison du réseau. WireGuard attend encore une validation fournisseur.
+comparaison du réseau. WireGuard attend la qualification du conteneur corrigé
+par AquaHub, après le correctif livré par le fournisseur.
 Le provisioning vérifie une cible SSH et respecte les adresses existantes.
 
 Validations initiales
@@ -66,6 +73,13 @@ les évolutions possibles d’un fournisseur.
 
 Un flux Git + registre nécessite un adaptateur dédié et une recette réelle.
 La recherche de Releases GitHub/GitLab n’est pas cet adaptateur.
+La réponse fournisseur du 21 octobre et le tag v1.0.1 ont levé l’ambiguïté :
+le parcours Compose du hub seul est confirmé, les scripts drones restent
+inchangés, et un correctif WireGuard est livré. Les sept digests ont été
+recoupés dans les registres, sans installation. L’adaptateur et le conteneur
+WireGuard complet restent à qualifier ; voir le plan complémentaire
+PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt. Aucun script fournisseur n’est
+modifié par le correctif d’interface 0.2.2.
 
 Priorité 2 : créer une livraison publique propre
 

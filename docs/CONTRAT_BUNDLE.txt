@@ -110,8 +110,12 @@ Un flux Git + registre doit figer une révision et les digests d’images,
 protéger les accès et qualifier ses effets. Il n’est pas implémenté par le
 connecteur de Releases actuel. Les tags Git et des cinq images privées ont
 été confirmés ; le jeton existant suffit pour les lire sans read_api.
-Le tag v1.0.0 appelle encore deploy.py depuis install.sh, alors que son README
-décrit aussi un parcours Compose séparé. Ce choix et la compatibilité des
-données restent à confirmer avant l’adaptateur du fournisseur.
+Le tag v1.0.0 appelle encore deploy.py depuis install.sh. La réponse fournisseur
+et le tag v1.0.1 confirment maintenant un parcours Compose du hub seul, avec
+configuration des drones séparée. Cela ne qualifie pas encore notre adaptateur
+Git + registre ni la compatibilité des volumes en retour arrière. Voir
+PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt pour les preuves et le lot proposé.
+Les scripts fournisseur restent intacts ; deploy.py et le générateur sont
+inchangés dans cette version, sans besoin de réécriture complète à ce stade.
 La mise à jour de l’application AquaHub est déjà implémentée comme un
 troisième contrat distinct ; elle ne met pas le bundle à jour.

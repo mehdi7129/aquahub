@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.1
+Préproduction 0.2.2
 
 1. Disponibilité et installation
 
@@ -24,7 +24,7 @@ un volume ou un service existant pour contourner un diagnostic.
 La liste affiche les composants reconnus sur le moteur Docker natif. En cours
 décrit l’état du conteneur. Validé décrit une sonde de santé définie qui
 réussit ; Non défini signifie qu’aucune sonde n’existe pour ce composant.
-Le contour du badge est vert pour un service en cours, rouge pour un service
+Le contour de 2 px du badge est vert pour un service en cours, rouge pour un service
 arrêté/en échec/absent, orange en transition et gris si son état actuel n’est
 pas confirmé. La santé se consulte dans le détail ; un échec de sonde reste
 signalé dans la liste. Le bundle reconnu a deux sondes et six composants sans sonde. Ces informations
@@ -44,6 +44,11 @@ Sélectionner le composant, choisir Redémarrer, puis vérifier le nom dans la
 confirmation. Autoriser l’action dans la boîte administrateur si elle est
 demandée et attendre le résultat. Une seule maintenance incompatible peut
 progresser à la fois. Fermer la fenêtre n’annule pas la tâche de l’agent.
+Le service ciblé passe à « Relance » en orange pendant la demande et le
+redémarrage ; son détail précise la phase. À la fin, « Actualisation » en
+gris attend une lecture postérieure à la tâche. « État à vérifier » indique
+un résultat incertain. Une relance très rapide n’affiche pas forcément une
+phase rouge : seule une observation d’arrêt ou d’échec produit cet état.
 
 Réseau du bundle et GCS Reactor disposent d’une relance individuelle avec
 contrôle des adresses et routes avant/après. Ces composants peuvent réappliquer
@@ -118,8 +123,8 @@ de lancer le travail. Le drone peut redémarrer ; attendre son retour vérifié.
 
 Le suivi nomme toujours Aqua_Drone_N. Sa barre indique les douze jalons
 confirmés, avec un pourcentage fondé sur ce qui a réellement été vérifié.
-Pendant une étape longue ou le redémarrage, une barre d’attente peut rester
-sur le même pourcentage. Cela n’indique pas à lui seul une panne. Le résultat
+Pendant une étape longue ou le redémarrage, la barre conserve son remplissage
+au dernier pourcentage acquis ; une animation séparée indique l’attente. Cela n’indique pas à lui seul une panne. Le résultat
 final attend le retour stable et les contrôles logiciels ; fermer la fenêtre
 n’arrête pas le travail.
 
