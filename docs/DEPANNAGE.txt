@@ -32,6 +32,29 @@ leur fonctionnement autorisé. Les tests natifs synthétiques utilisent leur
 propre serveur ; un banc réel doit suivre son parcours d’autorisation.
 Ne pas ajouter de règle PolicyKit permanente pour faire passer la recette.
 
+Depuis 0.2.1, le bouton Vérifier cet appareil ne demande plus PolicyKit.
+Si une fenêtre administrateur apparaît pour ce bouton, vérifier que le
+desktop ET l’agent installé utilisent cette version. La première association
+SSH reste distincte ; une identité inconnue ne doit pas être approuvée pour
+faire disparaître une erreur. Une maintenance en cours peut refuser le
+précontrôle sans demander de mot de passe.
+
+Les badges sont gris alors que le dernier état disait En cours
+
+Le gris signifie que l’état actuel n’est plus confirmé : collecte périmée,
+agent déconnecté ou réponse retardée. Le délai de fraîcheur est de 30 secondes.
+Relire la connexion ou les journaux de l’agent ; ne pas remplacer ce gris
+par un vert à partir des dernières données mises en cache.
+
+Activity logs est vide dans Portainer
+
+Cette page vise l’audit administratif documenté pour Business Edition.
+Les logs des services sont sous environnement local → Containers → le
+conteneur → Logs. Dans AquaHub : Supervision → service → Logs techniques.
+Enregistrer les logs et l’export groupé produisent des extraits filtrés,
+pas un historique exhaustif. La rotation du bundle est de 10m × 3 fichiers
+par conteneur ; une plage ancienne peut donc ne plus être disponible.
+
 Bundle inconnu ou archive non applicable
 
 Lire l’échec du précontrôle. Comparer les versions et le contrat reconnu,
@@ -75,7 +98,7 @@ un tag X.Y.Z ou vX.Y.Z et l’asset exact aquahub-application_X.Y.Z_amd64.deb,
 avec taille et digest SHA-256 GitHub disponibles. Brouillons, préversions,
 ZIP de sources, kits complets et fichiers sans intégrité vérifiable sont
 ignorés. Vérifier aussi la connexion Internet et une éventuelle limite API.
-Aucune Release publique n’est encore annoncée avec les sources 0.2.0.
+Aucune Release publique n’est encore annoncée avec les sources 0.2.1.
 
 L’agent disparaît pendant la mise à jour de l’application
 

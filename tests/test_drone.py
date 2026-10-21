@@ -1,6 +1,8 @@
 """Synthetic Aqua_Drone_5 tests. No connection to the physical drone."""
 import base64
+from contextlib import contextmanager, nullcontext
 from collections import deque
+import fcntl
 import hashlib
 import io
 import json
@@ -9,13 +11,16 @@ from pathlib import Path
 import stat
 import tarfile
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from aquahub_agent import drone as module
 from aquahub_agent.drone import DroneManager, drone_address, drone_number, network_fields, parse_remote, stable_network
-from aquahub_agent.security import ApiError, RequestContext
+from aquahub_agent.core import Application, Config
+from aquahub_agent.security import ApiError, AuthPolicy, RequestContext, process_start_time
+from test_core import FakeDocker
 
 
 IDENTITY = {"machine_id": "a" * 32, "host_key_fingerprint": "SHA256:synthetic-approved-host-fingerprint"}
@@ -83,6 +88,9 @@ class App:
 
     def report_progress(self, progress):
         self.progress.append(progress)
+
+    def operation_guard(self):
+        return nullcontext()
 
     def submit_job(self, kind, target, payload, work):
         self.jobs.append((kind, target, payload))
@@ -167,6 +175,142 @@ class DroneManagerTests(unittest.TestCase):
     def configure(self, preflight):
         return self.manager.configure({"number": 5, "preflight_id": preflight["preflight_id"],
                                        "confirmed_identity": preflight["identity"]}, self.context)
+
+    @contextmanager
+    def registered_app(self, *, privileged=False):
+        application = Application(Config(self.root / "socket", self.root / "guarded-state",
+            bundle_path=self.app.config.bundle_path, no_poll=True), docker=FakeDocker(),
+            policy=AuthPolicy(os.getuid(), privileged=privileged))
+        manager = module.register(application)
+        manager.runner = self.runner
+        manager._hub_network = self.manager._hub_network
+        try:
+            with patch.object(manager, "_ssh_credentials", return_value={
+                "options": [], "fingerprint": IDENTITY["host_key_fingerprint"],
+                "host": "root@192.168.205.2", "env": {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}}):
+                yield application, manager
+        finally:
+            application.close()
+
+    def test_registered_preflight_never_prompts_but_other_admin_actions_stay_protected(self):
+        context = RequestContext(os.getuid(), os.getpid(), process_start_time(os.getpid()))
+        with self.registered_app(privileged=True) as (application, _):
+            with patch("aquahub_agent.security.subprocess.run") as pkcheck:
+                pkcheck.return_value.returncode = 1
+                result = application.dispatch("drones.preflight", {"number": 5}, context)
+                self.assertTrue(result["allowed"], result)
+                pkcheck.assert_not_called()
+                for method, params in (
+                    ("drones.configure", {"number": 5, "preflight_id": result["preflight_id"], "confirmed_identity": result["identity"]}),
+                    ("drones.enroll", {"number": 5, "confirmed": True}),
+                    ("drones.ssh_settings", {}),
+                ):
+                    with self.assertRaises(ApiError) as caught:
+                        application.dispatch(method, params, context)
+                    self.assertEqual(caught.exception.code, "unauthorized")
+                self.assertEqual(pkcheck.call_count, 3)
+                self.assertTrue(all(call.args[0][0] == "/usr/bin/pkcheck" for call in pkcheck.call_args_list))
+            self.assertEqual(application.store.jobs(), [])
+
+    def test_registered_preflight_rejects_another_uid_before_ssh_or_staging(self):
+        with self.registered_app(privileged=True) as (application, manager):
+            before = list(manager.root.iterdir())
+            with patch("aquahub_agent.security.subprocess.run") as pkcheck:
+                with self.assertRaises(ApiError) as caught:
+                    application.dispatch("drones.preflight", {"number": 5}, RequestContext(os.getuid() + 1, os.getpid()))
+                self.assertEqual(caught.exception.code, "unauthorized")
+                pkcheck.assert_not_called()
+            self.assertEqual(self.runner.calls, [])
+            self.assertEqual(list(manager.root.iterdir()), before)
+
+    def test_registered_preflight_is_bounded_read_only_remote_and_does_not_enroll(self):
+        with self.registered_app() as (application, manager):
+            original = (self.app.config.bundle_path / "config/mavlink/config.conf").read_bytes()
+            result = application.dispatch("drones.preflight", {"number": 5}, self.context)
+            self.assertTrue(result["allowed"], result)
+            remote_calls = [(args, kwargs) for args, kwargs in self.runner.calls if args[0].endswith("ssh")]
+            self.assertEqual(len(remote_calls), 1)
+            args, kwargs = remote_calls[0]
+            self.assertEqual(args, ["/usr/bin/ssh", "root@192.168.205.2", module.REMOTE_READ])
+            self.assertEqual(kwargs["timeout"], 25)
+            self.assertFalse(any(args[0].endswith("scp") or "reboot" in args[-1] for args, _ in self.runner.calls))
+            self.assertFalse((manager.root / "inventory.json").exists())
+            self.assertFalse((manager.root / "hosts").exists())
+            self.assertEqual((self.app.config.bundle_path / "config/mavlink/config.conf").read_bytes(), original)
+            self.assertEqual(application.store.jobs(), [])
+
+    def test_registered_preflight_excludes_jobs_second_preflight_and_external_maintenance(self):
+        entered, release = threading.Event(), threading.Event()
+        outcome = []
+        with self.registered_app() as (application, manager):
+            def blocking_runner(args, **kwargs):
+                if args[-1] == module.REMOTE_READ:
+                    entered.set()
+                    self.assertTrue(release.wait(3))
+                return self.runner(args, **kwargs)
+            manager.runner = blocking_runner
+            def check():
+                outcome.append(application.dispatch("drones.preflight", {"number": 5}, self.context))
+            thread = threading.Thread(target=check)
+            thread.start()
+            try:
+                self.assertTrue(entered.wait(1))
+                with self.assertRaises(ApiError) as caught:
+                    application.submit_job("update", "aqua-hub", {}, lambda: self.fail("Must not update"))
+                self.assertEqual(caught.exception.code, "busy")
+                with self.assertRaises(ApiError) as caught:
+                    application.dispatch("drones.preflight", {"number": 6}, self.context)
+                self.assertEqual(caught.exception.code, "busy")
+                with application._maintenance_path.open("r+") as descriptor:
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(descriptor.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                release.set()
+                thread.join(3)
+            self.assertFalse(thread.is_alive())
+            self.assertTrue(outcome[0]["allowed"], outcome)
+            self.assertFalse(application._mutation_lock.locked())
+            with application._maintenance_path.open("r+") as descriptor:
+                fcntl.flock(descriptor.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_registered_preflight_refuses_pending_update_external_maintenance_and_unresolved_job(self):
+        with self.registered_app() as (application, _):
+            application.app_updates = SimpleNamespace(installation_pending=Mock(return_value=True))
+            with self.assertRaises(ApiError) as caught:
+                application.dispatch("drones.preflight", {"number": 5}, self.context)
+            self.assertEqual(caught.exception.code, "maintenance")
+            # Pending installation may appear between dispatch and reservation.
+            application.app_updates.installation_pending = Mock(side_effect=[False, True])
+            with self.assertRaises(ApiError) as caught:
+                application.dispatch("drones.preflight", {"number": 5}, self.context)
+            self.assertEqual(caught.exception.code, "maintenance")
+            application.app_updates.installation_pending = Mock(return_value=False)
+            with application._maintenance_path.open("r+") as descriptor:
+                fcntl.flock(descriptor.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with self.assertRaises(ApiError) as caught:
+                    application.dispatch("drones.preflight", {"number": 5}, self.context)
+                self.assertEqual(caught.exception.code, "maintenance")
+            application.store.create_job("legacy", "aqua-hub", {})
+            with self.assertRaises(ApiError) as caught:
+                application.dispatch("drones.preflight", {"number": 5}, self.context)
+            self.assertEqual(caught.exception.code, "busy")
+            self.assertEqual(self.runner.calls, [])
+            self.assertFalse(application._mutation_lock.locked())
+
+    def test_registered_preflight_releases_locks_after_failure_and_unexpected_error(self):
+        with self.registered_app() as (application, manager):
+            for error in (ApiError("ssh_failed", "synthetic failure"), RuntimeError("synthetic unexpected failure")):
+                manager.runner = Mock(side_effect=error)
+                if isinstance(error, ApiError):
+                    result = application.dispatch("drones.preflight", {"number": 5}, self.context)
+                    self.assertFalse(result["allowed"])
+                    self.assertEqual(result["code"], "ssh_failed")
+                else:
+                    with self.assertRaises(RuntimeError):
+                        application.dispatch("drones.preflight", {"number": 5}, self.context)
+                self.assertFalse(application._mutation_lock.locked())
+                with application._maintenance_path.open("r+") as descriptor:
+                    fcntl.flock(descriptor.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     def test_inventory_is_six_supported_unknown_unconfigured_devices(self):
         result = self.manager.list()

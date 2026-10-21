@@ -3,6 +3,18 @@ import type { Drone, HubStatus, Job, Preflight, Service, Inspection, JobProgress
 export function escape(value: unknown): string { return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!)); }
 export function plainLog(text: string): string { return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').slice(-200000); }
 export function serviceState(state: string): string { return ({ running: 'En cours', exited: 'Arrêté', stopped: 'Arrêté', restarting: 'Redémarrage', created: 'Créé', paused: 'En pause', dead: 'En échec', missing: 'Absent' } as Record<string, string>)[state] ?? 'État inconnu'; }
+export function observationFresh(status: HubStatus | null, connected: boolean, now = Date.now()): boolean {
+  if (!connected || !status?.docker_available || status.stale || !status.collected_at) return false;
+  const collected = Date.parse(status.collected_at);
+  return Number.isFinite(collected) && now - collected >= -5000 && now - collected <= 30000;
+}
+export function serviceTone(service: Service, fresh: boolean): 'running' | 'failed' | 'transition' | 'unknown' {
+  if (!fresh) return 'unknown';
+  if (service.state === 'running') return 'running';
+  if (['exited', 'stopped', 'dead', 'missing'].includes(service.state)) return 'failed';
+  if (['restarting', 'paused', 'created'].includes(service.state)) return 'transition';
+  return 'unknown';
+}
 export function healthState(health: string | null): string { if (!health || ['none', 'not_defined', 'undefined'].includes(health)) return 'Non défini'; return ({ healthy: 'Validé', unhealthy: 'En échec', starting: 'Vérification' } as Record<string, string>)[health] ?? 'Inconnu'; }
 export function counts(services: Service[]) { return { total: services.length, running: services.filter(s => s.state === 'running').length, healthy: services.filter(s => s.health === 'healthy').length, unhealthy: services.filter(s => s.health === 'unhealthy').length, undefined: services.filter(s => healthState(s.health) === 'Non défini').length }; }
 export function identifiedDrones(drones: Drone[]): Drone[] { return drones.filter(drone => drone.reachable === true || drone.identity_verified === true || drone.configured === true).sort((a, b) => Number(b.reachable === true) - Number(a.reachable === true) || a.number - b.number); }

@@ -16,6 +16,7 @@
       await mode('stale'); await wait(() => document.querySelector('#connection-banner').textContent.includes('non actualisée'), 'avertissement stale');
       assert(find('.service-row').textContent.includes('GCS de test'), 'Dernières données perdues');
       assert(find('[data-action="restart"]').disabled, 'Mutation disponible sur données anciennes');
+      assert(find('.service-row .service-state').classList.contains('state-unknown'), 'Ancien état encore coloré comme actuel');
       assert(find('#freshness').textContent.includes('Dernière lecture'), 'Données anciennes présentées comme actuelles');
     });
     await check('Un moteur non supervisable laisse le diagnostic et les réglages accessibles', async () => {
@@ -29,10 +30,12 @@
       await mode('offline'); await wait(() => find('#connection-banner').textContent.includes('Connexion simulée interrompue'), 'coupure affichée');
       assert(document.querySelectorAll('.service-row').length === 1, 'Dernier état effacé sans nécessité');
       assert(find('[data-action="restart"]').disabled, 'Mutation disponible pendant une coupure');
+      assert(find('.service-row .service-state').classList.contains('state-unknown'), 'Ancien état vert conservé pendant coupure');
     });
     await check('La reconnexion restaure les données et les actions sans redémarrer l’application', async () => {
       await mode('fresh'); await wait(() => !document.querySelector('#connection-banner .error'), 'reconnexion');
       assert(!find('[data-action="restart"]').disabled, 'Action non rétablie après reconnexion');
+      assert(find('.service-row .service-state').classList.contains('state-running'), 'Contour vert absent après observation récente');
     });
     await check('Une actualisation conserve le focus clavier du composant sélectionné', async () => {
       find('[data-service="gcs"]').focus(); click('[data-action="refresh"]'); await pause(300);

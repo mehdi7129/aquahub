@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.0.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.1.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -19,12 +19,15 @@ ses images et ses configurations privées doivent être obtenus séparément.
 - Supervision des huit composants reconnus du bundle, avec état du conteneur
   distinct de son contrôle de santé.
 - Détail d’un service, redémarrages autorisés et tâches de maintenance suivies.
-- Journaux techniques, événements persistants et extraits de panne bornés.
+- Journaux techniques, événements persistants et extraits de panne bornés,
+  avec enregistrement des logs d’un service ou export groupé.
 - Accès aux interfaces GCS, Fleet Controller et Portainer.
 - Inventaire Aqua_Drones, identité SSH, précontrôles et configuration d’une cible
   à partir des fonctions du fournisseur.
 - Suivi de configuration par appareil, progression fondée sur les étapes
   observées et rappel détaillé des cinq contrôles manuels.
+- Précontrôles Aqua_Drone sans demande de mot de passe administrateur,
+  avec identité SSH et exclusion des interventions concurrentes conservées.
 - Recherche, téléchargement et installation confirmée des mises à jour de
   l’application depuis les Releases GitHub officielles, séparées du bundle.
 - Inspection d’archives de mise à jour et application des seules livraisons
@@ -33,6 +36,12 @@ ses images et ses configurations privées doivent être obtenus séparément.
 Les adresses IP existantes ne sont pas administrées par l’interface. Les actions
 réseau sans précontrôle suffisant restent bloquées. Les contrôles manuels des
 drones ne sont pas validés automatiquement.
+
+Les états utilisent des contours discrets vert, rouge, orange ou gris ; une
+observation périmée n’est pas affichée comme un service actuellement en cours.
+Les relances de Réseau du bundle et GCS Reactor comparent les adresses et les
+routes avant et après. WireGuard reste protégé en attendant la validation de
+son comportement d’échec. La santé fonctionnelle reste distincte de l’état.
 
 ## Reprendre le développement
 

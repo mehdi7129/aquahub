@@ -8,8 +8,8 @@
  await check('La source officielle de l’application reste distincte du dépôt fournisseur',async()=>{
    await wait(()=>document.querySelector('.service-row'),'supervision');click('[data-page="updates"]');
    await wait(()=>document.querySelector('.app-update-card'),'application');
-   assert(find('.app-update-card').textContent.includes('github.com/mehdi7129/aquahub'),'source officielle absente');
-   assert(find('.source-card').textContent.includes('gitlab.com/fournisseur/bundle'),'source fournisseur absente');
+   assert(!find('.app-update-card').textContent.includes('github.com'),'source technique de l’application visible');
+   assert((await window.aquahub.request('settings.get')).github_url === 'https://gitlab.com/fournisseur/bundle','source fournisseur incorrecte');
    assert(!document.querySelector('.workspace-label'),'ancien sous-titre visible');
  });
  await check('Une erreur GitHub reste lisible et ne déclenche aucun téléchargement',async()=>{

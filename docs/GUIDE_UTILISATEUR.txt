@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.0
+Préproduction 0.2.1
 
 1. Disponibilité et installation
 
@@ -24,7 +24,10 @@ un volume ou un service existant pour contourner un diagnostic.
 La liste affiche les composants reconnus sur le moteur Docker natif. En cours
 décrit l’état du conteneur. Validé décrit une sonde de santé définie qui
 réussit ; Non défini signifie qu’aucune sonde n’existe pour ce composant.
-Le bundle reconnu a deux sondes et six composants sans sonde. Ces informations
+Le contour du badge est vert pour un service en cours, rouge pour un service
+arrêté/en échec/absent, orange en transition et gris si son état actuel n’est
+pas confirmé. La santé se consulte dans le détail ; un échec de sonde reste
+signalé dans la liste. Le bundle reconnu a deux sondes et six composants sans sonde. Ces informations
 ne valident pas les capteurs, moteurs ou conditions de navigation d’un drone.
 
 Sélectionner un composant pour lire son détail. Actualiser relit son état.
@@ -42,10 +45,11 @@ confirmation. Autoriser l’action dans la boîte administrateur si elle est
 demandée et attendre le résultat. Une seule maintenance incompatible peut
 progresser à la fois. Fermer la fenêtre n’annule pas la tâche de l’agent.
 
-Les actions sur Réseau du bundle, WireGuard et GCS Reactor restent bloquées
-tant que leur précontrôle ne garantit pas la conservation des IP existantes.
-Lire le motif dans le détail ; ne pas chercher une autre voie pour contourner
-cette protection dans le cadre d’une opération AquaHub.
+Réseau du bundle et GCS Reactor disposent d’une relance individuelle avec
+contrôle des adresses et routes avant/après. Ces composants peuvent réappliquer
+leurs paramètres existants au démarrage. WireGuard reste indisponible dans
+l’attente de la validation de son comportement d’échec ; le motif est affiché.
+AquaHub ne réécrit pas les paramètres réseau pour corriger un résultat.
 
 4. Journaux et historique
 
@@ -53,6 +57,14 @@ Logs techniques présente les dernières lignes disponibles du composant.
 Suivre active leur actualisation ; décocher permet une lecture stable.
 Les journaux contiennent ce que le service écrit : ils ne décrivent pas
 nécessairement toutes ses actions.
+
+Enregistrer les logs ouvre un dialogue de destination et produit un fichier
+.log avec un extrait récent, horodaté et filtré. L’export de tous les services
+se trouve aussi dans Réglages → Diagnostic et assistance ; il produit un ZIP
+avec un fichier par service et un résumé. Annuler ne lance pas de collecte.
+L’export est limité à 1000 dernières lignes demandées et 48 Kio par service ;
+un service absent, une troncature ou une lecture refusée sont signalés.
+La rotation Docker du bundle limite également ce qui reste disponible.
 
 Historique conserve les événements collectés par AquaHub. Le passé antérieur
 à la collecte et les périodes sans observation ne sont pas reconstitués.
@@ -80,6 +92,12 @@ local avec le socket monté par le kit. Il n’est pas nécessaire de réimporte
 une deuxième stack du bundle. Le bouton de relance conserve le compte et
 les données d’une instance locale gérée reconnue.
 
+Dans Portainer, les logs des services sont sous environnement local →
+Containers → choisir le conteneur → Logs. Download logs permet l’export.
+Activity logs désigne l’audit administratif documenté pour Business Edition,
+pas les sorties des conteneurs. AquaHub n’a pas besoin de ce compte pour
+consulter ou enregistrer les journaux des services.
+
 6. Aqua_Drones
 
 Les profils numérotés correspondent aux configurations du bundle ; leur
@@ -91,6 +109,9 @@ association avec une source physique fiable. Une réponse à une IP ne prouve
 pas l’identité d’un drone.
 
 Choisir le numéro prévu, lancer Vérifier cet appareil et lire les contrôles.
+Cette vérification ne demande plus le mot de passe administrateur du PC.
+Elle conserve l’identité SSH et ne transfère aucune configuration au drone.
+Une première association SSH reste une étape distincte.
 La configuration n’est disponible que si la cible, l’identité, les fichiers
 et le réseau sont compatibles. Confirmer ensuite l’identité physique avant
 de lancer le travail. Le drone peut redémarrer ; attendre son retour vérifié.
@@ -136,14 +157,12 @@ d’identité. Les clés privées ne sont pas saisies dans le renderer.
 
 7. Mettre l’application AquaHub à jour
 
-Dans Mises à jour, le premier bloc Application AquaHub concerne l’interface
-et son agent, depuis les Releases publiques GitHub de mehdi7129/aquahub.
-Ce canal est fixé dans l’application ; aucune URL fournisseur ni aucun jeton
-n’est nécessaire pour cette recherche publique. Une connexion Internet est
-requise pour rechercher et télécharger une nouvelle version.
+Dans Mises à jour, le premier bloc Application AquaHub affiche la version
+et le bouton de recherche. La source officielle est intégrée à l’application,
+sans URL à configurer. Une connexion Internet est nécessaire pour rechercher
+et télécharger une nouvelle version.
 
-Choisir Rechercher une mise à jour AquaHub. Une branche, un commit ou une
-archive de sources ne vaut pas une Release installable. Si une version
+Choisir Rechercher une mise à jour. Si une version
 stable compatible est proposée, lire ses notes puis choisir Télécharger.
 Le paquet est vérifié avant que le bouton Installer ne soit disponible.
 Confirmer ensuite l’installation et autoriser la demande système.
@@ -162,7 +181,12 @@ de première installation. Le kit complet hors ligne reste un autre artefact.
 
 8. Mettre le bundle fournisseur à jour
 
-Choisir une archive de bundle lance son inspection. Une archive reconnue peut
+La recherche en ligne est présentée en premier. Le connecteur actuel permet
+de consulter des livraisons publiées ; le parcours Git + registre spécifique
+du fournisseur attend encore sa qualification.
+
+La section située en bas permet d’installer depuis une archive déjà
+téléchargée. Choisir une archive de bundle lance son inspection. Une archive reconnue peut
 rester non applicable ; l’intégrité seule ne prouve pas sa compatibilité.
 Une application autorisée possède une confirmation distincte et peut
 interrompre les services. Lire le résultat et la disponibilité du retour

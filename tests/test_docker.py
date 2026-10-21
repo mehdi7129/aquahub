@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -87,11 +88,69 @@ class DockerAdapterTests(unittest.TestCase):
     def test_network_guard_precedes_every_docker_command(self):
         docker = Docker()
         with patch.object(docker,"run") as run:
-            for service in ("wireguard","net_setup","gcs_reactor"):
-                with self.assertRaises(ApiError) as caught:
-                    docker.action(service,"restart")
-                self.assertEqual(caught.exception.code,"network_guard")
+            for service in ("wireguard", "net_setup", "gcs_reactor"):
+                operations = ("start", "stop", "restart") if service == "wireguard" else ("start", "stop")
+                for operation in operations:
+                    with self.subTest(service=service, operation=operation), self.assertRaises(ApiError) as caught:
+                        docker.action(service, operation)
+                    self.assertEqual(caught.exception.code, "network_guard")
             run.assert_not_called()
+
+    def test_network_services_expose_only_qualified_restarts(self):
+        for service in ("net_setup", "gcs_reactor"):
+            actions = Docker.allowed_actions(service)
+            self.assertTrue(actions["restart"])
+            self.assertFalse(actions["start"])
+            self.assertFalse(actions["stop"])
+            self.assertFalse(Docker.allowed_actions(service, missing=True)["restart"])
+        self.assertFalse(Docker.allowed_actions("wireguard")["restart"])
+
+    def test_network_restart_observes_addresses_and_routes_without_recreating_container(self):
+        docker = Docker()
+        network = {"addresses": [["test0", "inet", "192.0.2.1", 24]], "routes": []}
+        for service in ("net_setup", "gcs_reactor"):
+            before = {"id": "abc", "service": service, "image_id": "sha256:fixed", "state": "running", "health": "not_defined"}
+            with self.subTest(service=service), patch.object(docker, "resolve", side_effect=[before.copy(), before.copy()]), \
+                    patch.object(docker, "_host_network_snapshot", side_effect=[network, network]) as snapshot, patch.object(docker, "run") as run:
+                result = docker.action(service, "restart")
+                run.assert_called_once_with(["restart", "--time", "15", "abc"], timeout=45)
+                self.assertEqual(snapshot.call_count, 2)
+                self.assertTrue(result["network_unchanged"])
+
+    def test_unavailable_network_observation_prevents_restart(self):
+        docker = Docker()
+        with patch.object(docker, "resolve", return_value={"id": "abc"}), \
+                patch.object(docker, "_host_network_snapshot", side_effect=ApiError("network_check", "Fixture indisponible")), \
+                patch.object(docker, "run") as run:
+            with self.assertRaises(ApiError) as caught:
+                docker.action("net_setup", "restart")
+            self.assertEqual(caught.exception.code, "network_check")
+            run.assert_not_called()
+
+    def test_changed_network_is_reported_and_never_rewritten(self):
+        docker = Docker()
+        row = {"id": "abc", "service": "gcs_reactor", "image_id": "sha256:fixed", "state": "running", "health": "not_defined"}
+        with patch.object(docker, "resolve", side_effect=[row.copy(), row.copy()]), \
+                patch.object(docker, "_host_network_snapshot", side_effect=[{"routes": ["before"]}, {"routes": ["changed"]}]), \
+                patch.object(docker, "run") as run:
+            with self.assertRaises(ApiError) as caught:
+                docker.action("gcs_reactor", "restart")
+            self.assertEqual(caught.exception.code, "network_changed")
+            run.assert_called_once_with(["restart", "--time", "15", "abc"], timeout=45)
+
+    def test_network_observation_includes_ipv6_routes_and_rejects_invalid_output(self):
+        docker = Docker()
+        outputs = [[], [{"dst": "192.0.2.0/24", "dev": "test0"}], [{"dst": "2001:db8::/64", "dev": "test0"}]]
+        results = [subprocess.CompletedProcess([], 0, json.dumps(value).encode()) for value in outputs]
+        with patch("aquahub_agent.docker.subprocess.run", side_effect=results) as run:
+            snapshot = docker._host_network_snapshot()
+        self.assertEqual(len(snapshot["routes"]), 2)
+        self.assertIn(["/usr/sbin/ip", "-j", "-6", "route", "show", "table", "all"], [call.args[0] for call in run.call_args_list])
+        for raw in (b"not JSON", b"{}", b"[1]"):
+            with patch("aquahub_agent.docker.subprocess.run", return_value=subprocess.CompletedProcess([], 0, raw)):
+                with self.assertRaises(ApiError) as caught:
+                    docker._host_network_snapshot()
+                self.assertEqual(caught.exception.code, "network_check")
 
     def test_portainer_link_uses_published_port(self):
         docker = Docker()

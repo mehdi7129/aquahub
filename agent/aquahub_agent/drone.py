@@ -404,6 +404,12 @@ class DroneManager:
             stream.write(content)
 
     def preflight(self, params, context=None):
+        # Read-only SSH and private local staging need no administrator prompt,
+        # but must not overlap a configuration, bundle update or app upgrade.
+        with self.app.operation_guard():
+            return self._preflight(params, context)
+
+    def _preflight(self, params, context=None):
         _params(params, {"number"})
         number = drone_number(params.get("number"))
         token = uuid.uuid4().hex
@@ -787,6 +793,8 @@ else: refuse()
 def register(app):
     manager = DroneManager(app)
     for name in ("list", "scan", "preflight", "configure", "identity", "enroll", "ssh_settings"):
-        app.register_handler("drones." + name, getattr(manager, name), mutation=name in ("preflight", "configure", "enroll", "ssh_settings"))
+        app.register_handler("drones." + name, getattr(manager, name),
+            mutation=name in ("preflight", "configure", "enroll", "ssh_settings"),
+            requires_admin=False if name == "preflight" else None)
     app.drones = manager
     return manager

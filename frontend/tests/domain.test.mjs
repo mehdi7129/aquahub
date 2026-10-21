@@ -1,11 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ActionGate, counts, escape, healthState, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobSucceeded, normalizeRepository, plainLog, preflightAllowed, progressCaption, restartAllowed, rpcResultError, validateStatus } from './.runtime/domain.mjs';
+import { ActionGate, counts, escape, healthState, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobSucceeded, normalizeRepository, observationFresh, plainLog, preflightAllowed, progressCaption, restartAllowed, rpcResultError, serviceTone, validateStatus } from './.runtime/domain.mjs';
 
 const drone = { number: 5, name: 'Aqua_Drone_5', address: '192.168.205.2', reachable: true, identity_verified: false, configured: false, supported: true };
 const preflight = { preflight_id: 'p-5', number: 5, address: drone.address, allowed: true, checks: [{ label: 'Réseau', ok: true }] };
 const service = { id: 'gcs', name: 'GCS', state: 'running', health: null };
 const status = { docker_available: true, services: [service], active_job: null };
+
+test('la couleur dépend d’une observation récente et non du dernier état mémorisé', () => {
+  const now = Date.parse('2026-10-21T12:00:00Z');
+  const fresh = { ...status, collected_at: new Date(now - 1000).toISOString() };
+  assert.equal(observationFresh(fresh, true, now), true);
+  for (const changed of [{ stale: true }, { docker_available: false }, { collected_at: new Date(now - 30001).toISOString() }, { collected_at: new Date(now + 5001).toISOString() }, { collected_at: 'invalide' }, { collected_at: undefined }]) assert.equal(observationFresh({ ...fresh, ...changed }, true, now), false);
+  assert.equal(observationFresh(fresh, false, now), false);
+  assert.equal(observationFresh(null, true, now), false);
+});
+
+test('les contours séparent exécution, arrêt, transition et état inconnu sans inventer une santé', () => {
+  assert.equal(serviceTone(service, true), 'running');
+  assert.equal(serviceTone({ ...service, health: 'unhealthy' }, true), 'running');
+  for (const state of ['exited', 'stopped', 'dead', 'missing']) assert.equal(serviceTone({ ...service, state }, true), 'failed');
+  for (const state of ['restarting', 'paused', 'created']) assert.equal(serviceTone({ ...service, state }, true), 'transition');
+  assert.equal(serviceTone({ ...service, state: 'future-state' }, true), 'unknown');
+  for (const state of ['running', 'exited', 'restarting']) assert.equal(serviceTone({ ...service, state }, false), 'unknown');
+});
 
 test('un service en cours sans contrôle de santé ne devient pas sain', () => {
   const summary = counts([service, { ...service, id: 'mqtt', health: 'healthy' }, { ...service, id: 'fleet', health: 'unhealthy' }, { ...service, id: 'old', state: 'exited', health: null }]);

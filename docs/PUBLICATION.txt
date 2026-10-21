@@ -45,8 +45,8 @@ Pour une mise à jour publique de l’application seule :
 
   python3 installer/build_package.py \
     --application-only \
-    --output dist/aquahub-application_0.2.0_amd64.deb \
-    --version 0.2.0
+    --output dist/aquahub-application_0.2.1_amd64.deb \
+    --version 0.2.1
 
 Ce mode n’accepte ni --payload ni --private-kit. Le paquet garde le nom Debian
 aquahub-setup afin de mettre à niveau l’installation 0.1.2 existante, sans
@@ -106,6 +106,17 @@ n’est pas un analyseur de secrets et une licence MIT ne donne pas les droits
 de redistribuer les configurations ou logiciels d’un fournisseur.
 Les notices, sources requises par des licences tierces et droits des images
 doivent être traités dans la livraison des composants concernés.
+
+Pour qualifier une mise à jour légère, capturer l’état de la VM après son
+démarrage puis avant l’installation du candidat. Comparer après installation
+les fichiers du bundle, son unité systemd, le kit hors ligne, les identités,
+images, montages et paramètres des conteneurs ainsi que les adresses et routes
+IPv4 et IPv6. Un redémarrage de conteneur doit changer son heure de lancement,
+sans changer son identité ni son image. Tester les relances autorisées une à
+une et conserver les rapports détaillés dans un dossier privé hors du dépôt.
+Une recette ne remplace pas la validation d’un comportement fournisseur
+encore inconnu : WireGuard demeure protégé tant que son chemin d’échec et
+la procédure de reprise ne sont pas validés.
 
 6. GitHub Releases
 

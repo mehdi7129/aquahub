@@ -1,0 +1,50 @@
+Suivi pour Benoît — mise à jour du hub et relance WireGuard
+21 octobre 2026
+
+Bonjour Benoît,
+
+J’ai bien retrouvé le tag Git v1.0.0 et les tags v1.0.0 des cinq images
+privées. Les accès existants suffisent pour Git et le registre ; pas
+besoin de read_api pour ce parcours.
+
+Après lecture du contenu réel de ce tag, il reste ces points précis :
+
+1. Mise à jour du hub sans configuration des drones
+
+Dans v1.0.0, install.sh appelle deploy.py à la ligne 80, sans option pour
+l’éviter. Or deploy.py configure les drones et peut les redémarrer.
+Le README décrit aussi git pull puis docker compose pull et up -d.
+Confirmes-tu que ce second parcours est celui à intégrer pour mettre à jour
+uniquement le hub, en conservant .env, MAVLink, VPN et données existantes ?
+Quels changements de setup rendent ensuite une reconfiguration des drones
+nécessaire, et comment une version le signale-t-elle ?
+
+2. Versions complètes et images externes
+
+Les cinq images privées suivent TAG, mais Mosquitto utilise 2.0 et
+WireGuard WIREGUARD_TAG, avec latest par défaut. Pour v1.0.0, quelles
+versions ou digests de ces deux images valides-tu ? Nous figerons toutes
+les images par digest pour pouvoir réinstaller exactement la même livraison.
+
+3. Retour à la version précédente
+
+Pour les volumes persistants et la configuration, quelles migrations
+existent ou peuvent apparaître ? Peut-on restaurer le précédent ensemble
+Compose + images + configuration sans incompatibilité de données ?
+Quels éléments faut-il sauvegarder pour un retour réellement valide ?
+Le but est de ne pas annoncer un rollback garanti avant sa qualification.
+
+4. Échec au redémarrage de WireGuard
+
+Dans l’image actuellement installée, le script
+/etc/s6-overlay/s6-rc.d/svc-wireguard/run exécute ip route del default
+si la configuration est absente/non reconnue ou si wg-quick up échoue.
+Le conteneur utilise network_mode: host et NET_ADMIN : cela peut donc
+toucher une route du poste, même si les IP sont fixes.
+Ce comportement est-il attendu dans ton installation ? Quelle procédure
+ou version d’image recommandes-tu pour permettre la relance depuis
+AquaHub avec un comportement d’échec maîtrisé ?
+
+Le kit client générique, sans clés privées préexistantes et avec une
+procédure de création de configurations propres à chaque client, reste
+un sujet de distribution séparé à définir ensemble.

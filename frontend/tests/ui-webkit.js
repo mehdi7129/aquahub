@@ -24,7 +24,7 @@
       await wait(() => document.querySelectorAll('.service-row').length === 8, 'services chargés');
       assert(find('.demo-banner').textContent.includes('Données fictives'), 'Bandeau démonstration absent');
       assert(!document.querySelector('.workspace-label'), 'Sous-titre espace de pilotage encore visible');
-      assert(document.querySelectorAll('.health .icon').length === 2, 'Nombre de contrôles santé incohérent');
+      assert(find('.summary-health').textContent.includes('2 validés') && !find('.summary-health').textContent.includes('non défini'), 'Résumé des contrôles santé incohérent');
     });
     await check('Le thème sombre puis clair est appliqué et mémorisé', async () => {
       if (document.documentElement.dataset.theme !== 'dark') click('#theme-toggle');
@@ -113,7 +113,7 @@
       find('#settings-form').requestSubmit();
       await wait(() => !document.querySelector('.job-banner'), 'source enregistrée');
       click('[data-page="updates"]');
-      assert(find('.source-card').textContent.includes('https://github.com/exemple/aqua'), 'Source non conservée');
+      assert(JSON.parse(localStorage.getItem('aquahub-demo-settings') ?? '{}').github_url === 'https://github.com/exemple/aqua', 'Source non conservée');
       assert(!document.querySelector('.job-banner'), 'Mise à jour déclenchée par la source');
     });
     await check('Le téléchargement d’une release revient à l’inspection sans appliquer la livraison', async () => {
@@ -127,8 +127,9 @@
       assert(!find('#confirmation').open, 'Installation automatiquement proposée en confirmation');
     });
     await check('Les Releases AquaHub sont séparées des livraisons du bundle', async () => {
-      assert(find('.app-update-card').textContent.includes('github.com/mehdi7129/aquahub'),'Source officielle de l’application absente');
-      assert(find('.source-card').textContent.includes('https://github.com/exemple/aqua'),'Source fournisseur remplacée par source application');
+      assert(!find('.app-update-card').textContent.includes('github.com'),'Source technique de l’application encore visible');
+      assert(find('.bundle-online').compareDocumentPosition(find('.bundle-local')) & Node.DOCUMENT_POSITION_FOLLOWING,'Archive présentée avant la mise à jour en ligne');
+      assert(JSON.parse(localStorage.getItem('aquahub-demo-settings') ?? '{}').github_url === 'https://github.com/exemple/aqua','Source fournisseur remplacée par source application');
       click('[data-action="check-app-update"]');
       await wait(()=>document.querySelector('[data-action="download-app-update"]'),'nouvelle version application');
       assert(find('[data-action="install-app-update"]').disabled,'Application installable avant téléchargement');

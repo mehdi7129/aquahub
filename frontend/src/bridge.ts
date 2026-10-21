@@ -17,7 +17,7 @@ export async function request<T>(method: string, params: Record<string, unknown>
 
 const serviceNames = [ ['mqtt', 'MQTT'], ['fleet-controller', 'Fleet Controller'], ['gcs', 'GCS'], ['reactor', 'Reactor'], ['net-setup', 'Réseau'], ['mavlink-router', 'Routeur MAVLink'], ['rtcm', 'Corrections RTCM'], ['wireguard', 'WireGuard'] ];
 const mockStatus: HubStatus = {
-  version: '0.2.0-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
+  version: '0.2.1-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
   bundle_path: '/opt/exemple/aqua-hub-bundle', active_job: null,
   services: serviceNames.map(([id, name], index) => ({ id, name, state: 'running', health: index < 2 ? 'healthy' : null, image_id: `sha256:demo-${id}`, restarts: 0, started_at: new Date(Date.now() - 3600000).toISOString() })),
 };
@@ -37,7 +37,7 @@ const demoManualChecks = [
   {id:'firmware',label:'Versions Heron',details:'Relever les versions du firmware Heron et du chargeur de démarrage (BL).'},
   {id:'console',label:'Diagnostic matériel MAVLink',details:'Dans la console MAVLink de QGroundControl : uavcan status, gps status et listener esc_status.'},
 ];
-let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.0-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
+let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.1-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
 let demoInstallationStarted = 0;
 
 
@@ -73,7 +73,7 @@ async function demoRequest(method: string, params: Record<string, unknown>): Pro
   await new Promise(resolve => setTimeout(resolve, 130));
   syncJob();
   switch (method) {
-    case 'status.get': return structuredClone(mockStatus);
+    case 'status.get': return structuredClone({ ...mockStatus, collected_at: new Date().toISOString() });
     case 'app.version': return { version: mockStatus.version };
     case 'app_updates.status': if(demoAppUpdate.installation?.status==='scheduled' && Date.now()-demoInstallationStarted>2500) {demoAppUpdate.installation={status:'installed',version:'0.3.0-démo',message:'Mise à jour simulée terminée.'};demoAppUpdate.current_version='0.3.0-démo';demoAppUpdate.available=false;} return structuredClone(demoAppUpdate);
     case 'app_updates.check': demoAppUpdate={...demoAppUpdate,available:true,release:{release_id:2,asset_id:3,version:'0.3.0-démo',tag:'v0.3.0-démo',notes:'Release fictive, aucun fichier réel téléchargé.',published_at:new Date().toISOString(),asset_name:'aquahub-application_0.3.0-demo_amd64.deb',asset_size:1024,sha256:'f'.repeat(64)},message:'Une version de démonstration est disponible.'};return structuredClone(demoAppUpdate);
@@ -85,6 +85,7 @@ async function demoRequest(method: string, params: Record<string, unknown>): Pro
     case 'service.logs': return { text: `[DÉMONSTRATION] ${String(params.service)}\n${new Date().toISOString()} Service simulé en cours.\nAucun journal réel n’est chargé.` };
     case 'service.restart': return startJob(`Redémarrage de ${mockStatus.services.find(service => service.id === params.service)?.name ?? 'service'}`, String(params.service));
     case 'portainer.restart': return startJob('Relance de Portainer', 'portainer');
+    case 'native.export_logs': return {saved:false,canceled:true};
     case 'native.source_credentials': return { canceled: true };
     case 'native.portainer_setup': return startJob('Initialisation Portainer', 'portainer-setup');
     case 'jobs.get': if (job?.id === params.id) return structuredClone(job); throw new Error('Tâche de démonstration introuvable.');

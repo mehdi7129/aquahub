@@ -5,23 +5,23 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-1. Résultat vérifié pour les sources 0.2.0
+1. Résultat vérifié pour les sources 0.2.1
 
-La suite Python publique a découvert 242 tests : 237 ont été exécutés avec
-succès et cinq ont été ignorés. Ces cinq cas sont les trois lectures Docker
-réelles, désactivées sans option, et les deux tests de contrat fournisseur,
-ignorés sans bundle local explicitement fourni. TypeScript, la construction
-frontend et les 19 tests de domaine JavaScript ont réussi.
-
-Les cinq tests optionnels ont aussi été exécutés séparément avec les
-préconditions du banc : trois lectures du moteur Docker réel et deux
-exécutions du script fournisseur sur transports interceptés ont réussi.
-Ces deux derniers cas n’ont pas configuré d’appareil physique.
+La suite Python publique a découvert 278 tests : 270 ont été exécutés avec
+succès et huit ont été ignorés dans le parcours sans options. Ces huit cas
+sont trois lectures Docker réelles, deux tests du script fournisseur sur
+transports interceptés et trois parcours GTK/WebKit des exports de journaux.
+Une exécution complète séparée sous Xvfb, avec les préconditions explicites
+du banc, a ensuite réussi les 278 tests sans omission. Aucun drone physique
+n’a été configuré par cette suite. TypeScript, la construction frontend et
+les 21 tests de domaine JavaScript ont réussi.
 
 Les recettes graphiques natives ont vérifié séparément :
   19 scénarios fonctionnels en mode démonstration ;
   17 scénarios de panne avec socket synthétique ;
   7 scénarios du canal applicatif avec socket synthétique ;
+  8 scénarios couleurs, données périmées, disposition des mises à jour et
+    exports avec retours de dialogue synthétiques ;
   12 contrôles de disposition et clavier, à 100 % et 200 % ;
   2 scénarios du dialogue GTK Portainer ;
   2 scénarios du dialogue GTK d’accès à la source.
@@ -89,6 +89,8 @@ Familles principales :
                                 de l’agent et vérification de version simulées.
   test_image_identity.py : identités Docker/OCI et rejets de contenus incohérents.
   test_portainer.py : premier compte, instance attendue et refus de remplacement.
+  test_log_exports.py : collecte filtrée et bornée, résultats partiels,
+                        fichiers privés, dialogue GTK et pont natif complet.
   test_installer_finish.py : adoption/installation avec opérations simulées.
   test_packaging.py : intégrité, contenu du .deb et portée des scripts Debian.
   test_upgrade_guard.py : exclusion avec une tâche active et garde du paquet.
@@ -102,7 +104,7 @@ Familles principales :
   cd ..
 
 npm test construit les ressources frontend et le module de domaine avant
-d’exécuter les 19 tests Node. Un simple npm run build construit les ressources
+d’exécuter les 21 tests Node. Un simple npm run build construit les ressources
 sans les tests. TypeScript est vérifié séparément par npm run check ; esbuild
 ne remplace pas ce contrôle des types.
 
@@ -166,6 +168,20 @@ doivent indiquer le mode demo ou fixture, et non une recette matérielle.
 Le parcours de démonstration vérifie la cible Aqua_Drone_N, ses jalons,
 l’attente indéterminée et le détail des cinq contrôles manuels. Voir aussi
 frontend/tests/README.txt pour les commandes et leurs limites.
+
+Couleurs, neutralisation d’une observation âgée même si le RPC reste bloqué,
+source applicative masquée, priorité en ligne et retours des exports :
+
+  python3 frontend/tests/run_phase1_feedback.py
+
+Les réponses des dialogues d’enregistrement de ce banc UI sont synthétiques.
+Les vrais dialogues et l’écriture utilisateur sont aussi exercés séparément :
+
+  AQUAHUB_TEST_GTK=1 GTK_USE_PORTAL=0 PYTHONPATH=agent:desktop xvfb-run -a python3 -m unittest discover -s tests -p test_log_exports.py -v
+
+Ce dernier banc utilise un backend de journaux factice, sans action sur
+un compte Portainer ou un conteneur réel. Son parcours complet passe par
+WebKit → bridge natif → collecte → fichier .log/.zip créé en mode 0600.
 
 Les scripts ui-dark-capture.js et ui-theme-persistence.js peuvent être injectés
 avec --test-script pour vérifier deux fenêtres successives partageant le même
@@ -255,7 +271,51 @@ une nouvelle livraison fournisseur ni une première installation à partir
 du petit paquet applicatif : celui-ci nécessite une installation initialisée.
 Les rapports bruts et données du banc restent privés.
 
-9. Ajouter et maintenir un test
+9. Recette du paquet applicatif 0.2.1
+
+Artefact : aquahub-application_0.2.1_amd64.deb, 145062 octets.
+SHA-256 : a16d5830a826b64c98963a23f33e04d806d8d7e0d30f94d92b84b93be8334d97.
+
+La VM Debian hors ligne a validé la mise à niveau 0.2.0 → 0.2.1 puis la
+réinstallation du paquet. Les 25 fichiers runtime/frontend contrôlés sont
+identiques aux sources figées et les 362 fichiers du kit conservé ont été
+vérifiés par empreinte. Les deux relances net_setup et gcs_reactor ont été
+exercées sur leurs conteneurs réels : fichiers, identités, images, montages,
+configurations et adresses/routes IPv4/IPv6 sont restés inchangés.
+
+Le composant RTCM redémarrait déjà de façon autonome dans cette VM hors
+ligne avant la construction du paquet. Son StartedAt seul est une exception
+documentée dans les comparaisons de recette ; ses autres invariants restent
+stricts. Les journaux bruts et les premières observations restent privés.
+WireGuard n’a pas été relancé, et aucun drone physique n’a été configuré.
+
+Sur le poste existant, le même paquet est installé et l’agent est actif.
+La mise à niveau a conservé les quinze fichiers surveillés, les neuf
+conteneurs avec leurs dates de démarrage et les observations réseau.
+Six contrôles natifs de lecture et de précontrôle ont réussi. Le clic de
+vérification du numéro 5 a obtenu un précontrôle valide alors qu’une règle
+de recette refusait explicitement l’élévation du seul processus testé.
+Cette règle a été supprimée après la recette. Aucun mot de passe, transfert
+de configuration ou redémarrage du drone n’a été nécessaire.
+
+Un export des huit services a aussi été lu depuis le compte utilisateur et
+enregistré en .zip, avec neuf entrées et un résumé. Le journal individuel
+a été enregistré en .log ; les deux fichiers ont le mode 0600. Une troncature
+réelle parmi les huit textes a été signalée comme telle, sans log indisponible.
+
+Les relances des deux services ont ensuite été exercées sur le poste via
+les vraies tâches RPC. Les deux résultats ont confirmé network_unchanged.
+La comparaison finale a conservé fichiers, réseau IPv4/IPv6, identités,
+images, montages et états ; seules les dates de démarrage des deux services
+demandés ont changé. Les autorisations de recette étaient limitées aux
+processus concernés et ont été supprimées. WireGuard n’a pas été relancé.
+
+La mise à jour Git + registre du fournisseur et la relance de WireGuard ne
+sont pas qualifiées par cette version. Elles attendent la procédure et la
+compatibilité demandées au fournisseur. Aucun install.sh ni deploy.py n’a
+été utilisé pour cette mise à niveau de l’application.
+
+10. Ajouter et maintenir un test
 
 Tester une règle au niveau où elle peut être contournée : la validation UI
 n’exonère pas le handler agent. Pour un refus, vérifier qu’aucun transport

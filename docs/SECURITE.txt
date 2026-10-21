@@ -12,7 +12,7 @@ par SO_PEERCRED ; le client ne peut pas les déclarer dans le JSON. La socket
 est en mode 0600 et appartient à l’opérateur autorisé. Un agent root ne sert
 que l’UID configuré ; la simple connexion n’autorise pas toutes les mutations.
 
-AuthPolicy vérifie, pour une mutation root, l’identité PID/UID et l’instant de
+AuthPolicy vérifie, pour une intervention administrative root, l’identité PID/UID et l’instant de
 démarrage lu dans /proc. Il demande à PolicyKit l’action
 com.aquadrone.aquahub.maintain, puis vérifie à nouveau le processus après
 l’autorisation. Le paquet utilise une action séparée pour son helper fixe.
@@ -20,6 +20,13 @@ Ne pas remplacer ces contrôles par une règle globale always-yes. Un agent de
 session non root n’utilise pas PolicyKit pour ses mutations : il opère avec
 les droits déjà détenus par l’utilisateur. L’accès au démon Docker reste donc
 un droit puissant ; le mode sources ne transforme pas Docker en sandbox.
+
+drones.preflight est une exception explicite à l’autorisation interactive,
+pas à l’identification locale. Le registre sépare requires_admin du besoin
+d’exclusion de maintenance. Le précontrôle utilise operation_guard : mutex,
+verrou de fichier partagé et seconde vérification de mise à jour programmée.
+Il ne transmet que la commande SSH de lecture fixe et prépare ses fichiers
+dans un espace local privé. Configure, enroll et ssh_settings restent protégés.
 
 Le pont WebKit n’accepte que le fichier index.html exact de l’application,
 avec un nonce aléatoire propre à la fenêtre. Navigation distante, nouvelles
@@ -63,8 +70,12 @@ cibles prévues par le contrat fournisseur actuel ; un scan cherche ces cibles,
 il ne reconfigure pas leurs interfaces. Toute évolution de ce contrat exige
 une décision et une qualification explicites.
 
-Les actions directes start/stop/restart de net_setup, wireguard et gcs_reactor
-sont bloquées, même si l’interface est contournée. Le moteur image-refresh-v1
+Les actions directes start/stop des trois composants réseau sont bloquées.
+restart est autorisé pour net_setup et gcs_reactor sur le conteneur existant,
+avec comparaison consultative des adresses et routes IPv4/IPv6 avant/après.
+Une différence donne un échec explicite, sans restauration automatique du
+réseau. WireGuard reste bloqué dans l’attente d’un parcours d’échec validé.
+Ces règles restent appliquées si l’interface est contournée. Le moteur image-refresh-v1
 refuse les changements d’images de ces composants ainsi que les changements
 de Compose et des configurations protégées.
 
@@ -130,6 +141,12 @@ liés à leur fournisseur et la politique de redirection empêche de les envoyer
 attendus avant de pouvoir être proposés au moteur. Un SHA-256 valide prouve
 la cohérence avec une référence, pas à lui seul l’identité de l’éditeur : la
 source et la chaîne de publication restent à établir pour chaque livraison.
+
+Les exports logs.export collectent seulement les huit services connus,
+bornent et filtrent chaque texte avant transport. Le desktop crée les
+fichiers ou archives côté utilisateur, après choix dans le dialogue GTK.
+L’agent n’expose pas d’écriture root dans une destination fournie par le
+renderer. Un export peut être partiel ; les absences sont explicites.
 
 Le réglage de source fournisseur concerne uniquement les livraisons du bundle.
 Un jeton de déploiement autorisant Git et le registre Docker ne donne pas

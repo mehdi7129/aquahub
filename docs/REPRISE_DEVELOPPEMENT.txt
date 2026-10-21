@@ -1,5 +1,5 @@
 AquaHub — reprendre le développement
-Référence : préproduction 0.2.0
+Référence : préproduction 0.2.1
 
 1. Commencer ici
 
@@ -154,7 +154,9 @@ API_ET_DONNEES.txt pour ses paramètres et son suivi d’installation séparé
 des tâches génériques. Un poste doit déjà être initialisé pour utiliser
 le paquet application-only. Aucune Release publique n’est encore annoncée.
 
-Les trois services configurant le réseau restent protégés. La présence d’un
+WireGuard reste protégé. Les relances de net_setup et gcs_reactor sont
+autorisées avec comparaison consultative des adresses/routes ; leurs autres
+actions restent protégées. La présence d’un
 conteneur running et les deux seules sondes du bundle ne valident pas la
 préparation physique des drones. Les contrôles manuels ne sont pas
 validés automatiquement.
@@ -185,3 +187,20 @@ Les tests de ses refus et des paquets sont indispensables avant de publier
 un binaire. Une somme SHA-256 GitHub/HTTPS est le contrôle actuel ; elle
 n’est pas une signature d’éditeur indépendante. La qualification réelle
 d’un nouveau paquet reste distincte des tests de fixtures.
+
+12. Évolutions 0.2.1
+
+Vérifier un Aqua_Drone ne nécessite plus d’autorisation interactive du PC.
+Le registre sépare requires_admin de mutation et le précontrôle utilise
+operation_guard. Ne pas modifier cette exception en rendant configure ou
+le handler de réglages SSH non protégés.
+
+Les badges d’état utilisent observationFresh/serviceTone. Le timer de
+fraîcheur neutralise un ancien état même si une réponse de l’agent tarde.
+La santé reste distincte et un échec de sonde demeure visible.
+
+logs.export renvoie des entrées bornées ; native.export_logs appelle le
+dialogue GTK et crée le fichier depuis le compte utilisateur. Voir les
+nouveaux modules log_exports.py des deux côtés et test_log_exports.py.
+L’export n’a pas besoin de jeton Portainer. Les fenêtres et les données de
+recette utilisent exclusivement des fixtures synthétiques ou un banc autorisé.

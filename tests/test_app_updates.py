@@ -153,7 +153,8 @@ class AppUpdateTests(unittest.TestCase):
         result = self.call("app_updates.check")
         self.assertEqual(result["repository"], REPOSITORY)
         self.assertFalse(result["available"])
-        self.assertIn("commit Git", result["message"])
+        self.assertIn("Aucune nouvelle version", result["message"])
+        self.assertNotIn("GitHub", result["message"])
         self.assertEqual(len(self.opener.calls), 1)
         request, timeout = self.opener.calls[0]
         self.assertEqual(request.full_url, API + "/releases?per_page=20")
@@ -355,6 +356,16 @@ class AppUpdateTests(unittest.TestCase):
         self.assertFalse(self.app._mutation_lock.locked())
         self.launcher.assert_not_called()
         self.app.store.set_job(job["id"], "interrupted")
+
+    def test_install_cannot_replace_agent_during_a_synchronous_drone_check(self):
+        self.stage()
+        with self.app.operation_guard():
+            self.expect("busy", "app_updates.install", {"version": "9.9.9", "confirmed": True})
+            self.launcher.assert_not_called()
+            self.assertFalse((self.manager.root / "pending.json").exists())
+        result = self.call("app_updates.install", {"version": "9.9.9", "confirmed": True})
+        self.assertTrue(result["scheduled"])
+        self.launcher.assert_called_once()
 
     def test_install_revalidates_remote_release_and_local_bytes_before_launch(self):
         self.stage()

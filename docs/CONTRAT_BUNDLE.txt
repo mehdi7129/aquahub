@@ -108,5 +108,10 @@ que la nouvelle procédure possède les mêmes effets.
 
 Un flux Git + registre doit figer une révision et les digests d’images,
 protéger les accès et qualifier ses effets. Il n’est pas implémenté par le
-connecteur de Releases actuel. La mise à jour de l’application AquaHub est
-un troisième contrat distinct à développer ultérieurement.
+connecteur de Releases actuel. Les tags Git et des cinq images privées ont
+été confirmés ; le jeton existant suffit pour les lire sans read_api.
+Le tag v1.0.0 appelle encore deploy.py depuis install.sh, alors que son README
+décrit aussi un parcours Compose séparé. Ce choix et la compatibilité des
+données restent à confirmer avant l’adaptateur du fournisseur.
+La mise à jour de l’application AquaHub est déjà implémentée comme un
+troisième contrat distinct ; elle ne met pas le bundle à jour.

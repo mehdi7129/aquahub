@@ -74,7 +74,7 @@ class ApplicationTests(unittest.TestCase):
         deadline = time.monotonic()+3
         while time.monotonic() < deadline:
             job = self.app.store.job(job_id)
-            if job["status"] not in {"queued", "running"}:
+            if job["status"] not in {"queued", "running"} and not self.app._mutation_lock.locked():
                 return job
             time.sleep(.01)
         self.fail("Job did not finish")
@@ -195,9 +195,16 @@ class ApplicationTests(unittest.TestCase):
 
     def test_network_actions_are_explicitly_blocked(self):
         for service in ("net_setup", "wireguard", "gcs_reactor"):
-            for operation in ("restart", "start", "stop"):
+            operations = ("restart", "start", "stop") if service == "wireguard" else ("start", "stop")
+            for operation in operations:
                 self.assertCode("network_guard", f"service.{operation}", {"service":service})
         self.assertFalse(self.fake.actions)
+
+    def test_only_restart_is_available_for_reviewed_network_services(self):
+        for service in ("net_setup", "gcs_reactor"):
+            job = self.call("service.restart", {"service": service})
+            self.assertEqual(self.wait_job(job["id"])["status"], "succeeded")
+        self.assertEqual(self.fake.actions, [("net_setup", "restart"), ("gcs_reactor", "restart")])
 
     def test_clean_exit_is_history_not_reported_as_crash(self):
         self.fake.pending_events=[{'Action':'die','timeNano':index,'Actor':{'ID':'a'*64,'Attributes':{'com.docker.compose.service':'gcs','exitCode':code}}} for index,code in enumerate(('0','137'),1)]

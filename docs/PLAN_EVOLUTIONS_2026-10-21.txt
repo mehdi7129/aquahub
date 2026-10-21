@@ -1,0 +1,273 @@
+AquaHub — analyse et plan des prochaines évolutions
+21 octobre 2026 — plan validé, première étape livrée dans AquaHub 0.2.1
+Base examinée : AquaHub 0.2.0, commit public 81b9220.
+
+1. Périmètre demandé
+
+Permettre les redémarrages des trois services actuellement protégés,
+rendre l’état des services plus lisible avec des contours colorés,
+alléger l’affichage de la santé, simplifier la mise à jour de l’application,
+présenter la mise à jour du bundle en ligne avant l’import local et
+faciliter l’enregistrement des logs des services. Le bouton « Vérifier
+cet appareil » doit fonctionner sans mot de passe du PC.
+
+L’application reste greffée sur le bundle. Elle ne gère pas les adresses
+IP et ne change pas les configurations réseau. L’autorisation donnée pour
+redémarrer les composants réseau est prise en compte ; elle ne signifie
+pas qu’un redémarrage n’a aucun effet transitoire sur les communications.
+
+L’analyse initiale et les questions de suivi ont été réalisées sans modifier
+le produit. Le plan a ensuite été validé ; les éléments indépendants des
+réponses fournisseur sont développés dans la version 0.2.1. La mise à jour
+du bundle et la relance de WireGuard restent à qualifier séparément.
+
+État de réalisation : interface, vérification sans mot de passe du PC,
+enregistrement des logs et relances ciblées de net_setup/GCS Reactor sont
+implémentés. Les recettes de sources, VM et poste installé sont consignées
+dans TESTS.txt. Les paragraphes suivants conservent le plan et ses critères
+initiaux ; ils ne déclarent pas les éléments fournisseur en attente terminés.
+
+2. Vérifications déjà réalisées
+
+Trois lectures ont été croisées : code AquaHub, scripts effectivement
+installés dans les conteneurs et sources fournisseur au tag réel v1.0.0.
+Les lectures des images ont utilisé les identités des conteneurs existants.
+Aucun script fournisseur n’a été exécuté. Le tag a été examiné dans un
+dossier privé isolé, sans modifier le bundle ni son dépôt de travail.
+
+Résultats confirmés :
+
+- Les huit services sont en cours et possèdent des logs Docker non vides.
+- Deux services ont une sonde de santé ; six n’en ont pas.
+- Portainer installé est Community Edition 2.45.2.
+- Les huit conteneurs ont une rotation json-file de 10m et 3 fichiers.
+  La durée de conservation dépend du débit des logs, pas d’un nombre
+  garanti de jours. L’historique AquaHub reste une autre collection.
+- Le dépôt Git fournisseur possède v1.0.0. Les cinq images privées ont
+  les tags v1.0.0 et latest ; leurs digests respectifs coïncident lors de
+  cette lecture. Le jeton existant permet Git et registre sans read_api.
+- Il existe sept images uniques pour huit services : GCS est partagée ;
+  Mosquitto et WireGuard sont deux images externes aux cinq privées.
+- Dans v1.0.0, install.sh appelle toujours deploy.py. Aucune option
+  de mise à jour du hub seul ou de désactivation des drones n’a été trouvée.
+- Le README du même tag décrit aussi une mise à jour Git suivie de
+  docker compose pull puis up -d. Ce choix doit être confirmé avec Benoît.
+- Le Compose tagué diffère de celui installé et reconnu par AquaHub.
+  L’adaptateur actuel image-refresh-v1 ne couvre pas cette évolution.
+
+3. Portainer, historique et logs : explication à présenter
+
+La page Activity logs concerne l’audit des actions administratives
+effectuées dans Portainer, documenté pour Business Edition. Elle ne montre
+pas les sorties des services Docker. Un compte Portainer ne transforme
+pas cette page en historique des composants.
+
+Pour consulter et télécharger les logs dans Portainer : environnement
+local → Containers → choisir le conteneur → Logs → Download logs.
+Dans AquaHub, ces sorties sont déjà visibles sous Supervision → choisir
+le service → Logs techniques, sans dépendre du compte Portainer.
+
+Trois contenus restent distincts :
+- Historique : changements d’état et opérations observés par AquaHub.
+- Logs techniques : sorties stdout/stderr encore conservées par Docker.
+- Diagnostic : état et événements récents, avec quelques extraits de panne.
+Le diagnostic n’est pas une sauvegarde complète des logs. Les périodes
+sans collecte, les rotations et les suppressions de conteneurs peuvent
+laisser des trous ; aucune interface ne doit promettre un historique total.
+
+4. Lot A — supervision et santé
+
+Afficher un contour discret sur le badge d’état :
+- vert : En cours, avec observation récente ;
+- rouge : Arrêté, En échec ou Absent ;
+- orange : Redémarrage ou En pause ;
+- gris : Inconnu, données périmées ou agent déconnecté.
+
+Les mots et une indication accessible restent présents. Le rendu doit
+fonctionner dans les thèmes clair/sombre et aux tailles déjà prises en charge.
+Si la collecte est interrompue, un ancien état En cours ne doit pas garder
+son contour vert comme s’il venait d’être vérifié.
+
+La santé reste utile : un processus peut être démarré mais ne plus rendre
+son service. Elle devient une information secondaire dans le détail, avec
+une alerte visible si une sonde signale un échec. Alléger le résumé répétant
+les six absences de sonde. Ne pas créer de faux contrôles ni confondre
+En cours avec Fonctionnement métier validé.
+
+Code concerné : frontend/src/app.ts, domain.ts et styles.css.
+
+5. Lot B — vérification d’un Aqua_Drone sans mot de passe du PC
+
+Cause identifiée : drones.preflight est actuellement enregistré comme
+une action protégée par PolicyKit, comme la configuration elle-même.
+
+Prévoir un parcours de précontrôle autorisé pour le compte local AquaHub,
+sans demande interactive d’administration. Conserver l’identification du
+compte par la socket locale et les vérifications d’identité SSH de l’appareil.
+Le contrôle utilise des commandes distantes de lecture et prépare les
+comparaisons dans un dossier privé local. Il n’envoie aucune configuration,
+ne change aucune IP et ne redémarre pas le drone.
+
+Retirer la demande administrateur uniquement pour ce périmètre. Séparer
+le classement de ce précontrôle des véritables interventions. Les règles
+de maintenance et les limites de préparation locale doivent rester explicites.
+Le booléen mutation commande aujourd’hui aussi le refus pendant une mise à
+jour de l’application : le passer simplement à false retirerait cette
+protection. Séparer le besoin d’autorisation administrateur de la garde de
+maintenance, et refuser proprement un précontrôle pendant une intervention
+exclusive. Ne pas rendre non protégé le handler SSH entier, qui sert aussi
+à enregistrer des paramètres.
+Ne pas approuver automatiquement une nouvelle empreinte SSH pour supprimer
+un dialogue : l’identité d’un nouvel appareil reste à confirmer séparément.
+
+Recette : cliquer sur Vérifier cet appareil sans autorisation PolicyKit
+déjà en cache ; confirmer l’absence de fenêtre de mot de passe et d’appel
+pkcheck pour ce contrôle. Vérifier qu’aucun SCP, reboot ni changement du
+bundle ou du drone ne se produit, y compris si le contrôle échoue.
+
+Code concerné : agent/aquahub_agent/drone.py, core.py et security.py,
+en ne modifiant que les frontières réellement nécessaires ; tests de
+droits, d’identité et du parcours natif.
+
+6. Lot C — relances des services actuellement bloqués
+
+Autoriser le redémarrage individuel du conteneur existant pour net_setup,
+gcs_reactor et wireguard. Ne pas remplacer ce geste par un redémarrage de
+l’unité Aqua Hub : celle-ci peut arrêter/recréer l’ensemble du projet.
+Conserver les autres protections : services connus uniquement, identité du
+conteneur et de son image, tâche unique, absence de mise à jour concurrente.
+Le besoin porte sur restart ; il n’impose pas d’ajouter des boutons start/stop.
+
+Effets réellement observés dans les scripts :
+- net_setup réapplique ses ajouts d’adresses existantes de manière idempotente ;
+- gcs_reactor réapplique son adresse IPv6 de dialogue au démarrage ;
+- WireGuard arrête puis remonte son tunnel : communications et routes du
+  tunnel sont temporairement interrompues.
+
+Point précis à lever pour WireGuard : le script de démarrage installé
+contient ip route del default en cas de configuration non reconnue ou
+d’échec de montée du tunnel. Le conteneur utilise le réseau hôte et NET_ADMIN.
+Les IP fixes ne suppriment donc pas le risque sur une route en cas d’échec.
+Ce comportement a été relu indépendamment dans les mêmes octets du script.
+
+La configuration actuelle satisfait plusieurs préconditions favorables,
+mais cela ne constitue pas une garantie contre tout échec. Avant d’activer
+la relance, prévoir des précontrôles consultatifs et une recette VM de ce
+chemin d’échec. Demander à Benoît si ce comportement est attendu et quelle
+procédure il recommande. Ne pas réécrire automatiquement des IP/routes
+pour masquer un échec. Ne pas annoncer la réussite sur le seul état running.
+
+La confirmation existante peut nommer le service et la brève interruption
+attendue, sans nouvelle succession de dialogues.
+
+Code concerné : docker.py allowed_actions/action, core.py _service_action,
+confirmation frontend et tests qui exigent actuellement le blocage global.
+
+7. Lot D — page des mises à jour
+
+Ordre proposé :
+1. Application AquaHub : version et bouton Rechercher une mise à jour.
+2. Bundle Aqua Hub : recherche en ligne, version disponible, préparation
+   puis confirmation d’installation.
+3. En bas : Installer depuis une archive déjà téléchargée.
+
+La source technique de l’application n’est plus affichée dans le parcours
+habituel. Elle reste fixée dans le moteur ; les contrôles de téléchargement,
+de paquet et de confirmation restent en place. Le détail de publication
+reste dans la documentation de développement.
+
+Pour le bundle, En ligne est l’entrée principale, pas une installation
+automatique à l’ouverture de la page. Télécharger ne doit pas installer.
+Les deux entrées convergent vers le même contrôle de compatibilité et le
+même récapitulatif. Un fichier local incompatible doit expliquer son refus.
+Modifier aussi le raccourci Supervision actuellement centré sur l’archive.
+
+8. Lot E — intégration des versions Git et du registre fournisseur
+
+Le flux en ligne ne doit plus chercher uniquement des Releases GitLab :
+les tags Git et les tags du registre sont bien disponibles avec les accès
+actuels. Aucun nouveau droit read_api n’est nécessaire pour ce flux.
+
+Parcours à développer après confirmation de la procédure fournisseur :
+1. Lire les versions Git publiées, résoudre le tag en commit et vérifier
+   la présence de la version correspondante dans les cinq images privées.
+2. Résoudre les sept images utiles en digests immuables, vérifier amd64 et
+   distinguer les images fournisseur des deux dépendances externes.
+3. Comparer la livraison avec l’installation réelle. Si sa provenance ne
+   peut pas être prouvée, afficher Version installée non identifiée plutôt
+   que déduire une version du nom latest ou de la version de l’application.
+4. Préparer la livraison et ses contrôles dans un espace privé. Détecter
+   un tag déplacé ou une livraison modifiée depuis la recherche.
+5. Contrôler la compatibilité, sauvegarder les éléments requis et conserver
+   les images précédentes, la révision et les données nécessaires au retour.
+6. Appliquer la procédure du hub seul confirmée, sans appel implicite à
+   deploy.py et sans recopier les configurations privées d’un autre poste.
+7. Vérifier les images actives, les services, la configuration et le réseau.
+   En cas d’échec, restaurer seulement dans les limites réellement validées.
+
+Ne pas accepter le nouveau Compose en remplaçant seulement une empreinte
+dans KNOWN_FILES. Le contrat actuel ne suffit pas. La compatibilité des
+données et le retour arrière doivent être qualifiés, pas supposés à partir
+de « on doit pouvoir changer de version sans problème ».
+
+Le choix de version doit pouvoir rester reproductible hors ligne. Le kit
+générique sans clés privées reste un chantier de distribution distinct,
+non résolu par la réponse actuelle du fournisseur.
+
+9. Lot F — enregistrement des logs
+
+Conserver Logs techniques et Historique avec une explication courte.
+Ajouter Enregistrer les logs dans le panneau d’un service. Prévoir un
+export groupé des huit services pour transmettre un dossier de support.
+Prendre par défaut un extrait récent borné, avec horodatage, service et
+limite clairement annoncée ; distinguer un fichier vide d’une lecture refusée.
+
+Réutiliser la collecte et le filtrage existants, ajouter un dialogue GTK
+Enregistrer sous : le parcours actuel du diagnostic ouvre seulement son
+dossier privé et ne possède pas encore ce dialogue. Le compte utilisateur
+choisit la destination ; l’agent système ne doit pas recevoir un chemin
+arbitraire où écrire avec ses droits administrateur.
+
+Les exports groupés doivent conserver le résultat de chaque service :
+indisponible, vide, tronqué ou collecté. Ne pas modifier la rotation du
+bundle, ne pas exporter les clés/configurations et ne pas appeler ces
+extraits Historique complet. Les journaux du moteur Docker lui-même sont
+un autre contenu que les sorties des services et ne sont pas ajoutés
+implicitement dans ce lot.
+
+10. Ordre de développement et critères de validation
+
+Étape 1 : supervision, vérification sans mot de passe, présentation des
+mises à jour et export des logs. Ces éléments sont indépendants des
+précisions encore attendues de Benoît sur la mise à jour du bundle.
+
+Étape 2 : relances ciblées, d’abord tests isolés et VM, puis services réels
+un par un. Comparer les fichiers, identités d’images, IP et routes avant
+et après. Vérifier le tunnel réellement opérationnel. Injecter en VM les
+erreurs WireGuard et vérifier un résultat explicite sans correction réseau.
+
+Étape 3 : adaptateur Git + registre, une fois procédure et compatibilité
+confirmées. Recette en VM avec installation existante, données persistantes,
+mise à jour réussie, coupure de téléchargement, version modifiée, disque
+insuffisant et retour arrière compatible. Aucune configuration de drone
+ne doit partir pendant une mise à jour du hub.
+
+À chaque étape : tests ciblés utiles, suite Python existante, TypeScript,
+tests de domaine et parcours natifs concernés. Vérifier les thèmes clair et
+sombre, les données périmées, les doubles clics et la conservation des
+limites du canal de mise à jour de l’application. Qualifier le paquet final
+en VM avant son installation sur le poste puis documenter ce qui a été
+réellement exercé. Une fixture ne remplace pas une recette matérielle.
+
+Les scripts de contrôle, rapports, sources privées et journaux bruts restent
+hors du dépôt public. Le document de suivi fournisseur détaille les
+questions restantes : QUESTIONS_BENOIT_SUIVI_2026-10-21.txt.
+
+Références officielles consultées
+
+Portainer — audit d’administration :
+https://docs.portainer.io/admin/logs/activity
+Portainer — consultation et téléchargement des logs des conteneurs :
+https://docs.portainer.io/user/docker/containers/logs
+Docker — sorties des conteneurs et limites :
+https://docs.docker.com/engine/logging/

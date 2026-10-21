@@ -9,6 +9,7 @@ import subprocess
 import time
 
 from .security import ApiError, redact
+from .network import stable_network
 
 
 SERVICES = {
@@ -22,6 +23,8 @@ SERVICES = {
     "wireguard": ("WireGuard", "aqua-wireguard"),
 }
 PROJECT = "aqua-hub-bundle"
+NETWORK_SERVICES = frozenset({"net_setup", "wireguard", "gcs_reactor"})
+NETWORK_RESTARTS = frozenset({"net_setup", "gcs_reactor"})
 INSPECT = ('{"id":{{json .Id}},"name":{{json .Name}},"image_id":{{json .Image}},'
            '"image":{{json .Config.Image}},"state":{{json .State.Status}},'
            '"running":{{json .State.Running}},"health":{{with (index .State "Health")}}{{json .Status}}{{else}}null{{end}},'
@@ -119,10 +122,33 @@ class Docker:
 
     @staticmethod
     def allowed_actions(service: str, missing: bool = False) -> dict:
-        guarded = service in {"net_setup", "wireguard", "gcs_reactor"}
-        reason = "Conteneur absent." if missing else ("Précontrôle sans modification d’IP non disponible pour ce composant réseau." if guarded else None)
+        guarded = service in NETWORK_SERVICES
+        restart = not missing and (not guarded or service in NETWORK_RESTARTS)
+        reason = ("Conteneur absent." if missing else
+                  "La relance de WireGuard attend la validation du comportement de ses routes en cas d’échec." if service == "wireguard" else None)
         return {"start": not (guarded or missing), "stop": not (guarded or missing),
-                "restart": not (guarded or missing), "disabled_reason": reason}
+                "restart": restart, "disabled_reason": reason}
+
+    @staticmethod
+    def _host_network_snapshot():
+        """Observe both IP families; never repair or write network settings."""
+        values = []
+        for arguments in (["-j", "-d", "address", "show"],
+                          ["-j", "route", "show", "table", "all"],
+                          ["-j", "-6", "route", "show", "table", "all"]):
+            try:
+                result = subprocess.run(["/usr/sbin/ip", *arguments], stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5, check=False,
+                    env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8"})
+                if result.returncode or len(result.stdout) > 2 * 1024**2:
+                    raise ValueError("network observation unavailable")
+                value = json.loads(result.stdout)
+                if not isinstance(value, list) or any(not isinstance(row, dict) for row in value):
+                    raise ValueError("invalid network observation")
+                values.append(value)
+            except (OSError, subprocess.SubprocessError, ValueError, UnicodeError):
+                raise ApiError("network_check", "Les adresses et les routes n’ont pas pu être vérifiées. Aucun réglage réseau n’est modifié par AquaHub.") from None
+        return stable_network(values[0], values[1] + values[2])
 
     def resolve(self, service: str) -> dict:
         if service not in SERVICES:
@@ -135,11 +161,10 @@ class Docker:
     def action(self, service: str, operation: str) -> dict:
         if operation not in {"start", "stop", "restart"}:
             raise ApiError("invalid_action", "Opération non autorisée.")
-        # These containers configure the network at startup. Their mutation is deliberately
-        # refused until a provider-supported no-IP-change check exists.
-        if service in {"net_setup", "wireguard", "gcs_reactor"}:
-            raise ApiError("network_guard", "Ce composant gère des adresses réseau. Action bloquée pour garantir qu’aucune IP ne change.")
+        if service in NETWORK_SERVICES and (operation != "restart" or service not in NETWORK_RESTARTS):
+            raise ApiError("network_guard", "Cette action réseau n’est pas disponible. Les relances du réseau du bundle et de GCS Reactor sont proposées individuellement ; WireGuard attend sa validation.")
         before = self.resolve(service)
+        network = self._host_network_snapshot() if service in NETWORK_RESTARTS else None
         args = [operation]
         if operation in {"stop", "restart"}:
             args += ["--time", "15"]
@@ -155,8 +180,13 @@ class Docker:
             state_ok = after["state"] == expected
             health = after.get("health")
             if state_ok and (operation == "stop" or health in {"healthy", "not_defined"}):
-                return {"service": service, "state": after["state"], "health": health,
-                        "image_id": after["image_id"], "health_verified": health == "healthy"}
+                result = {"service": service, "state": after["state"], "health": health,
+                          "image_id": after["image_id"], "health_verified": health == "healthy"}
+                if network is not None:
+                    if self._host_network_snapshot() != network:
+                        raise ApiError("network_changed", "Le service a reçu sa relance mais les adresses ou les routes observées ont changé. Vérifiez l’état réel ; AquaHub ne réécrit pas le réseau automatiquement.")
+                    result["network_unchanged"] = True
+                return result
             if time.monotonic() >= deadline:
                 raise ApiError("state_unconfirmed", "La commande a été envoyée mais l’état attendu n’a pas été confirmé. Consulter les journaux.")
             time.sleep(.5)

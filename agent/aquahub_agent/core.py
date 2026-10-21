@@ -1,6 +1,7 @@
 """Application orchestration; only this layer schedules serialized mutations."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import fcntl
@@ -75,10 +76,13 @@ class Application:
             self._poll_thread = threading.Thread(target=self._poll_loop, name="aquahub-observer", daemon=True)
             self._poll_thread.start()
 
-    def register_handler(self, method: str, handler, mutation: bool = False):
+    def register_handler(self, method: str, handler, mutation: bool = False, *, requires_admin: bool | None = None):
         if method in self._handlers:
             raise ValueError(f"Handler already registered: {method}")
-        self._handlers[method] = (handler, mutation)
+        # Some read-only checks must exclude maintenance while inspecting
+        # files and SSH state. They share the operation guard without needing
+        # an interactive administrative authorization.
+        self._handlers[method] = (handler, mutation, mutation if requires_admin is None else requires_admin)
 
     def _register_builtin(self):
         for method, handler, mutation in (
@@ -102,8 +106,8 @@ class Application:
             params = {}
         if not isinstance(params, dict):
             raise ApiError("invalid_params", "Les paramètres doivent être un objet JSON.")
-        handler, mutation = self._handlers[method]
-        self.policy.authorize(context, mutation)
+        handler, mutation, requires_admin = self._handlers[method]
+        self.policy.authorize(context, requires_admin)
         application_update = getattr(self, "app_updates", None)
         if mutation and application_update is not None and method != "app_updates.install" and application_update.installation_pending():
             raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
@@ -302,8 +306,8 @@ class Application:
     def _service_action(self, operation, params, context):
         self._check_keys(params, ("service",))
         service = self._service(params)
-        if service in {"net_setup", "wireguard", "gcs_reactor"}:
-            raise ApiError("network_guard", "Ce composant peut configurer des adresses réseau. Action bloquée pour garantir qu’aucune IP ne change.")
+        if service == "wireguard" or (service in {"net_setup", "gcs_reactor"} and operation != "restart"):
+            raise ApiError("network_guard", "Cette action réseau ne dispose pas encore d’un parcours de reprise validé. Elle reste indisponible.")
         return self.submit_job(f"service.{operation}", service, {"service": service}, lambda: self.docker.action(service, operation))
 
     def _restart_portainer(self, params, context):
@@ -311,6 +315,36 @@ class Application:
         if params.get('confirmed') is not True:
             raise ApiError('confirmation_required','Confirmez le redémarrage de Portainer. Ses comptes et volumes seront conservés.')
         return self.submit_job('portainer.restart','Portainer',{},self.docker.restart_portainer)
+
+    @contextmanager
+    def operation_guard(self):
+        """Reserve the operation slot for a synchronous, read-only check.
+
+        A preflight is not a durable job and must never stop the agent halfway
+        through its local/remote snapshot. Keep the same fences as job launch,
+        including a second upgrade check inside the scheduling mutex.
+        """
+        if self._stop.is_set():
+            raise ApiError("agent_stopping", "L’agent est en cours d’arrêt.")
+        if not self._mutation_lock.acquire(blocking=False):
+            raise ApiError("busy", "Une opération est déjà en cours. Attendre sa fin avant de continuer.")
+        maintenance_fd = None
+        try:
+            application_update = getattr(self, "app_updates", None)
+            if application_update is not None and application_update.installation_pending():
+                raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
+            maintenance_fd = os.open(self._maintenance_path, os.O_RDWR | os.O_NOFOLLOW)
+            try:
+                fcntl.flock(maintenance_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise ApiError("maintenance", "L’application est en cours de mise à jour. Attendre la fin de l’installation.") from None
+            if self.store.active_job() is not None:
+                raise ApiError("busy", "Une opération est déjà en cours. Attendre sa fin avant de continuer.")
+            yield
+        finally:
+            if maintenance_fd is not None:
+                os.close(maintenance_fd)
+            self._mutation_lock.release()
 
     def submit_job(self, kind: str, target: str, payload: dict, work, idempotency_key: str | None = None):
         if self._stop.is_set():

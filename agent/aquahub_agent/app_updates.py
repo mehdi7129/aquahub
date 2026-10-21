@@ -82,7 +82,7 @@ class AppUpdates:
         self.lock = threading.RLock()
         self.release = None
         self.checked_at = 0
-        self.message = "Recherchez une version de l’application sur GitHub Releases."
+        self.message = "Recherchez les mises à jour d’AquaHub."
         # Application owns the exclusive agent lock and has interrupted jobs
         # from the previous process before registering this manager. A killed
         # download cannot otherwise execute its finally block.
@@ -199,14 +199,14 @@ class AppUpdates:
             return self.opener.open(request, timeout=30)
         except urllib.error.HTTPError as error:
             if error.code in (403, 429):
-                message = "GitHub limite temporairement les recherches. Réessayez ultérieurement."
+                message = "Le service de mise à jour limite temporairement les recherches. Réessayez ultérieurement."
             elif error.code == 404:
                 message = "La version AquaHub demandée n’est plus publiée ou n’est pas accessible."
             else:
-                message = "GitHub n’a pas fourni la version AquaHub demandée."
+                message = "Le service de mise à jour n’a pas fourni la version AquaHub demandée."
             raise ApiError("app_update_source", message) from None
         except (urllib.error.URLError, TimeoutError, OSError):
-            raise ApiError("app_update_network", "Impossible de joindre GitHub. La mise à jour d’AquaHub nécessite une connexion Internet.") from None
+            raise ApiError("app_update_network", "Impossible de joindre le service de mise à jour. Vérifiez la connexion Internet.") from None
 
     def _json(self, url):
         try:
@@ -218,7 +218,7 @@ class AppUpdates:
         except (ValueError, UnicodeError):
             raise ApiError("app_update_metadata", "Les informations de version AquaHub sont invalides.") from None
         except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException):
-            raise ApiError("app_update_network", "La lecture des informations GitHub a été interrompue. Réessayez la recherche.") from None
+            raise ApiError("app_update_network", "La lecture des informations de mise à jour a été interrompue. Réessayez la recherche.") from None
 
     @staticmethod
     def _candidate(release):
@@ -268,9 +268,9 @@ class AppUpdates:
             if self.release:
                 self.message = "Une nouvelle version de l’application AquaHub est disponible."
             elif not releases:
-                self.message = "Aucune version de l’application n’est encore publiée sur GitHub Releases. Un commit Git n’est pas une mise à jour installable."
+                self.message = "Aucune nouvelle version d’AquaHub n’est encore publiée."
             else:
-                self.message = "Aucune nouvelle version stable avec un paquet AquaHub compatible et vérifiable n’est disponible."
+                self.message = "Aucune nouvelle mise à jour compatible n’est disponible."
             return self._status()
 
     def _fresh(self, expected):

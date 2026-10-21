@@ -14,6 +14,7 @@ import sys
 import time
 
 from .bridge import BridgeError, RpcClient, fixed_url, is_app_uri, portainer_url, agent_connection, portainer_credentials
+from .log_exports import export_request, choose_log_destination, destination_identity, build_log_export, save_log_export
 
 BRIDGE_SOURCE = r"""(() => {
   if (window !== window.top) return;
@@ -296,6 +297,9 @@ def main(argv=None) -> int:
 
         def native(self, request_id, method, params):
             try:
+                if method == 'native.export_logs':
+                    self.export_logs(request_id, params)
+                    return
                 if method=='native.source_credentials':
                     self.source_credentials_dialog(request_id)
                     return
@@ -336,6 +340,37 @@ def main(argv=None) -> int:
                     raise BridgeError("unknown_method", "Cette fonction native est inconnue.")
             except (BridgeError, GLib.Error) as error:
                 self.deliver(request_id, error={"code": getattr(error, "code", "open_failed"), "message": str(error)})
+
+        def export_logs(self, request_id, params):
+            request = export_request(params)
+
+            def accepted(target):
+                try:
+                    expected = destination_identity(target)
+                except BridgeError as error:
+                    self.deliver(request_id, error={'code': error.code, 'message': error.message})
+                    return
+
+                def collect_and_save():
+                    snapshot = client.request('logs.export', request)
+                    content, partial = build_log_export(snapshot, request)
+                    save_log_export(target, content, expected)
+                    return {'saved': True, 'partial': partial, 'filename': target.name}
+
+                future = executor.submit(collect_and_save)
+
+                def completed(done):
+                    try:
+                        GLib.idle_add(self.deliver, request_id, done.result(), None)
+                    except BridgeError as error:
+                        GLib.idle_add(self.deliver, request_id, None, {'code': error.code, 'message': error.message})
+                    except Exception:
+                        GLib.idle_add(self.deliver, request_id, None, {'code': 'save_failed', 'message': 'L’export des journaux n’a pas pu être enregistré.'})
+
+                future.add_done_callback(completed)
+
+            choose_log_destination(Gtk, self, request, accepted,
+                                   lambda: self.deliver(request_id, {'saved': False, 'canceled': True}))
 
         def prepare_portainer(self, request_id):
             future=executor.submit(client.request,'portainer.status')

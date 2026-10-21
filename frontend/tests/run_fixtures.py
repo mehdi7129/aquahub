@@ -6,6 +6,7 @@ import socketserver
 import subprocess
 import tempfile
 import threading
+from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / "tests/.runtime/fixtures"
@@ -33,7 +34,7 @@ class Handler(socketserver.StreamRequestHandler):
                 error = {"code": "fixture_unavailable", "message": "Connexion simulée interrompue."}
             else:
                 result = {"version": "test-synthetique", "machine": "Banc isolé", "docker_available": mode != "stale",
-                          "portainer_available": False, "bundle_path": None, "collected_at": "2026-10-20T12:00:00Z",
+                          "portainer_available": False, "bundle_path": None, "collected_at": datetime.now(timezone.utc).isoformat(),
                           "services": [{"id": "gcs", "name": "GCS de test", "state": "running", "health": None,
                                         "actions": {"restart": True}}], "active_job": {"id": "fixture-job", "status": "running", "label": "Tâche synthétique"} if mode.startswith("job") else None,
                           "stale": mode == "stale", "error": {"code": "stale_snapshot", "message": "Collecte synthétique en retard."} if mode == "stale" else None}

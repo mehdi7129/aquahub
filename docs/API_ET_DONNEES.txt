@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.0","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.1","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -23,7 +23,9 @@ et passent par une origine exacte et un nonce.
 
 L’UID, le PID et l’heure de démarrage du processus viennent de SO_PEERCRED
 et de /proc, pas du JSON. Ne pas ajouter de champ permettant au renderer
-d’affirmer son rôle ou son identité. Les mutations passent par PolicyKit.
+d’affirmer son rôle ou son identité. Les interventions passent par PolicyKit.
+Le précontrôle drones.preflight est exempté d’autorisation interactive ; il
+reste authentifié et incompatible avec une maintenance en cours.
 
 2. Méthodes disponibles
 
@@ -40,6 +42,8 @@ Lecture générale :
   jobs.get          id ; relire une tâche persistante.
   settings.get      Réglages publics, sans secret.
   diagnostics.export  Diagnostic local filtré.
+  logs.export       service facultatif, tail entre 1 et 1000 ; entrées de
+                    logs filtrées, sans chemin de destination utilisateur.
 
 Maintenance générale, autorisation requise :
   service.start/stop/restart  service limité à la liste connue.
@@ -57,7 +61,12 @@ Aqua_Drones :
                       temporaire de plan.
   drones.configure    number, preflight_id, confirmed_identity.
 
-enroll, ssh_settings, preflight et configure sont enregistrés comme protégés.
+enroll, ssh_settings et configure restent protégés par PolicyKit.
+preflight réserve le créneau d’opération et le verrou de maintenance sans
+demander d’autorisation administrateur. Le registre distingue mutation et
+requires_admin : ne pas supprimer la garde de maintenance en modifiant
+seulement le classement de l’autorisation. Les verrous sont libérés même
+si un précontrôle échoue.
 Une réponse au scan ne suffit pas à autoriser configure. La confirmation
 d’identité doit correspondre au plan ; reprendre la forme exacte retournée
 par le précontrôle et utilisée par le frontend, sans recréer un objet supposé.
@@ -126,6 +135,19 @@ servent à choisir une archive, ouvrir un outil local autorisé, configurer
 des accès privés et enregistrer/afficher un diagnostic. Leur liste et leurs
 paramètres sont dans app.py. Ne pas ajouter une ouverture arbitraire d’URL,
 un accès arbitraire au système de fichiers ou une commande shell.
+
+native.export_logs prend service facultatif. Il ouvre un dialogue GTK
+Enregistrer sous, collecte logs.export puis produit un .log individuel ou
+un .zip groupé côté utilisateur. Annuler n’est pas un échec. La réponse
+renderer contient saved, canceled, partial et filename selon le résultat,
+pas un droit d’écriture administrateur vers un chemin choisi dans WebKit.
+
+logs.export renvoie schema=1, created_at en UTC, tail, partial, notice et
+entries. Chaque entrée décrit service, label, state, text, lines, truncated
+et error. state vaut available, empty, truncated ou unavailable. Le texte
+filtré est borné à 48 Kio UTF-8 par service et la collecte est bornée dans
+le temps. Un export groupé conserve les huit résultats, même si certains
+services sont indisponibles ; le ZIP utilisateur contient aussi resume.json.
 
 test.report est un crochet de recette du desktop activé avec --test-output.
 Il ne fait pas partie d’un service distant ni des fonctions de maintenance.

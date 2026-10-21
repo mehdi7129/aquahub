@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.2.0. Il complète
+Ce document décrit les sources de la préproduction 0.2.1. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -93,7 +93,7 @@ répétée. Elle ne remplace pas l’autorisation du demandeur.
 Principales familles de méthodes :
 
   app.version ; status.get ; service.logs ; service.start/stop/restart
-  events.list ; events.logs ; jobs.get ; diagnostics.export
+  events.list ; events.logs ; jobs.get ; diagnostics.export ; logs.export
   settings.get/save ; portainer.status/initialize/restart
   drones.list/scan/identity/enroll/ssh_settings/preflight/configure
   updates.inspect/check/download/apply/rollback/settings
@@ -105,7 +105,10 @@ panne de collecte rend les données périmées et enregistre un trou d’histori
 elle ne transforme pas le dernier état connu en état sain. L’état running
 d’un conteneur et son healthcheck restent deux informations distinctes.
 
-Les handlers déclarent s’ils exigent une autorisation de mutation. Les
+Les handlers distinguent l’exclusion des opérations (mutation) de la demande
+d’autorisation administrateur (requires_admin). drones.preflight garde la
+première sans déclencher la seconde. operation_guard sérialise ses lectures
+et préparations locales avec les autres interventions et le paquet. Les
 opérations longues utilisent submit_job() : une seule tâche mutante peut
 progresser à la fois. Un verrou de processus protège le dossier d’état ; un
 verrou de maintenance coordonne les tâches avec le remplacement du paquet.
@@ -125,8 +128,11 @@ docker.py restreint la supervision aux huit services du projet Compose connu.
 Il découvre le chemin du bundle à partir de ses labels, sans gérer toutes
 les stacks du poste. Le contexte Docker pris en charge est default. Les
 commandes sont des listes d’arguments, avec délais et volumes de sortie bornés.
-Les actions directes sur net_setup, wireguard et gcs_reactor sont bloquées
-tant que leur précontrôle ne garantit pas le respect du contrat réseau.
+Les relances de net_setup et gcs_reactor visent les conteneurs existants et
+comparent les adresses et routes IPv4/IPv6 avant/après. Une différence reste
+un échec explicite sans réécriture du réseau. start/stop de ces composants
+et toutes les actions WireGuard restent bloqués. Le parcours d’échec du
+tunnel doit être validé séparément.
 
 drone.py contient le contrat actuel de numérotation et de cible du fournisseur.
 Le scan cherche les six cibles prévues, pas tout le réseau. Les profils du
@@ -190,6 +196,12 @@ n’est pas remplacé. Les instances Portainer préexistantes sont distinguées 
 l’instance gérée pour éviter les actions sur un autre environnement.
 
 6. État persistant et installation
+
+log_exports.py dans l’agent collecte seulement les sorties des services connus,
+les filtre et les borne à 48 Kio par entrée. Le module desktop du même nom
+construit un .log ou un ZIP groupé et l’enregistre depuis la session utilisateur
+après le dialogue GTK. L’agent root ne reçoit pas de destination arbitraire.
+La collecte des journaux reste distincte de l’historique et du diagnostic.
 
 Installation système :
   /usr/lib/aquahub/agent et /usr/lib/aquahub/desktop : sources exécutées

@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.0 — état du code et qualification à poursuivre
+Préproduction 0.2.1 — état du code et qualification à poursuivre
 
 Développé
 
@@ -20,8 +20,13 @@ observés. Les cinq contrôles manuels ont une aide détaillée, utilisable au
 survol, au clavier et au clic. Le travail reste séquentiel pour conserver
 la cohérence de la configuration partagée du hub.
 
+La version 0.2.1 simplifie la supervision et la page de mise à jour, ajoute
+les exports de journaux et retire l’autorisation interactive du précontrôle
+Aqua_Drone sans retirer ses gardes d’identité et de maintenance.
+
 Le pilote actuel connaît huit services. Deux ont un healthcheck ; six sont
-sans sonde. Les relances de net_setup, wireguard et gcs_reactor sont bloquées.
+sans sonde. Les relances de net_setup et gcs_reactor sont possibles avec
+comparaison du réseau. WireGuard attend encore une validation fournisseur.
 Le provisioning vérifie une cible SSH et respecte les adresses existantes.
 
 Validations initiales
@@ -42,6 +47,13 @@ existant, la conservation du kit hors ligne et sa réparation. Le parcours
 gestionnaire → helper a installé un paquet de recette avec source HTTP
 synthétique et installation système réelle. Les services du fournisseur et
 le réseau sont restés identiques. Le détail et les limites sont dans TESTS.txt.
+
+La recette 0.2.1 a validé 278 tests Python avec préconditions explicites,
+21 tests de domaine et les parcours graphiques concernés. Le paquet a été
+mis à niveau et réinstallé en VM ; les deux relances réseau autorisées et
+les exports y ont été exercés. Sur le poste installé, un précontrôle du
+numéro 5 a réussi sans élévation et l’export groupé a produit les journaux
+avec leurs limites explicites. Voir TESTS.txt pour le périmètre observé.
 
 Priorité 1 : terminer le contrat fournisseur
 

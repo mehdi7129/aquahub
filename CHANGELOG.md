@@ -3,6 +3,20 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.1 — préproduction
+
+- États des services avec contours colorés, neutralisés lorsque les données
+  sont périmées. Santé secondaire et alerte lorsqu’une sonde signale un échec.
+- Vérification d’un Aqua_Drone sans mot de passe administrateur du PC,
+  avec contrôle de l’UID, identité SSH et exclusion de maintenance conservés.
+- Relance individuelle de Réseau du bundle et GCS Reactor, avec comparaison
+  des adresses et routes IPv4/IPv6 ; WireGuard reste protégé.
+- Mise à jour de l’application présentée sans URL technique. Recherche en
+  ligne du bundle en premier et import d’une archive locale en bas de page.
+  L’adaptateur Git + registre du fournisseur attend encore sa qualification.
+- Enregistrement natif des logs d’un service et archive groupée des huit
+  services, avec filtres, limites et résultats partiels explicites.
+
 ## 0.2.0 — préproduction
 
 - Canal **Application AquaHub** distinct des livraisons du bundle : recherche

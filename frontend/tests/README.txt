@@ -12,6 +12,14 @@ les dépendances de développement décrites dans docs/REPRISE_DEVELOPPEMENT.txt
 Pannes et pagination, transport Unix factice, aucun matériel contacté :
   python3 frontend/tests/run_fixtures.py
 
+Retours ergonomiques (couleurs fraîches/périmées, mise à jour en ligne en
+premier, source technique de l’application masquée, exports des logs) :
+  python3 frontend/tests/run_phase1_feedback.py
+Le moteur WebKit et le transport Unix sont réels. Les réponses du dialogue
+Enregistrer sous sont synthétiques pour vérifier annulation, succès et
+résultat partiel sans choisir un fichier du poste. Les tests desktop
+vérifient séparément l’écriture protégée et le dialogue GTK.
+
 Mise à jour de l’application (Releases GitHub séparées du bundle) :
   python3 frontend/tests/run_updates_feedback.py
 Ce banc vérifie téléchargement avant installation, annulation, confirmation,
