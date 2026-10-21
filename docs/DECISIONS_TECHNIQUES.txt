@@ -1,0 +1,138 @@
+AquaHub — décisions techniques à préserver
+Référence : code 0.2.2. Les propositions futures sont marquées séparément.
+
+1. Application locale, agent distinct
+
+Décision : interface TypeScript embarquée dans une fenêtre GTK3/WebKitGTK,
+avec un agent Python et un transport JSON sur socket Unix.
+
+Pourquoi : garder une application de bureau, borner les interventions et
+sortir les opérations longues du thread graphique. Le renderer ne reçoit
+ni le socket Docker ni les secrets. Aucun serveur HTTP de maintenance ne
+doit être ajouté pour simplifier un bouton.
+
+Repères : desktop/aquahub_desktop/app.py et bridge.py ; agent/server.py et
+core.py, dans le paquet aquahub_agent ; ARCHITECTURE.txt et SECURITE.txt.
+
+2. Portainer est une console complémentaire
+
+Décision : AquaHub maintient les services via la CLI Docker native et des
+cibles connues. Portainer est ouvert comme outil avancé indépendant.
+
+Pourquoi : les opérations courantes et la lecture des journaux ne doivent
+pas dépendre d’un compte Portainer. Activity logs n’est pas l’historique des
+sorties des services. Les logs Docker et les événements AquaHub sont distincts.
+
+Repères : docker.py, portainer.py, GUIDE_UTILISATEUR.txt et DEPANNAGE.txt.
+
+3. Le bundle fournisseur garde son fonctionnement
+
+Décision : reconnaître un contrat et ses versions avant d’utiliser les
+fonctions fournisseur ; conserver ses scripts intacts et hors du dépôt public.
+L’adaptateur AquaHub reste dans notre propre code.
+
+Pourquoi : une archive intègre ou un script de même nom n’est pas une preuve
+de compatibilité. Modifier uniquement une empreinte attendue supprimerait
+la garde sans qualifier les effets de la nouvelle version.
+
+Le périmètre existant ne gère ni les IP des drones ni celles de leur réseau.
+Une différence après intervention doit rester explicite ; ne pas écrire
+une adresse ou une route pour fabriquer un succès.
+
+Repères : drone.py, updates.py, network.py et CONTRAT_BUNDLE.txt.
+
+4. Configuration d’un appareil à la fois
+
+Décision : appareil et identité SSH vérifiés, précontrôle frais, confirmation
+de cible et opération sérialisée. Le numéro choisit les configurations du bundle.
+
+Pourquoi : les scripts utilisent aussi une configuration partagée du hub.
+Deux configurations concurrentes demanderaient un nouveau contrat. Un profil
+dans le bundle ou une réponse réseau ne prouve pas l’identité physique.
+
+La vérification préalable est sans autorisation administrateur interactive,
+mais reste authentifiée et soumise aux gardes de maintenance. Configuration,
+association SSH et réglages protégés gardent leurs autorisations propres.
+
+Repères : drone.py, core.operation_guard et tests/test_drone*.py.
+
+5. État observé, santé et action en cours
+
+Décision : conserver trois notions distinctes : état du conteneur, éventuelle
+sonde de santé et intervention demandée par l’opérateur.
+
+Pourquoi : running ne signifie pas validation métier ; l’absence de sonde
+n’est pas une panne. Une relance rapide peut ne jamais être observée à l’arrêt.
+
+En 0.2.2, la présentation de relance suit la tâche du service ciblé. Après
+sa fin, collected_at doit être postérieur à finished_at pour rétablir un état
+confirmé. Une réponse perdue ne provoque pas de seconde commande automatique.
+Les données périmées deviennent grises, même si la requête de lecture est bloquée.
+
+Repères : frontend/src/domain.ts, app.ts et tests de domaine/fixtures natifs.
+
+6. Une progression acquise, sans horloge fictive
+
+Décision : afficher le pourcentage des étapes réellement validées. Quand un
+pourcentage existe, la barre garde sa valeur pendant l’attente ; l’activité
+continue est indiquée séparément. Sans estimation, elle est indéterminée.
+
+Pourquoi : une étape peut être longue sans être bloquée. Avancer selon le
+temps écoulé promettrait un résultat non observé. Les contrôles manuels
+restent à effectuer après la validation logicielle.
+
+Repères : JobProgress, jobProgress(), renderChrome() et drone._progress().
+
+7. Deux canaux de mise à jour
+
+Décision : séparer l’application AquaHub et le bundle Aqua Hub.
+
+Application : Releases publiques stables d’un dépôt fixe, paquet applicatif
+exact, intégrité vérifiée et installation confirmée par un helper indépendant.
+Le remplacement du paquet peut redémarrer l’agent ; son résultat se suit
+par app_updates.status. Un commit Git n’est pas une mise à jour installable.
+
+Bundle : archive compatible avec le contrat reconnu. Le moteur actuel
+image-refresh-v1 est borné ; il ne réalise pas le futur flux Git + registre
+du fournisseur et ne garantit pas toutes les migrations de volumes.
+
+Pourquoi : séparer compatibilité, authentification, effets sur les services
+et reprise après échec. Le rollback d’images du bundle n’est pas un rollback
+de l’application. La signature d’éditeur indépendante reste à réaliser.
+
+Repères : app_updates.py, updates.py, installer/application_upgrade.py,
+API_ET_DONNEES.txt et PUBLICATION.txt.
+
+8. Paquet léger et kit complet séparés
+
+Décision : garder un petit paquet application-only pour les postes déjà
+initialisés et un kit externe complet pour la première installation hors ligne.
+Le passage au paquet léger conserve le kit privé de réparation.
+
+Pourquoi : une mise à jour de l’interface ne doit pas réinstaller le bundle.
+Un kit client contient potentiellement des configurations et secrets non
+redistribuables ; il n’est pas un asset public ordinaire sous licence MIT.
+
+Repères : installer/build_package.py, preserve_payload.py, finish.py,
+tests/test_packaging.py et PUBLICATION.txt.
+
+9. Validation et documentation
+
+Décision : documenter séparément test unitaire, fixture native, recette en VM
+et observation matérielle. Donner la version réellement vérifiée et les limites.
+
+Pourquoi : une simulation réussie ne prouve pas une flotte, une première
+installation ou une future livraison fournisseur. Une archive de sources
+publique n’est pas un installateur client qualifié.
+
+Repères : TESTS.txt, CHANGELOG.md et ETAT_ET_FEUILLE_DE_ROUTE.txt.
+
+10. Décisions encore proposées
+
+Identité bureau : aligner application, nom humain, lanceur et icône ; voir
+PLAN_IDENTITE_BUREAU_2026-10-21.txt. Ce correctif n’est pas implémenté.
+
+Bundle v1.0.1 : adaptateur Git + registre, profils de compatibilité et
+qualification du correctif WireGuard ; voir le plan d’intégration dédié.
+Les réponses fournisseur ont levé les ambiguïtés de procédure ; elles ne
+valent pas qualification de notre futur adaptateur ou des retours arrière.

@@ -2,6 +2,10 @@ AquaHub — analyse et plan des prochaines évolutions
 21 octobre 2026 — plan validé, première étape livrée dans AquaHub 0.2.1
 Base examinée : AquaHub 0.2.0, commit public 81b9220.
 
+Les questions fournisseur ont depuis reçu des réponses. Leur analyse et
+le lot suivant sont dans PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt ;
+les demandes initiales ci-dessous sont conservées comme contexte technique.
+
 1. Périmètre demandé
 
 Permettre les redémarrages des trois services actuellement protégés,
@@ -51,7 +55,7 @@ Résultats confirmés :
 - Dans v1.0.0, install.sh appelle toujours deploy.py. Aucune option
   de mise à jour du hub seul ou de désactivation des drones n’a été trouvée.
 - Le README du même tag décrit aussi une mise à jour Git suivie de
-  docker compose pull puis up -d. Ce choix doit être confirmé avec Benoît.
+  docker compose pull puis up -d. Ce choix doit être confirmé avec le fournisseur.
 - Le Compose tagué diffère de celui installé et reconnu par AquaHub.
   L’adaptateur actuel image-refresh-v1 ne couvre pas cette évolution.
 
@@ -153,7 +157,7 @@ Ce comportement a été relu indépendamment dans les mêmes octets du script.
 La configuration actuelle satisfait plusieurs préconditions favorables,
 mais cela ne constitue pas une garantie contre tout échec. Avant d’activer
 la relance, prévoir des précontrôles consultatifs et une recette VM de ce
-chemin d’échec. Demander à Benoît si ce comportement est attendu et quelle
+chemin d’échec. Demander au fournisseur si ce comportement est attendu et quelle
 procédure il recommande. Ne pas réécrire automatiquement des IP/routes
 pour masquer un échec. Ne pas annoncer la réussite sur le seul état running.
 
@@ -239,7 +243,7 @@ implicitement dans ce lot.
 
 Étape 1 : supervision, vérification sans mot de passe, présentation des
 mises à jour et export des logs. Ces éléments sont indépendants des
-précisions encore attendues de Benoît sur la mise à jour du bundle.
+précisions encore attendues du fournisseur sur la mise à jour du bundle.
 
 Étape 2 : relances ciblées, d’abord tests isolés et VM, puis services réels
 un par un. Comparer les fichiers, identités d’images, IP et routes avant
@@ -261,7 +265,7 @@ réellement exercé. Une fixture ne remplace pas une recette matérielle.
 
 Les scripts de contrôle, rapports, sources privées et journaux bruts restent
 hors du dépôt public. Le document de suivi fournisseur détaille les
-questions restantes : QUESTIONS_BENOIT_SUIVI_2026-10-21.txt.
+questions restantes : QUESTIONS_FOURNISSEUR_SUIVI_2026-10-21.txt.
 
 Références officielles consultées
 

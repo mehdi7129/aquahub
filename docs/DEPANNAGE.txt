@@ -46,6 +46,12 @@ agent déconnecté ou réponse retardée. Le délai de fraîcheur est de 30 seco
 Relire la connexion ou les journaux de l’agent ; ne pas remplacer ce gris
 par un vert à partir des dernières données mises en cache.
 
+Depuis 0.2.2, « Actualisation » après une relance attend une collecte commencée
+après la fin de la tâche. « État à vérifier » signale notamment une réponse
+perdue ou un suivi incomplet. Une relance brève peut passer entre deux
+observations Docker : l’indicateur orange suit alors la tâche ciblée, sans
+inventer un arrêt rouge. L’interface ne réessaie pas la commande automatiquement.
+
 Activity logs est vide dans Portainer
 
 Cette page vise l’audit administratif documenté pour Business Edition.
@@ -98,7 +104,7 @@ un tag X.Y.Z ou vX.Y.Z et l’asset exact aquahub-application_X.Y.Z_amd64.deb,
 avec taille et digest SHA-256 GitHub disponibles. Brouillons, préversions,
 ZIP de sources, kits complets et fichiers sans intégrité vérifiable sont
 ignorés. Vérifier aussi la connexion Internet et une éventuelle limite API.
-Aucune Release publique n’est encore annoncée avec les sources 0.2.1.
+La présence des sources ne garantit pas qu’une Release ait été publiée.
 
 L’agent disparaît pendant la mise à jour de l’application
 
@@ -119,11 +125,27 @@ pas à l’application.
 La progression d’un drone reste au même pourcentage
 
 Le pourcentage compte les jalons validés, pas le temps écoulé. Pendant une
-copie, une commande fournisseur ou l’attente du redémarrage, la barre peut
-rester indéterminée. Lire le nom de l’appareil et l’étape. Un résultat
+copie, une commande fournisseur ou l’attente du redémarrage, le pourcentage
+peut rester stable. Depuis 0.2.2, la barre conserve le remplissage acquis ;
+un spinner séparé indique l’activité. Elle reste indéterminée seulement
+lorsqu’aucun pourcentage réel n’est disponible. Lire le nom de l’appareil et
+l’étape. Si l’ancien rendu persiste après une mise à niveau, vérifier la
+version installée et fermer puis rouvrir la fenêtre pour charger ses nouvelles
+ressources. Ne pas faire progresser la barre selon le temps écoulé. Un résultat
 logiciel réussi ne valide pas les cinq contrôles manuels. Le bouton « i »
 donne la liste. Deux éléments sont consultatifs : vérifications du LAN et
 de la route existants, sans modification des IP par AquaHub.
+
+Le bureau affiche __main__.py au lieu d’AquaHub
+
+Le titre de la fenêtre et l’identité de l’application dans GNOME sont
+distincts. Dans 0.2.2, le nom du programme, l’identifiant GTK et celui du
+lanceur ne sont pas encore harmonisés. Le problème concerne le regroupement
+de la fenêtre, son nom et son icône ; il ne justifie pas de réinstaller
+Docker, de reconfigurer les appareils ou de modifier le bundle fournisseur.
+Le correctif est seulement planifié : voir PLAN_IDENTITE_BUREAU_2026-10-21.txt.
+Ne pas le présenter comme livré ni supprimer les préférences du bureau
+pour masquer le symptôme.
 
 Retour arrière refusé
 

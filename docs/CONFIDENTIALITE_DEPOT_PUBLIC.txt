@@ -1,0 +1,101 @@
+AquaHub — contenu du dépôt public et revue de confidentialité
+Revue documentaire du 21 octobre 2026, base technique 0.2.2 / 053b714.
+
+1. Ce qui est public
+
+Code propre à AquaHub sous licence MIT, documentation, tests synthétiques,
+exemples nécessaires au protocole et visuels explicitement en démonstration.
+Les noms de modules, chemins système génériques et références du dépôt GitHub
+public sont des éléments techniques du projet, pas des identités du banc.
+
+Les scripts et images du fournisseur, configurations client et données
+d’exploitation restent externes. La licence MIT d’AquaHub ne les couvre pas.
+
+2. Ce qui reste privé
+
+- Jetons, mots de passe, clés privées et identifiants d’accès.
+- Documents d’accès, réponses nominatives et correspondance brute.
+- Empreintes SSH et identités de machines/appareils effectivement observées.
+- Adresses et plans réseau propres à un poste ou un client.
+- Configurations .env, VPN, paramètres client et exports de volumes.
+- Bases SQLite, journaux et diagnostics réels non expurgés.
+- Kits de réparation privés, images Docker et disques de VM.
+- Captures de session contenant profil, utilisateur ou équipement réel.
+
+Les constantes du contrat fournisseur et les données fictives des tests
+peuvent ressembler à des paramètres réels. Les qualifier par leur origine,
+sans supprimer une garde ou une constante fonctionnelle à l’aveugle.
+
+3. Portée de la revue initiale
+
+L’audit de la base 053b714 a porté sur 102 fichiers suivis, cinq commits
+atteignables et 203 blobs historiques disponibles dans le clone local.
+Les nouveaux documents et le diff de cette publication sont relus séparément.
+
+Résultat : aucun jeton authentique, clé privée exploitable, email privé,
+chemin de compte personnel ou URL authentifiée réelle n’a été détecté.
+Les correspondances de jetons, secrets et URL authentifiées sont des fixtures
+explicites servant à tester le filtrage. Les exemples ne fournissent pas
+d’accès à un service réel.
+
+Les métadonnées Git emploient le compte public technique et une adresse
+noreply, sans email privé détecté. Le remote est le dépôt public attendu
+sans accès secret intégré. Les références publiques au compte hébergeant
+le projet restent nécessaires, notamment pour le canal de mise à jour.
+
+Les deux captures courantes 0.2.2, en clair et sombre, ont été contrôlées
+visuellement. Leurs chunks PNG ne contiennent pas de métadonnées EXIF ou
+textuelles. Les trois versions historiques du visuel initial ont été vérifiées
+structurellement pour ces métadonnées lors de l’audit de la base 053b714 ;
+elles n’ont pas toutes fait l’objet d’une revue visuelle.
+
+4. Neutralisation documentaire
+
+Les prénoms accessoires sont remplacés par des rôles génériques dans les
+documents courants. La note des questions fournisseur reçoit un nom de
+fichier neutre. Aucune correspondance nominative brute n’est ajoutée.
+
+Cette mise à jour ne réécrit pas les anciens commits. Ils conservent donc
+les anciennes mentions de prénom et l’ancien nom de fichier. Ces mentions
+ne sont pas des secrets d’accès, mais elles ne sont pas supprimées de
+l’historique par le nettoyage de la branche courante.
+
+5. Préparation d’une contribution publique
+
+Avant de publier :
+- Examiner la liste exacte des fichiers du diff et leur origine.
+- Chercher clés, jetons, accès intégrés aux URL et chemins personnels.
+- Relire les faux positifs des fixtures sans imprimer de valeur sensible.
+- Contrôler les noms de fichiers et les métadonnées Git.
+- Examiner les images, leur contenu visible et leurs métadonnées.
+- Vérifier liens et exemples, puis relire indépendamment les documents.
+- Confirmer que seuls les fichiers relus sont ajoutés au commit.
+
+.gitignore exclut les archives, paquets, clés, bases, rapports et captures
+de banc. La revue ajoute aussi les logs, documents RTF, fichiers de capture
+réseau, répertoires SSH et fichiers d’identités SSH courants. Ces exclusions
+n’agissent pas rétroactivement sur un fichier déjà suivi et ne remplacent
+pas une inspection du contenu.
+
+Ne pas ignorer globalement tous les JSON/YAML : certains décrivent des
+contrats et fixtures publics utiles. Les vraies configurations client
+doivent être préparées et conservées hors du dépôt.
+
+6. En cas de découverte d’une vraie donnée sensible
+
+Suspendre sa publication et traiter d’abord l’accès concerné : un secret
+déjà exposé doit être révoqué ou remplacé. Le retirer d’un nouveau commit
+ne le retire pas des anciens objets ou des copies distantes.
+
+Une éventuelle réécriture de l’historique public est une opération distincte,
+à préparer avec sauvegarde et coordination des clones, branches et tags.
+Elle ne garantit pas l’effacement de forks, caches ou copies déjà récupérées.
+Ne pas publier un incident avec sa valeur sensible dans une issue publique.
+
+7. Limites de ce contrôle
+
+La recherche est heuristique et repose sur les fichiers et objets Git
+atteignables disponibles au moment de l’audit. Elle n’inspecte pas les forks,
+caches GitHub, artefacts externes ni références absentes du clone.
+Le présent document donne une portée et des résultats observés, sans
+prétendre certifier tout contenu futur ou toute copie du dépôt.

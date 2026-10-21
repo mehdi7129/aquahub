@@ -22,6 +22,16 @@ test-results/
 .env.*
 !.env.example
 git-url-repo.rtf
+*.rtf
+*.log
+*.pcap
+*.pcapng
+known_hosts
+known_hosts.*
+authorized_keys
+.ssh/
+*.p12
+*.pfx
 id_ed25519
 id_ed25519.pub
 id_rsa

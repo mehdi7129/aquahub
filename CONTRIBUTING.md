@@ -36,6 +36,12 @@ effectuées. Indiquer clairement les tests non exécutés qui concernent le
 changement. Ne pas joindre d’export réel contenant une configuration client,
 une identité matérielle, un jeton ou des journaux non expurgés.
 
+Relire aussi la [politique du dépôt public](docs/CONFIDENTIALITE_DEPOT_PUBLIC.txt)
+avant de joindre des exemples ou des captures. Employer des rôles génériques,
+des données fictives et des chemins de documentation ; vérifier les métadonnées
+des images et des commits. Un fichier ignoré par Git ou un log déjà filtré
+n’est pas automatiquement prêt à être rendu public.
+
 Le code et la documentation proposés à ce dépôt sont destinés à être distribués
 sous la [licence MIT du projet](LICENSE). Conserver les notices des composants
 tiers lorsqu’ils sont utilisés.

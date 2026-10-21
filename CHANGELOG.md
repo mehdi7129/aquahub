@@ -3,6 +3,20 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## Documentation — 21 octobre 2026
+
+- État fonctionnel 0.2.2 et limites détaillés dans le README, avec captures
+  de démonstration récentes en clair et sombre.
+- Architecture, dépannage, reprise du développement et exemples de
+  construction actualisés ; décisions techniques regroupées et expliquées.
+- Plan de correction du nom et de l’icône dans le bureau, avec critères
+  GNOME/Wayland/X11, instance unique et recette de paquet. Correction
+  proposée seulement : la version du code reste 0.2.2.
+- Revue du dépôt public et des objets Git locaux, neutralisation des mentions
+  personnelles dans les documents courants et exclusions renforcées. La portée
+  du contrôle et les anciennes mentions conservées dans l’historique sont
+  précisées dans docs/CONFIDENTIALITE_DEPOT_PUBLIC.txt.
+
 ## 0.2.2 — correctif d’interface, préproduction
 
 - Barre de configuration conservant le pourcentage acquis pendant les

@@ -62,9 +62,25 @@ les exports y ont été exercés. Sur le poste installé, un précontrôle du
 numéro 5 a réussi sans élévation et l’export groupé a produit les journaux
 avec leurs limites explicites. Voir TESTS.txt pour le périmètre observé.
 
+La recette 0.2.2 documente 270 tests Python réussis et huit ignorés sans
+options, 28 tests de domaine et les parcours natifs ciblés. Le paquet extrait
+a été exercé, puis une mise à niveau du poste a été contrôlée en lecture seule.
+Les invariants du bundle, conteneurs, réseau et kit de réparation sont restés
+identiques pendant cette recette. Les préconditions et limites sont dans
+TESTS.txt ; il ne s’agit pas d’une qualification d’un kit commercial générique.
+
+Correctif ciblé proposé : identité dans le bureau
+
+Le nom __main__.py et une icône générique peuvent apparaître pour la fenêtre.
+Des écarts entre identifiant GTK, lanceur et nom d’icône sont confirmés dans
+0.2.2. Le plan PLAN_IDENTITE_BUREAU_2026-10-21.txt propose leur alignement et
+la recette GNOME/Wayland/X11, des favoris et de l’instance unique.
+Ce correctif est au stade du plan : aucun changement de version ou de code
+d’identité ne fait partie de la publication documentaire présente.
+
 Priorité 1 : terminer le contrat fournisseur
 
-Obtenir et qualifier une procédure de mise à jour d’un Hub déjà installé,
+Qualifier la procédure fournisseur confirmée de mise à jour d’un Hub déjà installé,
 conservant .env, configurations client/VPN et adresses. Définir la procédure
 de restauration, les migrations éventuelles et l’identité durable de chaque
 version du dépôt et de ses images. Le pilote actuel image-refresh-v1 garde

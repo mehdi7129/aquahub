@@ -68,10 +68,12 @@ doit rester visible. Cette fenêtre ne prouve aucun état du matériel.
 
   PYTHONPATH=agent:desktop /usr/bin/python3 -m unittest discover -s tests -q
 
-Les tests génériques se lancent sans Docker ni drone. Trois tests Docker en
-lecture seule sont ignorés sans opt-in. Deux tests de contrat fournisseur
-sont ignorés sans le bundle local explicitement indiqué. Les commandes de
-ces recettes et les tests natifs sont dans TESTS.txt.
+Les tests génériques se lancent sans Docker ni drone. Les cas facultatifs
+couvrent des lectures Docker, le contrat fournisseur sur transports interceptés
+et les dialogues GTK/WebKit des exports. Ils exigent leurs opt-ins et
+préconditions : bundle local explicitement indiqué ou affichage isolé selon
+le cas. Rapporter les cas ignorés ; les commandes et le détail de chaque
+précondition sont dans TESTS.txt.
 
 Les tests d’installation compilent de petits helpers avec les en-têtes GTK4
 et construisent un faux paquet. Ils n’installent pas ce paquet dans le système.
@@ -108,6 +110,8 @@ Socket serveur : server.py ; autorisations et redaction : security.py.
 Docker natif : docker.py ; bootstrap du compte Portainer : portainer.py.
 Configuration Aqua_Drones : drone.py ; archivage d’incidents : health_history.py.
 Historique SQLite : store.py ; comparaisons réseau : network.py.
+Exports de journaux : agent/aquahub_agent/log_exports.py pour la collecte,
+desktop/aquahub_desktop/log_exports.py pour le fichier et le dialogue GTK.
 Archives/mises à jour du bundle : updates.py et image_identity.py.
 Mises à jour de l’application : app_updates.py ; installation indépendante
 dans installer/application_upgrade.py. Ces deux canaux restent séparés.
@@ -204,3 +208,46 @@ dialogue GTK et crée le fichier depuis le compte utilisateur. Voir les
 nouveaux modules log_exports.py des deux côtés et test_log_exports.py.
 L’export n’a pas besoin de jeton Portainer. Les fenêtres et les données de
 recette utilisent exclusivement des fixtures synthétiques ou un banc autorisé.
+
+13. Corrections 0.2.2 et points de vigilance
+
+Le contrat backend progress ne change pas. Dans app.ts, conserver value dès
+que percent est défini, même si indeterminate vaut true : celui-ci signale
+une attente, pas la perte du pourcentage déjà acquis. Le spinner montre
+l’activité sans interpoler l’avancement. ui-webkit.js et le nouveau parcours
+run_visual_feedback.py vérifient ce remplissage dans le vrai moteur WebKitGTK.
+
+Les badges utilisent désormais servicePresentation() dans domain.ts : demande
+en cours, tâche de relance liée à sa cible, puis attente d’une observation
+postérieure à finished_at. status.get fournit déjà collected_at, active_job
+et les dernières tâches ; aucune nouvelle API n’est nécessaire. Une réponse
+perdue n’autorise pas un second envoi. Le gris conserve l’incertitude ; un
+échec de commande ne prouve pas que le conteneur est arrêté. Les tests de
+domaine et run_visual_feedback.py couvrent notamment ancien cache, cible
+changée, rechargement et suivi perdu.
+
+Le timer de fraîcheur doit comparer l’état effectivement rendu : renderPage()
+maintient lastObservationFresh. run_phase1_feedback.py vérifie l’expiration
+même si une requête reste bloquée. Ne pas résoudre une intermittence de test
+en conservant indéfiniment un badge vert ou en accélérant toute la collecte.
+
+La présentation utilise des contours de 2 px, des titres de mise à jour
+communs et des espacements locaux. Le switch de thème a une géométrie
+explicite, sans transformation animée. L’artefact signalé n’a pas été reproduit
+pendant les captures : ne pas annoncer sa cause comme démontrée. TESTS.txt
+décrit les recettes de sources, les essais du paquet et leurs limites.
+
+14. Prochain chantier : identité de l’application dans le bureau
+
+Non implémenté dans 0.2.2. Lire PLAN_IDENTITE_BUREAU_2026-10-21.txt avant toute
+modification. Le symptôme est un nom de programme Python visible à la place
+d’AquaHub dans GNOME, malgré le titre correct de la fenêtre. Les points
+d’entrée concernés sont desktop/aquahub_desktop/app.py et les ressources
+.desktop/icône produites par installer/build_package.py.
+
+Le futur correctif doit être qualifié avec les identités natives et le
+regroupement des fenêtres sous Wayland et X11, y compris au lancement depuis
+l’icône et lors d’un second lancement. Il ne requiert ni changement fournisseur
+ni intervention sur les adresses, les services ou les appareils. Le flux
+Git + registre du bundle reste un chantier séparé ; son plan n’est pas une
+fonction déjà disponible.

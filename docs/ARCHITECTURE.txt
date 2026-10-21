@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.2.1. Il complète
+Ce document décrit les sources de la préproduction 0.2.2. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -11,6 +11,20 @@ AquaHub est une application de bureau Linux pour superviser un bundle Aqua
 Hub fourni séparément. La cible de l’installateur est Debian 13 amd64 avec
 GNOME. L’interface, l’agent et l’installateur sont dans ce dépôt ; le bundle,
 ses images, ses configurations et les identifiants client ne le sont pas.
+
+Cartographie du dépôt public :
+  agent/aquahub_agent/ : service local, contrats et opérations privilégiées
+  desktop/aquahub_desktop/ : fenêtre GTK, pont et dialogues natifs
+  frontend/src/ et frontend/styles.css : interface et règles de présentation
+  frontend/tests/ : parcours WebKitGTK synthétiques et tests de domaine
+  tests/ : tests Python de l’agent, du desktop et des installateurs
+  installer/ : constructeur Debian, assistants et helpers système
+  scripts/prepare_payload.py : préparation explicite d’un kit privé
+  docs/ : documentation et plans, distincts des résultats bruts de recette
+
+frontend/dist/, node_modules/, les .runtime/, dist/, reports/ et
+local-private/ sont des sorties générées ou privées, ignorées par Git.
+Les captures de recette et les états client ne sont pas des sources à publier.
 
 Le chemin d’une action réelle est le suivant :
 
@@ -42,6 +56,17 @@ regroupe les règles pures : distinction état/santé, validation des réponses,
 garde d’action, identité de cible, normalisation d’URL et échappement du texte.
 Les règles sensibles restent aussi vérifiées par l’agent : désactiver un
 bouton ne constitue jamais à lui seul une mesure d’autorisation.
+
+Depuis 0.2.2, servicePresentation() et latestRestart() relient le badge au
+service et à sa tâche, pas à la sélection courante. requestingService suit
+l’envoi ; unconfirmedRestarts garde l’incertitude d’une réponse perdue sans
+rejouer la commande. Après la fin d’une relance, collected_at doit être
+strictement postérieur à finished_at avant de réafficher l’état Docker.
+La tâche courante, la tâche active et les dernières tâches persistantes
+permettent de reprendre ce suivi après reconnexion ou rechargement.
+observationFresh() et le timer de fraîcheur grisent les données devenues
+anciennes, même si une requête de supervision locale reste en attente.
+Ces règles ne remplacent pas les vérifications de résultat de l’agent.
 
 src/bridge.ts choisit le transport natif ou la simulation explicite ?demo=1.
 La simulation porte un bandeau permanent et ne lance pas de maintenance.
@@ -146,8 +171,11 @@ Les précontrôles expirent ; la configuration sauvegarde les fichiers distants
 concernés, suit le redémarrage et vérifie le résultat. Les contrôles manuels
 restent distincts des étapes automatiques. Chaque appareil et chaque résultat exposent
 manual_checklist. La tâche configure_drone nomme Aqua_Drone_N et publie
-douze jalons observés, avec phase et pourcentage persistant. Les attentes
-longues restent indéterminées ; 100 % attend les contrôles finaux.
+douze jalons observés, avec phase et pourcentage persistant. Depuis 0.2.2,
+la barre conserve son remplissage dès qu’un pourcentage réel est disponible,
+même lorsque indeterminate indique une attente. Un spinner séparé signale
+l’activité ; la barre n’est indéterminée qu’en l’absence de pourcentage.
+100 % attend les contrôles finaux.
 La configuration est séquentielle : le générateur modifie aussi un fichier
 partagé du hub, ce qui interdit de configurer plusieurs appareils en parallèle
 sans nouveau contrat. Voir docs/SECURITE.txt.
@@ -206,14 +234,20 @@ La collecte des journaux reste distincte de l’historique et du diagnostic.
 Installation système :
   /usr/lib/aquahub/agent et /usr/lib/aquahub/desktop : sources exécutées
   /usr/share/aquahub/frontend : ressources compilées
-  /usr/share/aquahub/offline : payload externe du kit complet
+  /usr/share/aquahub/offline : payload initial du kit complet, si présent
+  /var/lib/aquahub/offline : kit préservé après passage au paquet applicatif
   /etc/aquahub/operator.conf : UID de l’opérateur autorisé
   /run/aquahub/agent.sock : communication locale
   /var/lib/aquahub/agent : base, préparations, snapshots et données privées
   /var/lib/aquahub/agent/app-updates : paquet et suivi applicatif privés
   /usr/lib/aquahub/application-upgrade.py : helper applicatif indépendant
   /var/lib/aquahub/installer : progression et journaux d’installation
-  /var/lib/aquahub/setup.complete : version ayant terminé l’assistant
+  /var/lib/aquahub/setup.complete : marqueur d’installation initiale accomplie
+
+Le paquet application-only préserve le kit hors de l’inventaire dpkg lors
+de sa première migration ; l’assistant sait lire les deux emplacements.
+La présence de setup.complete évite de rejouer l’installation du bundle
+à chaque changement de version d’AquaHub. Voir docs/PUBLICATION.txt.
 
 En développement, runtime_paths() utilise les dossiers XDG de l’utilisateur
 ou les chemins explicitement fournis. Les données WebKit et son cache sont
@@ -238,13 +272,22 @@ d’un poste initialisé ; il ne remplace pas un kit de première installation.
 
 7. Où intervenir pour une évolution
 
-Une règle d’affichage pure : src/domain.ts et tests/domain.test.mjs.
+Une règle d’affichage pure : frontend/src/domain.ts et
+frontend/tests/domain.test.mjs.
 Une nouvelle réponse métier : types.ts, validation frontend, handler de l’agent
-et tests de l’adaptateur. Une opération privilégiée : handler avec mutation,
-paramètres fermés et tâche sérialisée si longue ; ne pas ajouter de commande
-shell fournie par le frontend. Un dialogue secret : app.py, hors du renderer.
+et tests de l’adaptateur. Une opération administrative : requires_admin
+explicite, paramètres fermés et exclusion mutation selon son comportement.
+Ces deux besoins sont distincts ; une opération longue utilise une tâche
+sérialisée. Ne pas ajouter de commande shell fournie par le frontend.
+Un dialogue secret : app.py, hors du renderer.
 Un nouveau bundle : tests de contrat puis qualification séparée. Une évolution
 du paquet : tests/test_packaging.py, test_installer_finish.py et upgrade_guard.
 
 Les handlers et validations sont l’autorité ; la documentation ne permet pas
 de déduire qu’une procédure fournisseur inconnue est déjà compatible.
+
+L’identité GNOME de la fenêtre est un prochain chantier, non corrigé dans
+0.2.2 : le titre AquaHub ne suffit pas à garantir le nom ni l’icône affichés
+par le bureau. Le diagnostic et les critères de qualification sont séparés
+dans docs/PLAN_IDENTITE_BUREAU_2026-10-21.txt. Ce plan ne modifie ni l’agent
+ni le fonctionnement du bundle fournisseur.

@@ -1,7 +1,9 @@
-Suivi pour Benoît — mise à jour du hub et relance WireGuard
+Suivi pour le fournisseur — mise à jour du hub et relance WireGuard
 21 octobre 2026
 
-Bonjour Benoît,
+Cette note conserve les questions techniques initiales. Les réponses ont
+été reçues et recoupées ; voir PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt.
+Le présent document ne constitue pas l’état actuel du chantier fournisseur.
 
 J’ai bien retrouvé le tag Git v1.0.0 et les tags v1.0.0 des cinq images
 privées. Les accès existants suffisent pour Git et le registre ; pas

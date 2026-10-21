@@ -1,0 +1,185 @@
+AquaHub — plan de correction de l’identité dans le bureau
+21 octobre 2026 — proposition à valider, correction non développée
+Référence examinée : AquaHub 0.2.2, commit 053b714.
+
+1. Résultat attendu
+
+Un lancement depuis le menu des applications ou un favori doit être reconnu
+comme AquaHub : nom lisible, icône officielle, regroupement correct dans
+GNOME et dans Alt-Tab. Le nom __main__.py ne doit plus servir d’identité à
+l’application. Le titre HTML ou le titre de fenêtre seul ne suffit pas.
+
+Ce document prépare le développement. Aucune correction de runtime, aucun
+nouveau paquet ni aucune installation n’est réalisé par ce lot documentaire.
+La version implémentée reste 0.2.2. Le numéro du futur correctif sera attribué
+lors de sa réalisation ; une proposition ne constitue pas une version livrée.
+
+2. Écarts confirmés à la lecture des sources
+
+Fenêtre : desktop/aquahub_desktop/app.py.
+- Gtk.Application utilise com.aquadrone.AquaHub.
+- Window.set_icon_name demande aquahub.
+- Le titre de la fenêtre est déjà AquaHub.
+- Aucun nom d’application humain ni nom de programme n’est explicitement
+  déclaré par GLib dans ce parcours.
+
+Paquet : installer/build_package.py.
+- Le lanceur installé est com.aquadrone.aquahub.desktop.
+- Son Name est AquaHub et son Icon est com.aquadrone.aquahub.
+- L’icône livrée est com.aquadrone.aquahub.svg dans le thème hicolor.
+- Le métainfo utilise également com.aquadrone.aquahub.
+- Exec passe par /usr/bin/aquahub, puis python3 -m aquahub_desktop.
+
+Les différences de casse de l’identifiant et de nom entre l’icône demandée
+et celle livrée sont établies. Le retour au nom du programme Python est
+une explication cohérente avec le symptôme ; la recette native devra
+confirmer le comportement réel
+du bureau. Ne pas prétendre avoir déjà reproduit tous ses mécanismes.
+
+3. Contrat d’identité recommandé
+
+Nom visible                     AquaHub
+Identifiant applicatif          com.aquadrone.aquahub
+Nom de programme GLib           com.aquadrone.aquahub
+Nom d’icône de thème             com.aquadrone.aquahub
+Lanceur                         com.aquadrone.aquahub.desktop
+Métainfo                        com.aquadrone.aquahub
+Commande utilisateur            /usr/bin/aquahub
+
+Conserver le basename du lanceur et le fichier d’icône déjà distribués.
+Le changement vise l’identité de la fenêtre, sans renommer les modules
+Python, le paquet Debian, les chemins d’état ou les identifiants du bundle.
+Une icône redessinée n’est pas nécessaire pour résoudre cette incohérence.
+
+4. Étapes de développement après validation
+
+A — Déclaration de la fenêtre
+
+Définir explicitement le nom d’application humain et le nom de programme
+GLib suffisamment tôt, avant l’enregistrement de l’application et la création
+des fenêtres. Aligner Gtk.Application sur l’identifiant canonique. Employer
+le nom d’icône réellement installé pour la fenêtre et, si nécessaire, les
+autres fenêtres/dialogues AquaHub. Éviter de disperser des variantes de casse.
+
+Le code doit garder ses modes de démo, de test et d’instance normale. Ne pas
+ajouter un appel au shell, une dépendance réseau ou une recherche d’icône dans
+le dossier personnel d’un développeur pour contourner une installation incomplète.
+
+B — Contrat du paquet et compatibilité X11
+
+Conserver l’entrée desktop existante, sa commande et le nom de l’icône.
+Vérifier les champs du lanceur et du métainfo, puis leur présence dans les
+deux modes du constructeur : application seule et kit complet de fixture.
+Utiliser desktop-file-validate et vérifier la résolution de l’icône dans un
+thème hicolor isolé, sans profiter d’une ancienne copie du poste.
+
+Sous X11/XWayland, relever WM_CLASS et _GTK_APPLICATION_ID sur une vraie
+fenêtre. Définir StartupWMClass seulement avec la valeur de classe réellement
+retenue et vérifiée. Cette clé ne remplace pas l’identité Wayland.
+Ne pas employer Gtk.Window.set_wmclass, API dépréciée, comme solution globale.
+
+C — Premier lancement et assistant
+
+Vérifier aussi le parcours /usr/bin/aquahub avant setup.complete, qui ouvre
+l’assistant GTK4. Celui-ci possède déjà une identité distincte de setup.
+Tester son nom, son icône et le passage vers AquaHub ; conserver son rôle
+d’installation séparé. Si une correction y est nécessaire, la limiter aux
+métadonnées d’identité, sans modifier la logique d’installation du bundle.
+
+D — Passage d’une version existante au correctif
+
+Le nouvel identifiant GTK ne partage pas le nom D-Bus de l’ancien. Fermer
+l’ancienne fenêtre avant la première ouverture du correctif afin d’éviter
+une coexistence temporaire de deux identités.
+
+Conserver le favori existant lorsqu’il pointe vers le lanceur canonique.
+Un éventuel raccourci local obsolète doit être identifié avant toute proposition
+de remplacement. Ne pas supprimer globalement les favoris, vider le profil
+GNOME ou effacer les caches personnels. Prévoir une simple fermeture/réouverture
+de l’application ; ne pas exiger par défaut un reboot du PC ou de la session.
+
+5. Recette native : prouver le comportement du bureau
+
+Les captures habituelles de WebKit ne montrent que l’interface HTML.
+Elles ne prouvent pas l’icône ou le nom retenu par le bureau.
+
+Recette nominale sur Debian 13 / GNOME :
+- Ouvrir depuis le vrai lanceur installé, puis depuis un favori existant.
+- Vérifier le nom AquaHub et son icône dans le menu, l’aperçu GNOME,
+  la barre d’applications et Alt-Tab.
+- Vérifier l’absence d’entrée __main__.py et de seconde icône orpheline.
+- Réouvrir et maximiser la fenêtre, puis fermer et relancer l’application.
+- Vérifier la lisibilité de l’icône en clair/sombre et à deux échelles.
+
+Complément instrumenté, avec données de démonstration :
+- Relever les propriétés Gio/GLib/GTK effectives après réalisation de la
+  fenêtre : identifiant, nom humain, nom de programme, titre et icon_name.
+- Vérifier qu’un chargeur de thème résout réellement l’icône attendue.
+- Sous Xvfb/X11, relever les propriétés de la fenêtre native avec xprop.
+- Sous Wayland, contrôler l’identité native et le regroupement par GNOME ;
+  ne pas déduire leur réussite des seuls résultats X11.
+- Employer une socket inutilisée, --demo, --no-agent et un état temporaire
+  privé pour les essais d’interface. Aucun équipement ne doit être contacté.
+
+6. Cas particulier : instance unique
+
+Actuellement --test-script ou --quit-after active NON_UNIQUE dans le desktop.
+Un double lancement avec ces options ne valide donc pas le comportement normal.
+
+Prévoir un essai distinct de deux lancements normaux en démonstration,
+sans ces options, dans une session D-Bus isolée. Vérifier que le second
+présente la première fenêtre puis quitte, sans seconde fenêtre ni nouvel
+agent. Le nettoyage termine uniquement les processus créés par le banc.
+Ne pas envoyer d’activation à une fenêtre utilisateur déjà ouverte.
+
+7. Contrôles du paquet correctif
+
+- Construire depuis un commit identifié et noter version et SHA-256.
+- Extraire le paquet dans un espace isolé : lanceur, icône et métainfo
+  doivent partager l’identité canonique ; vérifier les ressources réellement
+  livrées et les chemins de résolution, pas seulement les chaînes du code.
+- Vérifier le parcours natif du paquet extrait avec ses propres ressources.
+- Tester en environnement isolé la mise à niveau depuis 0.2.2 puis la
+  réinstallation du même correctif ; garder les données et le kit de réparation.
+- Vérifier ensuite le lancement installé depuis le bureau et le favori.
+- Comparer bundle, conteneurs et réseau avant/après ; aucune réinstallation
+  du bundle ni relance d’un drone ne fait partie de cette correction.
+
+Les tests de construction existants restent la base. Ajouter un banc natif
+d’identité si nécessaire, plutôt qu’un test qui cherche uniquement une chaîne
+dans app.py. Distinguer son périmètre automatisé des observations GNOME.
+
+8. Critères d’acceptation et livrables
+
+Accepté si le lancement normal affiche AquaHub avec son icône, est rattaché
+au bon lanceur, conserve le favori, respecte l’instance unique et fonctionne
+après mise à niveau/réinstallation dans les environnements vérifiés.
+Les contrôles X11 et Wayland manquants doivent être déclarés, jamais déduits
+l’un de l’autre. L’assistant de première installation reste identifié proprement.
+
+Livrables : correctif ciblé de l’identité, tests natifs/paquet adaptés,
+résultats de recette expurgés, notes de version et installateur applicatif
+qualifié. Les captures de démonstration seules peuvent être proposées à la
+documentation publique, après contrôle de leur contenu et de leurs métadonnées.
+
+9. Périmètre de validation de ce plan
+
+La présente publication comprend le plan et la documentation du projet.
+Elle ne modifie pas app.py, le constructeur, le système installé ou les
+préférences GNOME. Les scripts fournisseur restent intacts. L’intégration
+du bundle v1.0.1 conserve son propre plan et sa propre qualification.
+
+10. Références officielles examinées
+
+Nom humain GLib :
+https://docs.gtk.org/glib/func.set_application_name.html
+Nom de programme GLib :
+https://docs.gtk.org/glib/func.set_prgname.html
+Intégration et unicité GtkApplication :
+https://docs.gtk.org/gtk3/class.Application.html
+Icône de fenêtre et limites de plateforme :
+https://docs.gtk.org/gtk3/method.Window.set_icon_name.html
+Champs du lanceur, dont StartupWMClass :
+https://specifications.freedesktop.org/desktop-entry/latest/recognized-keys.html
+API set_wmclass dépréciée :
+https://docs.gtk.org/gtk3/method.Window.set_wmclass.html
