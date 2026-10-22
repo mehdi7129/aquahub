@@ -3,6 +3,17 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.4 — configuration sans mot de passe administrateur du PC, préproduction
+
+- Configuration d’un Aqua_Drone accessible au compte opérateur autorisé sans
+  demande PolicyKit. La confirmation du numéro et de l’identité, le précontrôle
+  récent à usage unique, les comparaisons réseau et les verrous restent actifs.
+- Les réglages et associations SSH, les services, les mises à jour et les
+  autres opérations administratives conservent leurs autorisations propres.
+  Aucun changement de règle système globale, d’IP ou de script fournisseur.
+- Tests du dispatch privilégié, avec configuration synthétique complète et
+  refus des demandes non autorisées ou incompatibles. Voir docs/TESTS.txt.
+
 ## 0.2.3 — identité bureau, préproduction
 
 - Nom humain AquaHub, nom de programme et identifiant GTK harmonisés avec

@@ -21,12 +21,22 @@ session non root n’utilise pas PolicyKit pour ses mutations : il opère avec
 les droits déjà détenus par l’utilisateur. L’accès au démon Docker reste donc
 un droit puissant ; le mode sources ne transforme pas Docker en sandbox.
 
-drones.preflight est une exception explicite à l’autorisation interactive,
-pas à l’identification locale. Le registre sépare requires_admin du besoin
-d’exclusion de maintenance. Le précontrôle utilise operation_guard : mutex,
-verrou de fichier partagé et seconde vérification de mise à jour programmée.
-Il ne transmet que la commande SSH de lecture fixe et prépare ses fichiers
-dans un espace local privé. Configure, enroll et ssh_settings restent protégés.
+Depuis 0.2.4, drones.preflight et drones.configure sont des exceptions
+explicites à l’autorisation administrateur interactive du PC, pas à
+l’identification locale. Cette délégation appartient au compte opérateur
+configuré : ses processus peuvent appeler ces méthodes par la socket privée.
+Le clic de l’interface n’est pas une frontière d’autorisation. L’identité
+SO_PEERCRED et l’UID sont contrôlés par le serveur ; la revérification du
+PID et de son instant de démarrage dans AuthPolicy reste propre aux méthodes
+administratives soumises à PolicyKit.
+
+Le registre conserve mutation=True et requires_admin=False pour ces deux
+méthodes. Le précontrôle utilise operation_guard : mutex, verrou de fichier
+partagé et seconde vérification de mise à jour programmée. Il ne transmet
+que la commande SSH de lecture fixe et prépare ses fichiers dans un espace
+local privé. configure passe par submit_job et ses gardes de maintenance.
+enroll, ssh_settings et les autres interventions administratives conservent
+PolicyKit. Aucune règle globale PolicyKit ni exception sudoers n’est ajoutée.
 
 Le pont WebKit n’accepte que le fichier index.html exact de l’application,
 avec un nonce aléatoire propre à la fenêtre. Navigation distante, nouvelles
@@ -100,12 +110,23 @@ SSH. Cette empreinte doit être vérifiée par un canal de confiance ; la prése
 d’une réponse sur une IP ne suffit pas à prouver le bon appareil. Le précontrôle
 et la configuration vérifient ensuite l’identité stable, le numéro et l’adresse.
 
+Le plan du précontrôle expire après 600 secondes et ne peut être utilisé
+qu’une fois. configure exige son identifiant, le même UID et la confirmation
+exacte de l’identité ; un numéro fourni doit correspondre au plan. Avant
+l’envoi, les empreintes des fichiers, le réseau du hub et l’état distant
+sont relus et comparés. L’exception d’autorisation locale ne change aucun
+de ces contrôles et ne modifie ni les scripts fournisseur ni les IP.
+
 La connexion utilise BatchMode, StrictHostKeyChecking et un known_hosts épinglé
 pour l’opération. Les configurations SSH utilisateur implicites sont neutralisées.
 L’authentification par mot de passe et clavier interactif est désactivée. Les
 clés locales retenues doivent avoir propriétaire et permissions acceptables.
 Le profil sans secret est désactivé par défaut et nécessite un choix explicite
 pour un appareil qui le prend en charge ; il conserve les contrôles d’identité.
+L’accès SSH au drone est distinct de l’autorisation administrateur du PC.
+L’absence de cette dernière pour configurer ne crée pas d’accès SSH et
+n’approuve pas une nouvelle empreinte : l’association et les réglages de
+transport restent des opérations administratives séparées.
 
 Les scripts fournisseur ne sont pas téléchargés puis exécutés à l’aveugle.
 Leur empreinte doit correspondre au contrat connu. Le code est copié dans un

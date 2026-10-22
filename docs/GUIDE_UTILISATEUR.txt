@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.3
+Préproduction 0.2.4
 
 1. Disponibilité et installation
 
@@ -124,7 +124,11 @@ Elle conserve l’identité SSH et ne transfère aucune configuration au drone.
 Une première association SSH reste une étape distincte.
 La configuration n’est disponible que si la cible, l’identité, les fichiers
 et le réseau sont compatibles. Confirmer ensuite l’identité physique avant
-de lancer le travail. Le drone peut redémarrer ; attendre son retour vérifié.
+de lancer le travail. Depuis 0.2.4, le bouton Lancer la configuration ne
+demande pas le mot de passe administrateur du PC au compte autorisé AquaHub.
+La confirmation du drone reste obligatoire. Les accès SSH du drone sont
+distincts ; leur association initiale et leurs réglages restent protégés.
+Le drone peut redémarrer ; attendre son retour vérifié.
 
 Le suivi nomme toujours Aqua_Drone_N. Sa barre indique les douze jalons
 confirmés, avec un pourcentage fondé sur ce qui a réellement été vérifié.

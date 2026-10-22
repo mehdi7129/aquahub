@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.3","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.4","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -23,9 +23,14 @@ et passent par une origine exacte et un nonce.
 
 L’UID, le PID et l’heure de démarrage du processus viennent de SO_PEERCRED
 et de /proc, pas du JSON. Ne pas ajouter de champ permettant au renderer
-d’affirmer son rôle ou son identité. Les interventions passent par PolicyKit.
-Le précontrôle drones.preflight est exempté d’autorisation interactive ; il
-reste authentifié et incompatible avec une maintenance en cours.
+d’affirmer son rôle ou son identité. Les interventions administratives passent
+par PolicyKit. Depuis 0.2.4, drones.preflight et drones.configure en sont
+explicitement exemptées pour l’UID opérateur autorisé. Tout processus de ce
+compte pouvant joindre la socket privée bénéficie de cette délégation ; elle
+ne dépend pas d’un clic dans la GUI. Ces méthodes restent authentifiées et
+incompatibles avec une maintenance en cours. La revérification supplémentaire
+du PID et de son instant de démarrage dans AuthPolicy reste appliquée aux
+méthodes administratives, pas à ces deux exceptions.
 
 Les tâches exposent notamment created_at, started_at et finished_at.
 status.collected_at date le début de collecte. L’interface 0.2.2 utilise
@@ -68,15 +73,22 @@ Aqua_Drones :
                       temporaire de plan.
   drones.configure    number, preflight_id, confirmed_identity.
 
-enroll, ssh_settings et configure restent protégés par PolicyKit.
-preflight réserve le créneau d’opération et le verrou de maintenance sans
-demander d’autorisation administrateur. Le registre distingue mutation et
-requires_admin : ne pas supprimer la garde de maintenance en modifiant
-seulement le classement de l’autorisation. Les verrous sont libérés même
-si un précontrôle échoue.
+enroll et ssh_settings restent protégés par PolicyKit. preflight et configure
+ne demandent pas le mot de passe administrateur du PC depuis 0.2.4 ; leur
+enregistrement conserve mutation=True et requires_admin=False. preflight
+réserve le créneau et le verrou de maintenance par operation_guard ; configure
+utilise les gardes de submit_job. Ne pas supprimer l’exclusion de maintenance
+en modifiant le classement de l’autorisation. Les verrous sont libérés même
+si un précontrôle échoue. Aucun changement de sudoers ou de règle PolicyKit
+globale n’est nécessaire.
 Une réponse au scan ne suffit pas à autoriser configure. La confirmation
 d’identité doit correspondre au plan ; reprendre la forme exacte retournée
 par le précontrôle et utilisée par le frontend, sans recréer un objet supposé.
+Le plan appartient à l’UID qui l’a créé, expire après 600 secondes et ne peut
+être utilisé qu’une fois. Le numéro, les fichiers, l’identité et l’état distant
+sont revérifiés avant l’envoi ; les gardes sur le réseau restent inchangées.
+L’accès SSH préalablement configuré reste nécessaire : l’exception locale ne
+crée aucun accès et ne dispense pas d’approuver séparément une empreinte.
 
 Mises à jour du bundle :
   updates.check      Recherche de Releases, sans déploiement.

@@ -45,8 +45,8 @@ Pour une mise à jour publique de l’application seule :
 
   python3 installer/build_package.py \
     --application-only \
-    --output dist/aquahub-application_0.2.3_amd64.deb \
-    --version 0.2.3
+    --output dist/aquahub-application_0.2.4_amd64.deb \
+    --version 0.2.4
 
 Ce mode n’accepte ni --payload ni --private-kit. Le paquet garde le nom Debian
 aquahub-setup afin de mettre à niveau l’installation 0.1.2 existante, sans
@@ -80,8 +80,8 @@ Exemple avec un payload externe déjà vérifié, depuis la racine du dépôt :
 
   python3 installer/build_package.py \
     --payload /chemin/hors-depot/payload \
-    --output dist/aquahub-setup_0.2.3_amd64.deb \
-    --version 0.2.3
+    --output dist/aquahub-setup_0.2.4_amd64.deb \
+    --version 0.2.4
 
 Cette commande refuse un payload déclaré privé ou contenant les formes de
 clés privées reconnues. L’option --private-kit permet uniquement une recette
@@ -143,7 +143,14 @@ Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
 
-État du candidat 0.2.3 : le correctif d’identité est implémenté et un paquet
+Paquet applicatif 0.2.4 construit localement : 146820 octets, SHA-256 :
+  1a3b33b0b5c825c711294de049c4d95c5394be61807cb4c5639d514f8800a980
+Le changement d’autorisation de configuration, ses tests synthétiques et la
+mise à niveau du poste sont décrits dans TESTS.txt. La recette VM 0.2.3 n’est
+pas rejouée pour ce lot. Aucun kit complet 0.2.4 ni nouvelle Release publique
+n’est annoncé par la publication des sources.
+
+Historique du candidat 0.2.3 : le correctif d’identité est implémenté et un paquet
 applicatif local de 146764 octets a été construit, SHA-256 :
   404b741aed6aedc2a5f3fe51e4dd1b3f7f75ef91f9a74be34683b2612525dc1d
 Cette empreinte identifie ce candidat, pas tous les futurs builds du même

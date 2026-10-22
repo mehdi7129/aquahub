@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.3.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.4.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -19,12 +19,12 @@ Capture de l’interface 0.2.2 avec données fictives uniquement.
 
 ## Fonctionnalités
 
-| Fonction | État dans 0.2.3 | Limite à connaître |
+| Fonction | État dans 0.2.4 | Limite à connaître |
 | --- | --- | --- |
 | Supervision | Huit services reconnus, contours colorés et détail par service | État du conteneur et santé distincts ; données anciennes neutralisées |
 | Relances | Tâche ciblée visible, résultat et observation après intervention | WireGuard reste protégé ; toutes les actions réseau ne sont pas ouvertes |
 | Journaux et historique | Logs techniques, événements, extraits de panne et exports | Collecte et conservation bornées ; aucun historique exhaustif garanti |
-| Aqua_Drones | Inventaire, identité SSH, précontrôle sans mot de passe administrateur et configuration ciblée | Un appareil à la fois, avec les configurations reconnues du fournisseur |
+| Aqua_Drones | Inventaire, identité SSH, précontrôle et configuration ciblée sans mot de passe administrateur du PC | Compte AquaHub autorisé, identité confirmée, un appareil à la fois ; association et réglages SSH restent protégés |
 | Progression | Numéro du drone, étapes validées et remplissage conservé pendant l’attente | Les cinq contrôles manuels restent séparés |
 | Outils complémentaires | Accès à GCS, Fleet Controller et Portainer | Le compte Portainer est distinct des opérations courantes AquaHub |
 | Mise à jour AquaHub | Recherche de Releases, téléchargement vérifié et installation confirmée | Un commit ou un ZIP de sources ne suffit pas ; aucun installateur public qualifié publié à ce stade |
@@ -50,12 +50,15 @@ son comportement d’échec. La santé fonctionnelle reste distincte de l’éta
 | 0.2.1 | Précontrôle sans mot de passe administrateur, exports des logs, relances réseau ciblées et supervision simplifiée |
 | 0.2.2 | Barre de progression corrigée, retour visuel des relances, gestion de l’ancien cache et des réponses perdues, titres et espacements harmonisés |
 | 0.2.3 | Identité native, nom et icône du bureau harmonisés ; assistant distinct sans second raccourci dans le menu |
+| 0.2.4 | Configuration d’un Aqua_Drone sans demande de mot de passe administrateur du PC, avec contrôles de cible et de maintenance conservés |
 
 Les [notes de version](CHANGELOG.md) décrivent le code livré. Les
 [résultats de validation](docs/TESTS.txt) séparent tests génériques, parcours
-graphiques, recettes de paquet et essais matériels. La recette 0.2.3 documente
-270 tests Python réussis et huit ignorés sans options, 28 tests de domaine
-JavaScript, les identités natives et les mises à niveau du paquet applicatif.
+graphiques, recettes de paquet et essais matériels. La recette 0.2.4 documente
+272 tests Python réussis et huit ignorés sans options, 28 tests de domaine
+JavaScript, une configuration synthétique sans demande administrateur et
+une mise à niveau du paquet applicatif. Les résultats d’identité native 0.2.3
+restent consignés séparément.
 Ces résultats ne qualifient pas une flotte ou un kit client générique.
 
 ## Prochains chantiers

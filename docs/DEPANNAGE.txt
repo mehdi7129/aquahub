@@ -33,11 +33,21 @@ propre serveur ; un banc réel doit suivre son parcours d’autorisation.
 Ne pas ajouter de règle PolicyKit permanente pour faire passer la recette.
 
 Depuis 0.2.1, le bouton Vérifier cet appareil ne demande plus PolicyKit.
-Si une fenêtre administrateur apparaît pour ce bouton, vérifier que le
-desktop ET l’agent installé utilisent cette version. La première association
-SSH reste distincte ; une identité inconnue ne doit pas être approuvée pour
-faire disparaître une erreur. Une maintenance en cours peut refuser le
-précontrôle sans demander de mot de passe.
+Depuis 0.2.4, Lancer la configuration ne demande plus non plus le mot de passe
+administrateur du PC. Si une fenêtre administrateur apparaît dans ces deux
+parcours, vérifier la version du desktop ET de l’agent installé, ainsi que la
+méthode réellement appelée. L’exception est limitée à drones.preflight et
+drones.configure pour l’UID opérateur ; leurs gardes de maintenance et de
+cible restent actives. Le précontrôle doit être renouvelé après 600 secondes
+ou après utilisation. Ne pas ajouter de règle globale PolicyKit/sudoers.
+
+L’accès SSH reste distinct : il utilise les accès configurés et une empreinte
+approuvée. Une clé absente ou une identité inconnue donne un échec explicite,
+pas une demande de mot de passe administrateur destinée à la contourner.
+La première association SSH et les réglages de transport gardent leur propre
+autorisation. Une maintenance en cours peut aussi refuser le précontrôle ou
+la configuration sans demander de mot de passe. Aucun de ces refus ne justifie
+de modifier les scripts fournisseur ou une adresse IP.
 
 Les badges sont gris alors que le dernier état disait En cours
 

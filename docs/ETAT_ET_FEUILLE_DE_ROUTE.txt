@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.3 — état du code et qualification à poursuivre
+Préproduction 0.2.4 — état du code et qualification à poursuivre
 
 Développé
 
@@ -35,6 +35,12 @@ sans sonde. Les relances de net_setup et gcs_reactor sont possibles avec
 comparaison du réseau. WireGuard attend la qualification du conteneur corrigé
 par AquaHub, après le correctif livré par le fournisseur.
 Le provisioning vérifie une cible SSH et respecte les adresses existantes.
+
+La version 0.2.4 retire aussi la demande de mot de passe administrateur du PC
+lors de drones.configure pour le compte opérateur autorisé. L’opération reste
+une mutation sérialisée avec précontrôle frais et confirmation de l’identité.
+Les accès SSH et les autres interventions gardent leurs protections distinctes.
+Cette évolution ne modifie aucun script fournisseur ni paramètre réseau.
 
 Validations initiales
 

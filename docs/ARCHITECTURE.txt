@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.2.3. Il complète
+Ce document décrit les sources de la préproduction 0.2.4. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -146,9 +146,16 @@ elle ne transforme pas le dernier état connu en état sain. L’état running
 d’un conteneur et son healthcheck restent deux informations distinctes.
 
 Les handlers distinguent l’exclusion des opérations (mutation) de la demande
-d’autorisation administrateur (requires_admin). drones.preflight garde la
-première sans déclencher la seconde. operation_guard sérialise ses lectures
-et préparations locales avec les autres interventions et le paquet. Les
+d’autorisation administrateur (requires_admin). Depuis 0.2.4, drones.preflight
+et drones.configure ont mutation=True et requires_admin=False. Le compte
+opérateur identifié par SO_PEERCRED peut les invoquer sans mot de passe
+administrateur du PC, depuis la GUI ou un autre processus de ce compte via
+la socket privée. Ce droit n’est donc pas limité au bouton de configuration.
+Les méthodes enroll, ssh_settings et les autres interventions administratives
+conservent PolicyKit, avec son contrôle supplémentaire du processus demandeur.
+Aucune exception sudoers ni règle globale PolicyKit n’est nécessaire.
+operation_guard sérialise les lectures et préparations du précontrôle avec
+les autres interventions et le paquet ; configure conserve submit_job. Les
 opérations longues utilisent submit_job() : une seule tâche mutante peut
 progresser à la fois. Un verrou de processus protège le dossier d’état ; un
 verrou de maintenance coordonne les tâches avec le remplacement du paquet.
@@ -182,7 +189,12 @@ le numéro, les fichiers attendus et le réseau avant une configuration.
 Les scripts fournisseur exécutables sont vérifiés par empreinte, copiés dans
 un espace privé et limités par des transports contrôlés. Une nouvelle version
 de script exige une nouvelle qualification, pas une simple mise à jour de hash.
-Les précontrôles expirent ; la configuration sauvegarde les fichiers distants
+Le plan du précontrôle est lié à son UID, valable 600 secondes et à usage
+unique. La configuration exige la confirmation exacte de l’identité et du
+numéro ciblé, puis revérifie les fichiers et les états réseau et distant avant
+l’envoi. L’absence d’autorisation administrateur locale ne remplace pas les
+accès SSH préalablement configurés ou l’approbation de l’empreinte du drone.
+La configuration sauvegarde les fichiers distants
 concernés, suit le redémarrage et vérifie le résultat. Les contrôles manuels
 restent distincts des étapes automatiques. Chaque appareil et chaque résultat exposent
 manual_checklist. La tâche configure_drone nomme Aqua_Drone_N et publie

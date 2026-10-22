@@ -795,6 +795,6 @@ def register(app):
     for name in ("list", "scan", "preflight", "configure", "identity", "enroll", "ssh_settings"):
         app.register_handler("drones." + name, getattr(manager, name),
             mutation=name in ("preflight", "configure", "enroll", "ssh_settings"),
-            requires_admin=False if name == "preflight" else None)
+            requires_admin=False if name in ("preflight", "configure") else None)
     app.drones = manager
     return manager

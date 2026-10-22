@@ -1,5 +1,5 @@
 AquaHub — décisions techniques à préserver
-Référence : code 0.2.3. Les propositions futures sont marquées séparément.
+Référence : code 0.2.4. Les propositions futures sont marquées séparément.
 
 1. Application locale, agent distinct
 
@@ -50,9 +50,19 @@ Pourquoi : les scripts utilisent aussi une configuration partagée du hub.
 Deux configurations concurrentes demanderaient un nouveau contrat. Un profil
 dans le bundle ou une réponse réseau ne prouve pas l’identité physique.
 
-La vérification préalable est sans autorisation administrateur interactive,
-mais reste authentifiée et soumise aux gardes de maintenance. Configuration,
-association SSH et réglages protégés gardent leurs autorisations propres.
+Depuis 0.2.4, vérification préalable et configuration sont sans autorisation
+administrateur interactive du PC pour le compte opérateur configuré. Ce droit
+est délégué aux processus de ce compte par la socket privée/SO_PEERCRED ;
+la GUI ne constitue pas seule la barrière d’accès. mutation=True conserve
+les gardes de maintenance malgré requires_admin=False. Le plan de précontrôle
+reste lié à l’UID, valable 600 secondes et à usage unique, avec confirmation
+exacte de cible et comparaison des fichiers, identités et réseaux avant envoi.
+
+Pourquoi : ne pas imposer un mot de passe PC à chaque configuration courante,
+sans créer de commande libre ni de règle générale PolicyKit/sudoers. L’accès
+SSH reste un prérequis distinct ; association SSH, réglages et autres méthodes
+administratives conservent leurs autorisations propres. Le contrat fournisseur,
+ses scripts et les IP ne changent pas.
 
 Repères : drone.py, core.operation_guard et tests/test_drone*.py.
 

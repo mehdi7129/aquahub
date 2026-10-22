@@ -201,14 +201,15 @@ class DroneManagerTests(unittest.TestCase):
                 self.assertTrue(result["allowed"], result)
                 pkcheck.assert_not_called()
                 for method, params in (
-                    ("drones.configure", {"number": 5, "preflight_id": result["preflight_id"], "confirmed_identity": result["identity"]}),
                     ("drones.enroll", {"number": 5, "confirmed": True}),
                     ("drones.ssh_settings", {}),
+                    ("service.restart", {"service": "mavlink_router"}),
+                    ("settings.save", {"theme": "dark"}),
                 ):
                     with self.assertRaises(ApiError) as caught:
                         application.dispatch(method, params, context)
                     self.assertEqual(caught.exception.code, "unauthorized")
-                self.assertEqual(pkcheck.call_count, 3)
+                self.assertEqual(pkcheck.call_count, 4)
                 self.assertTrue(all(call.args[0][0] == "/usr/bin/pkcheck" for call in pkcheck.call_args_list))
             self.assertEqual(application.store.jobs(), [])
 
@@ -398,15 +399,118 @@ class DroneManagerTests(unittest.TestCase):
         self.assertFalse(result["allowed"])
         self.assertEqual(result["code"], "ssh_identity_untrusted")
 
-    def test_configuration_requires_confirmation_correct_target_and_operator(self):
-        result = self.preflight()
-        params = {"number": 5, "preflight_id": result["preflight_id"], "confirmed_identity": result["identity"]}
-        for update in ({"confirmed_identity": None}, {"number": 4}):
-            with self.assertRaises(ApiError):
-                self.manager.configure({**params, **update}, self.context)
-        with self.assertRaises(ApiError):
-            self.manager.configure(params, RequestContext(os.getuid() + 1, os.getpid()))
-        self.assertEqual(self.app.jobs, [])
+    @staticmethod
+    def wait_registered_job(application, job_id):
+        with application._threads_lock:
+            workers = list(application._threads)
+        for worker in workers:
+            worker.join(3)
+            if worker.is_alive():
+                raise AssertionError("Synthetic configuration did not finish")
+        return application.store.job(job_id)
+
+    def test_registered_configuration_requires_preflight_confirmation_target_and_operator(self):
+        with self.registered_app(privileged=True) as (application, manager):
+            with patch("aquahub_agent.security.subprocess.run") as pkcheck:
+                result = application.dispatch("drones.preflight", {"number": 5}, self.context)
+                params = {"number": 5, "preflight_id": result["preflight_id"], "confirmed_identity": result["identity"]}
+                calls_before = len(self.runner.calls)
+                for update, code in (({"preflight_id": None}, "invalid_params"),
+                                     ({"preflight_id": "unknown-preflight"}, "preflight_expired"),
+                                     ({"confirmed_identity": None}, "identity_confirmation_required"),
+                                     ({"number": 4}, "target_mismatch")):
+                    with self.subTest(update=update), self.assertRaises(ApiError) as caught:
+                        application.dispatch("drones.configure", {**params, **update}, self.context)
+                    self.assertEqual(caught.exception.code, code)
+                with self.assertRaises(ApiError) as caught:
+                    application.dispatch("drones.configure", params, RequestContext(os.getuid() + 1, os.getpid()))
+                self.assertEqual(caught.exception.code, "unauthorized")
+                manager.preflights[result["preflight_id"]]["uid"] = os.getuid() + 1
+                with self.assertRaises(ApiError) as caught:
+                    application.dispatch("drones.configure", params, self.context)
+                self.assertEqual(caught.exception.code, "target_mismatch")
+                pkcheck.assert_not_called()
+                self.assertEqual(len(self.runner.calls), calls_before)
+                self.assertEqual(application.store.jobs(), [])
+
+    def test_registered_configuration_keeps_maintenance_and_busy_fences_without_prompt(self):
+        with self.registered_app(privileged=True) as (application, manager):
+            with patch("aquahub_agent.security.subprocess.run") as pkcheck:
+                result = application.dispatch("drones.preflight", {"number": 5}, self.context)
+                params = {"number": 5, "preflight_id": result["preflight_id"], "confirmed_identity": result["identity"]}
+                for pending in (Mock(return_value=True), Mock(side_effect=[False, True])):
+                    application.app_updates = SimpleNamespace(installation_pending=pending)
+                    with self.assertRaises(ApiError) as caught:
+                        application.dispatch("drones.configure", params, self.context)
+                    self.assertEqual(caught.exception.code, "maintenance")
+                application.app_updates.installation_pending = Mock(return_value=False)
+                with application._maintenance_path.open("r+") as descriptor:
+                    fcntl.flock(descriptor.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    with self.assertRaises(ApiError) as caught:
+                        application.dispatch("drones.configure", params, self.context)
+                    self.assertEqual(caught.exception.code, "maintenance")
+                with application.operation_guard():
+                    with self.assertRaises(ApiError) as caught:
+                        application.dispatch("drones.configure", params, self.context)
+                    self.assertEqual(caught.exception.code, "busy")
+                pkcheck.assert_not_called()
+                self.assertFalse(manager.preflights[result["preflight_id"]]["used"])
+                self.assertEqual(application.store.jobs(), [])
+                self.assertFalse(application._mutation_lock.locked())
+
+    def test_registered_configuration_completes_and_persists_without_admin_prompt(self):
+        entered, release = threading.Event(), threading.Event()
+        with self.registered_app(privileged=True) as (application, manager):
+            with patch("aquahub_agent.security.subprocess.run") as pkcheck:
+                result = application.dispatch("drones.preflight", {"number": 5}, self.context)
+                second = application.dispatch("drones.preflight", {"number": 5}, self.context)
+                params = {"number": 5, "preflight_id": result["preflight_id"], "confirmed_identity": result["identity"]}
+                second_params = {**params, "preflight_id": second["preflight_id"]}
+                states = deque((False, True))
+                manager._reachable = lambda number: states.popleft() if states else True
+                original_hub = (self.app.config.bundle_path / "config/mavlink/config.conf").read_bytes()
+                def supplier(plan):
+                    entered.set()
+                    self.assertTrue(release.wait(3))
+                    self.runner.rebooted = True
+                    return {"automatic_completed": 7, "manual_skipped": 5, "failed": 0}
+                with patch.object(manager, "_deploy_pty", side_effect=supplier) as deploy, patch.object(module.time, "sleep"):
+                    job = application.dispatch("drones.configure", params, self.context)
+                    try:
+                        self.assertTrue(entered.wait(1))
+                        self.assertEqual(application.store.active_job()["id"], job["id"])
+                        with self.assertRaises(ApiError) as caught:
+                            application.dispatch("drones.configure", second_params, self.context)
+                        self.assertEqual(caught.exception.code, "busy")
+                        with self.assertRaises(ApiError) as caught:
+                            application.dispatch("drones.configure", params, self.context)
+                        self.assertEqual(caught.exception.code, "preflight_expired")
+                    finally:
+                        release.set()
+                    terminal = self.wait_registered_job(application, job["id"])
+                deploy.assert_called_once()
+                pkcheck.assert_not_called()
+                self.assertEqual(terminal["status"], "succeeded", terminal)
+                self.assertEqual(terminal["kind"], "configure_drone")
+                self.assertEqual(terminal["target"], "Aqua_Drone_5")
+                self.assertTrue(terminal["result"]["verified"])
+                self.assertTrue(terminal["result"]["reboot_verified"])
+                self.assertTrue(terminal["result"]["ip_unchanged"])
+                self.assertEqual(terminal["progress"]["percent"], 100)
+                self.assertFalse(terminal["progress"]["indeterminate"])
+                self.assertEqual(len(application.store.jobs()), 1)
+                self.assertIsNone(application.store.active_job())
+                self.assertTrue(manager.list()["drones"][4]["configured"])
+                plan = manager.preflights[result["preflight_id"]]
+                self.assertTrue((plan["stage"] / "drone-before.tar.gz").is_file())
+                self.assertEqual(stat.S_IMODE((plan["stage"] / "drone-before.tar.gz").stat().st_mode), 0o600)
+                self.assertEqual((self.app.config.bundle_path / "config/mavlink/config.conf").read_bytes(), original_hub)
+                self.assertEqual((plan["runtime"] / "deploy.py").read_bytes(),
+                                 (self.app.config.bundle_path / "deploy.py").read_bytes())
+        with self.registered_app(privileged=True) as (restarted, manager):
+            self.assertEqual(restarted.store.job(job["id"]), terminal)
+            self.assertTrue(manager.list()["drones"][4]["configured"])
+            self.assertEqual(manager.list()["drones"][4]["identity"], IDENTITY)
 
     def test_expired_preflight_and_file_changes_refused(self):
         result = self.preflight()

@@ -1,5 +1,5 @@
 AquaHub — reprendre le développement
-Référence : préproduction 0.2.3
+Référence : préproduction 0.2.4
 
 1. Commencer ici
 
@@ -194,10 +194,12 @@ d’un nouveau paquet reste distincte des tests de fixtures.
 
 12. Évolutions 0.2.1
 
-Vérifier un Aqua_Drone ne nécessite plus d’autorisation interactive du PC.
-Le registre sépare requires_admin de mutation et le précontrôle utilise
-operation_guard. Ne pas modifier cette exception en rendant configure ou
-le handler de réglages SSH non protégés.
+En 0.2.1, le précontrôle est devenu accessible sans autorisation interactive
+du PC ; configure restait alors soumis à PolicyKit. Le registre sépare
+requires_admin de mutation et le précontrôle utilise operation_guard.
+Depuis 0.2.4, configure bénéficie aussi d’une délégation explicite au compte
+opérateur, tout en gardant les contrôles de cible et de maintenance décrits
+en section 15. Le handler de réglages SSH reste soumis à PolicyKit.
 
 Les badges d’état utilisent observationFresh/serviceTone. Le timer de
 fraîcheur neutralise un ancien état même si une réponse de l’agent tarde.
@@ -262,3 +264,28 @@ Après mise à niveau de 0.2.2, fermer l’ancienne fenêtre puis rouvrir AquaHu
 Ne pas réinitialiser les favoris ou les préférences de session. Le flux
 Git + registre du bundle reste le prochain chantier séparé ; ce correctif
 ne modifie aucun script fournisseur ni aucune adresse.
+
+15. Configuration sans mot de passe administrateur du PC — 0.2.4
+
+drone.register enregistre preflight et configure avec mutation=True et
+requires_admin=False. Ne pas remplacer ce contrat par mutation=False : les
+gardes d’opération et de mise à jour doivent rester actives. Le serveur
+identifie l’opérateur par SO_PEERCRED et vérifie son UID à chaque dispatch.
+Les processus du compte autorisé peuvent invoquer ces méthodes via la socket
+privée ; l’autorisation ne dépend pas exclusivement d’un bouton dans la GUI.
+La revérification du PID et de son instant de démarrage dans AuthPolicy reste
+spécifique aux interventions qui nécessitent PolicyKit.
+
+configure conserve le plan créé par preflight : UID propriétaire, durée
+maximale de 600 secondes, usage unique, numéro et identité confirmés. Les
+fichiers, réseaux et identité distante sont relus avant l’envoi. Le lancement
+passe toujours par submit_job et ses exclusions de maintenance/concurrence.
+Les tests doivent exercer le registre réel avec AuthPolicy(privileged=True),
+un pkcheck refusé, un transport SSH synthétique et aucun drone physique.
+Vérifier aussi les refus de cible, d’UID et de maintenance, ainsi que le maintien
+de PolicyKit pour enroll, ssh_settings et les autres interventions protégées.
+
+Ne pas élargir une règle PolicyKit ou sudoers. L’accès SSH déjà configuré est
+distinct du mot de passe administrateur du PC ; cette exception ne crée pas
+d’accès, n’approuve pas de nouvelle empreinte et ne change ni les scripts
+fournisseur ni les IP. Voir SECURITE.txt et API_ET_DONNEES.txt.

@@ -79,9 +79,9 @@ class Application:
     def register_handler(self, method: str, handler, mutation: bool = False, *, requires_admin: bool | None = None):
         if method in self._handlers:
             raise ValueError(f"Handler already registered: {method}")
-        # Some read-only checks must exclude maintenance while inspecting
-        # files and SSH state. They share the operation guard without needing
-        # an interactive administrative authorization.
+        # Maintenance exclusion and interactive authorization are independent:
+        # operator-authorized drone checks/configuration keep their operation
+        # fences without requiring an administrative password for each launch.
         self._handlers[method] = (handler, mutation, mutation if requires_admin is None else requires_admin)
 
     def _register_builtin(self):

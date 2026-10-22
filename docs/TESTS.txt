@@ -5,7 +5,51 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-0. Correctif 0.2.3 — vérification du 22 octobre 2026
+0. Correctif 0.2.4 — configuration sans mot de passe administrateur du PC
+
+Vérification du 22 octobre 2026. Suite générique : 280 tests découverts,
+272 réussis et huit ignorés sans leurs préconditions facultatives. Le module
+test_drone.py passe 35/35. TypeScript, compilation et 28 tests de domaine
+JavaScript passent. L’interface et la logique fournisseur ne changent pas.
+
+Le scénario de configuration utilise le vrai Application.dispatch, une
+AuthPolicy privilégiée et le vrai submit_job asynchrone. Seuls les transports
+et l’exécution du script sur pseudo-terminal sont synthétiques. Il vérifie
+une configuration Aqua_Drone_5 complète sans aucun appel à pkcheck : sauvegarde
+privée, copie inchangée du code fournisseur, retour après reboot simulé,
+contrôles réseau, progression à 100 %, inventaire et tâche persistants après
+réouverture. Une seconde configuration concurrente et la réutilisation du
+précontrôle sont refusées.
+
+Les demandes sans précontrôle, avec autre UID, numéro ou identité incorrects,
+ainsi que les maintenances internes/externes, sont refusées via le dispatch.
+Un refus de maintenance ne consomme pas le plan. Les contrôles métier
+existants continuent à couvrir l’expiration et les modifications des fichiers
+ou de l’appareil avant envoi. enroll, ssh_settings, service.restart et
+settings.save continuent chacun à appeler pkcheck ; le test les refuse quand
+l’autorisation est refusée. Aucune règle système globale n’est ajoutée.
+
+Paquet applicatif 0.2.4 : 146820 octets,
+SHA-256 1a3b33b0b5c825c711294de049c4d95c5394be61807cb4c5639d514f8800a980.
+Vingt-quatre comparaisons confirment les mêmes modules Python, finish.py et
+trois ressources frontend que les sources et le build testés.
+
+Mise à niveau réelle du poste 0.2.3 → 0.2.4 réussie ; agent actif et vérification
+dpkg sans différence. Une requête locale de configuration avec un identifiant
+de précontrôle inexistant renvoie preflight_expired, sans tâche ni demande
+administrateur. Cette sonde n’envoie aucune configuration et ne contacte aucun
+drone. Les comparaisons avant/après retrouvent les mêmes empreintes/modes des
+15 fichiers du bundle, les mêmes neuf conteneurs (identités/images/états/
+démarrages/montages), le même relevé IPv4/IPv6 et le même inventaire taille/
+date/mode des 363 fichiers du kit. Les preuves brutes restent privées.
+
+Limites : aucune configuration physique de drone, nouvelle recette VM,
+installation complète, ni revue graphique GNOME rejouée pour ce correctif
+d’autorisation. Les résultats natifs et système 0.2.3 restent historiques ;
+ils ne sont pas présentés comme de nouveaux essais 0.2.4. La délégation est
+limitée au compte opérateur autorisé ; les accès SSH restent distincts.
+
+0 bis. Correctif 0.2.3 — vérification du 22 octobre 2026
 
 Suite Python générique : 278 cas découverts, 270 exécutés avec succès et huit
 ignorés sans leurs préconditions facultatives. Les neuf tests de packaging
@@ -80,7 +124,7 @@ n’est utilisée comme preuve de cette partie. Ni première installation de kit
 client générique, ni configuration physique d’un drone rejouée pour ce lot.
 Rapports VM, traces Wayland et lectures du poste restent privés, hors dépôt.
 
-0 bis. Correctif 0.2.2 — vérification du 21 octobre 2026
+0 ter. Correctif 0.2.2 — vérification du 21 octobre 2026
 
 Suite Python : 278 cas découverts, 270 exécutés avec succès et huit ignorés
 sans opt-in ; aucun changement de logique backend. TypeScript, compilation
