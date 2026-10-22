@@ -1,5 +1,5 @@
 AquaHub — reprendre le développement
-Référence : préproduction 0.2.2
+Référence : préproduction 0.2.3
 
 1. Commencer ici
 
@@ -24,7 +24,7 @@ Paquets de développement à prévoir, selon le poste :
   sudo apt install git nodejs npm python3 python3-gi python3-cairo \
     python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
     build-essential pkg-config libgtk-4-dev dpkg-dev apt-utils gnupg \
-    xvfb xauth libx11-6 libxtst6
+    xvfb xauth libx11-6 libxtst6 dbus x11-utils desktop-file-utils
 
 Ces commandes concernent uniquement le développeur. Elles ne sont pas le
 parcours graphique de l’utilisateur final. Utiliser /usr/bin/python3 : les
@@ -237,17 +237,28 @@ explicite, sans transformation animée. L’artefact signalé n’a pas été re
 pendant les captures : ne pas annoncer sa cause comme démontrée. TESTS.txt
 décrit les recettes de sources, les essais du paquet et leurs limites.
 
-14. Prochain chantier : identité de l’application dans le bureau
+14. Identité de l’application dans le bureau — 0.2.3
 
-Non implémenté dans 0.2.2. Lire PLAN_IDENTITE_BUREAU_2026-10-21.txt avant toute
-modification. Le symptôme est un nom de programme Python visible à la place
-d’AquaHub dans GNOME, malgré le titre correct de la fenêtre. Les points
-d’entrée concernés sont desktop/aquahub_desktop/app.py et les ressources
-.desktop/icône produites par installer/build_package.py.
+Le correctif est implémenté dans desktop/aquahub_desktop/app.py et les
+ressources produites par installer/build_package.py. APPLICATION_ID vaut
+com.aquadrone.aquahub et APPLICATION_NAME vaut AquaHub. Définir les noms GLib
+avant tout import de Gtk/Gdk : cet import peut initialiser le nom de programme.
+Conserver l’icône par défaut pour les erreurs précédant Gtk.Application.
 
-Le futur correctif doit être qualifié avec les identités natives et le
-regroupement des fenêtres sous Wayland et X11, y compris au lancement depuis
-l’icône et lors d’un second lancement. Il ne requiert ni changement fournisseur
-ni intervention sur les adresses, les services ou les appareils. Le flux
-Git + registre du bundle reste un chantier séparé ; son plan n’est pas une
-fonction déjà disponible.
+Le lanceur principal conserve son nom de fichier et son icône pour les favoris.
+L’assistant GTK4 a sa propre identité .setup et une entrée NoDisplay=true.
+StartupWMClass correspond à la classe X11 mesurée ; cette clé ne règle pas
+le comportement Wayland. Voir PLAN_IDENTITE_BUREAU_2026-10-21.txt et TESTS.txt
+pour les résultats et les limites des observations GNOME.
+
+frontend/tests/run_desktop_identity.py exerce les propriétés natives, l’icône
+du candidat dans un thème isolé, un dialogue précoce et deux lancements normaux
+dans une session D-Bus/Xvfb privée. Ne pas importer Gtk avant app.main dans
+une sonde. --test-script et --quit-after activent NON_UNIQUE : ils ne peuvent
+pas démontrer l’instance unique normale. Le mode --package-root ajoute les
+lanceurs extraits et l’assistant sans cliquer sur son installation.
+
+Après mise à niveau de 0.2.2, fermer l’ancienne fenêtre puis rouvrir AquaHub.
+Ne pas réinitialiser les favoris ou les préférences de session. Le flux
+Git + registre du bundle reste le prochain chantier séparé ; ce correctif
+ne modifie aucun script fournisseur ni aucune adresse.

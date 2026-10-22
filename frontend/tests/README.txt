@@ -9,6 +9,17 @@ Depuis la racine du dépôt :
 Les tests natifs utilisent WebKitGTK, GTK, Xvfb et XTest. Ils supposent
 les dépendances de développement décrites dans docs/REPRISE_DEVELOPPEMENT.txt.
 
+Identité native du bureau 0.2.3, sur un paquet candidat extrait :
+  python3 frontend/tests/run_desktop_identity.py --package-root ./local-private/candidate
+Ce banc lance lui-même sa session D-Bus et Xvfb isolées. Il requiert
+dbus-run-session, Xvfb, xprop et xwininfo, plus les dépendances GTK/WebKit.
+Il vérifie les propriétés natives, la résolution/rastérisation de l’icône
+du candidat sans copie système, deux lancements normaux, un dialogue d’erreur
+précoce et l’assistant extrait sans cliquer sur son installation. Les modes
+--test-script et --quit-after ne sont pas utilisés pour l’instance unique.
+Les 24 contrôles du mode paquet ne prouvent ni le protocole Wayland ni le
+graphisme du shell GNOME ; voir docs/TESTS.txt pour leur recette distincte.
+
 Pannes et pagination, transport Unix factice, aucun matériel contacté :
   python3 frontend/tests/run_fixtures.py
 

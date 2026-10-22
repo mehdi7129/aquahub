@@ -1,6 +1,7 @@
 """Package construction and privilege-boundary tests; never installs a package."""
 from __future__ import annotations
 
+import configparser
 import hashlib
 import importlib.util
 import io
@@ -112,6 +113,38 @@ class PayloadValidationTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("cc") and shutil.which("pkg-config") and shutil.which("dpkg-deb"),"Debian build tools unavailable")
 class DebianPackageTests(unittest.TestCase):
+    def assert_desktop_identity(self, unpacked: Path):
+        """Check the resources actually shipped by either package mode."""
+        applications=unpacked/'usr/share/applications'
+        canonical='com.aquadrone.aquahub'
+        entries={}
+        for desktop_id in (canonical, canonical+'.setup'):
+            desktop=applications/(desktop_id+'.desktop')
+            parser=configparser.ConfigParser(interpolation=None)
+            parser.read(desktop,encoding='utf-8')
+            entry=parser['Desktop Entry']
+            entries[desktop_id]=entry
+            self.assertEqual(entry['Type'],'Application')
+            self.assertEqual(entry['Icon'],canonical)
+            self.assertFalse(entry.getboolean('Terminal'))
+            self.assertTrue(entry.getboolean('StartupNotify'))
+            if shutil.which('desktop-file-validate'):
+                subprocess.run(['desktop-file-validate',str(desktop)],check=True)
+        self.assertEqual(entries[canonical]['Name'],'AquaHub')
+        self.assertEqual(entries[canonical]['Exec'],'/usr/bin/aquahub')
+        self.assertFalse(entries[canonical].getboolean('NoDisplay',False))
+        self.assertEqual(entries[canonical]['StartupWMClass'],'Com.aquadrone.aquahub')
+        self.assertEqual(entries[canonical+'.setup']['Name'],'AquaHub — Installation')
+        self.assertEqual(entries[canonical+'.setup']['Exec'],'/usr/bin/aquahub --setup')
+        self.assertTrue(entries[canonical+'.setup'].getboolean('NoDisplay'))
+        self.assertEqual(entries[canonical+'.setup']['StartupWMClass'],canonical+'.setup')
+        icon=unpacked/'usr/share/icons/hicolor/scalable/apps'/f'{canonical}.svg'
+        self.assertEqual(ET.parse(icon).getroot().tag,'{http://www.w3.org/2000/svg}svg')
+        metadata=ET.parse(unpacked/'usr/share/metainfo'/f'{canonical}.metainfo.xml')
+        self.assertEqual(metadata.findtext('id'),canonical)
+        self.assertEqual(metadata.findtext('name'),'AquaHub')
+        self.assertEqual(metadata.findtext('launchable'),canonical+'.desktop')
+
     def test_public_application_update_has_no_supplier_payload_and_preserves_setup(self):
         with tempfile.TemporaryDirectory() as directory:
             base=Path(directory)
@@ -125,6 +158,7 @@ class DebianPackageTests(unittest.TestCase):
             self.assertLess(result['bytes'],20*1024**2)
             unpacked=base/'unpacked'
             subprocess.run(['dpkg-deb','-x',str(output),str(unpacked)],check=True)
+            self.assert_desktop_identity(unpacked)
             self.assertFalse((unpacked/'usr/share/aquahub/offline').exists())
             self.assertFalse(list(unpacked.rglob('*.tar.gz')))
             self.assertTrue((unpacked/'usr/lib/aquahub/application-upgrade.py').is_file())
@@ -185,6 +219,7 @@ class DebianPackageTests(unittest.TestCase):
             self.assertEqual(subprocess.check_output(["dpkg-deb","-f",str(output),"Package"],text=True).strip(),"aquahub-setup")
             unpacked=base/"unpacked"
             subprocess.run(["dpkg-deb","-x",str(output),str(unpacked)],check=True)
+            self.assert_desktop_identity(unpacked)
             self.assertEqual((unpacked/"usr/share/aquahub/offline/bundle.tar.gz").stat().st_mode&0o777,0o600)
             self.assertEqual((unpacked/"usr/share/aquahub/offline/repo-key.gpg").stat().st_mode&0o777,0o644)
             self.assertFalse(list(unpacked.rglob("*.pyc")))

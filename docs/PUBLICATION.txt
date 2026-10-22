@@ -45,8 +45,8 @@ Pour une mise à jour publique de l’application seule :
 
   python3 installer/build_package.py \
     --application-only \
-    --output dist/aquahub-application_0.2.2_amd64.deb \
-    --version 0.2.2
+    --output dist/aquahub-application_0.2.3_amd64.deb \
+    --version 0.2.3
 
 Ce mode n’accepte ni --payload ni --private-kit. Le paquet garde le nom Debian
 aquahub-setup afin de mettre à niveau l’installation 0.1.2 existante, sans
@@ -80,8 +80,8 @@ Exemple avec un payload externe déjà vérifié, depuis la racine du dépôt :
 
   python3 installer/build_package.py \
     --payload /chemin/hors-depot/payload \
-    --output dist/aquahub-setup_0.1.2_amd64.deb \
-    --version 0.1.2
+    --output dist/aquahub-setup_0.2.3_amd64.deb \
+    --version 0.2.3
 
 Cette commande refuse un payload déclaré privé ou contenant les formes de
 clés privées reconnues. L’option --private-kit permet uniquement une recette
@@ -118,6 +118,23 @@ Une recette ne remplace pas la validation d’un comportement fournisseur
 encore inconnu : WireGuard demeure protégé tant que son chemin d’échec et
 la procédure de reprise ne sont pas validés.
 
+Recette de l’identité bureau 0.2.3 : extraire les deux modes de construction,
+valider les deux fichiers desktop et résoudre l’icône fournie dans un thème
+hicolor isolé. Le principal conserve com.aquadrone.aquahub.desktop ; l’assistant
+possède com.aquadrone.aquahub.setup.desktop avec NoDisplay=true. Vérifier les
+métadonnées effectivement livrées, pas une icône déjà installée sur le banc.
+Les classes X11 réellement mesurées sont Com.aquadrone.aquahub pour le principal
+GTK3 et com.aquadrone.aquahub.setup pour l’assistant GTK4 ; leurs champs
+StartupWMClass sont distincts. Vérifier séparément l’identifiant Wayland et
+le résultat visible dans GNOME.
+
+Après remplacement d’une version antérieure, fermer l’ancienne fenêtre puis
+rouvrir avec le lanceur existant. Tester l’instance unique avec deux lancements
+normaux dans une session D-Bus isolée, sans --test-script ni --quit-after ;
+ces options activent un mode NON_UNIQUE réservé à la recette. L’assistant
+peut être inspecté sans lancer son installation. Préserver les préférences,
+les favoris et le fonctionnement du bundle pendant ces essais.
+
 6. GitHub Releases
 
 Dépôt de publication prévu : https://github.com/mehdi7129/aquahub
@@ -125,6 +142,18 @@ Ne pas pousser le dépôt privé du banc ou son historique dans ce dépôt publi
 Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
+
+État du candidat 0.2.3 : le correctif d’identité est implémenté et un paquet
+applicatif local de 146764 octets a été construit, SHA-256 :
+  404b741aed6aedc2a5f3fe51e4dd1b3f7f75ef91f9a74be34683b2612525dc1d
+Cette empreinte identifie ce candidat, pas tous les futurs builds du même
+numéro. La mise à niveau depuis 0.2.2 et la réinstallation en VM, puis la mise
+à niveau et le lancement sur poste installé, sont consignés dans TESTS.txt.
+La portée instrumentée GNOME et les contrôles visuels restant à compléter
+y sont distingués de l’identité native et des invariants système vérifiés.
+Aucune nouvelle Release publique n’est créée par cette construction locale
+ou par la publication du code. Les exemples de kit complet ci-dessus ne
+constituent pas l’annonce d’un kit 0.2.3 redistribuable déjà qualifié.
 
 GitHub limite actuellement chaque fichier joint à une Release à moins de
 2 Gio. Un gros kit complet doit donc avoir une stratégie de distribution

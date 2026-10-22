@@ -3,6 +3,21 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.3 — identité bureau, préproduction
+
+- Nom humain AquaHub, nom de programme et identifiant GTK harmonisés avec
+  le lanceur existant, avant l’initialisation GTK. L’icône réellement livrée
+  est utilisée par la fenêtre et ses dialogues d’erreur précoces.
+- Lanceur principal et favoris conservés ; contrat d’identité X11 explicite
+  et contrôle distinct du fonctionnement sous Wayland.
+- Assistant de première installation identifié séparément, avec une entrée
+  desktop masquée du menu pour éviter un second raccourci utilisateur.
+- Recettes natives d’identité, résolution d’icône et instance unique, puis
+  qualification du paquet applicatif. Aucun changement des scripts fournisseur.
+- Mise à niveau depuis 0.2.2 et réinstallation en VM ; installation sur le
+  poste et lancement par son entrée desktop contrôlés. Les observations
+  automatiques du bureau ne couvrent pas une revue visuelle complète d’Alt-Tab.
+
 ## Documentation — 21 octobre 2026
 
 - État fonctionnel 0.2.2 et limites détaillés dans le README, avec captures

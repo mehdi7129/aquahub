@@ -16,6 +16,9 @@ import time
 from .bridge import BridgeError, RpcClient, fixed_url, is_app_uri, portainer_url, agent_connection, portainer_credentials
 from .log_exports import export_request, choose_log_destination, destination_identity, build_log_export, save_log_export
 
+APPLICATION_ID = "com.aquadrone.aquahub"
+APPLICATION_NAME = "AquaHub"
+
 BRIDGE_SOURCE = r"""(() => {
   if (window !== window.top) return;
   const pending = new Map();
@@ -136,7 +139,14 @@ def main(argv=None) -> int:
     import gi
     gi.require_version("Gtk", "3.0")
     gi.require_version("WebKit2", "4.1")
-    from gi.repository import Gio, GLib, Gtk, WebKit2 as WebKit
+    from gi.repository import Gio, GLib
+
+    # GTK/GDK derive native window identity from the program name at startup.
+    # Set it before importing GTK so the Python module name cannot become it.
+    GLib.set_prgname(APPLICATION_ID)
+    GLib.set_application_name(APPLICATION_NAME)
+    from gi.repository import Gtk, WebKit2 as WebKit
+    Gtk.Window.set_default_icon_name(APPLICATION_ID)
 
     source_root = Path(__file__).resolve().parents[2]
     installed_share = Path("/usr/share/aquahub/frontend")
@@ -144,7 +154,7 @@ def main(argv=None) -> int:
     frontend = options.frontend or (installed_share if source_root == Path('/usr/lib/aquahub') else source_root / "frontend/dist")
     index = frontend.resolve() / "index.html"
     if not index.is_file():
-        dialog = Gtk.MessageDialog(message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.CLOSE, text="AquaHub ne peut pas ouvrir son interface.")
+        dialog = Gtk.MessageDialog(title=APPLICATION_NAME, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.CLOSE, text="AquaHub ne peut pas ouvrir son interface.")
         dialog.format_secondary_text("Les ressources de l’application sont absentes. Réinstallez le paquet AquaHub.")
         dialog.run()
         dialog.destroy()
@@ -157,7 +167,7 @@ def main(argv=None) -> int:
         try:
             ensure_agent(path, state, source_root)
         except BridgeError as error:
-            dialog = Gtk.MessageDialog(message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.CLOSE, text=error.message)
+            dialog = Gtk.MessageDialog(title=APPLICATION_NAME, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.CLOSE, text=error.message)
             dialog.run()
             dialog.destroy()
             return 2
@@ -166,10 +176,10 @@ def main(argv=None) -> int:
 
     class Window(Gtk.ApplicationWindow):
         def __init__(self, app):
-            super().__init__(application=app, title="AquaHub")
+            super().__init__(application=app, title=APPLICATION_NAME)
             self.set_default_size(options.width, options.height)
             self.set_size_request(1024, 650)
-            self.set_icon_name("aquahub")
+            self.set_icon_name(APPLICATION_ID)
             self.nonce = secrets.token_urlsafe(32)
             self.alive = True
             self.pending = set()
@@ -495,7 +505,7 @@ def main(argv=None) -> int:
             self.web.get_snapshot(WebKit.SnapshotRegion.VISIBLE, WebKit.SnapshotOptions.NONE, None, saved, None)
             return False
 
-    application = Gtk.Application(application_id="com.aquadrone.AquaHub", flags=Gio.ApplicationFlags.NON_UNIQUE if options.test_script or options.quit_after else Gio.ApplicationFlags.FLAGS_NONE)
+    application = Gtk.Application(application_id=APPLICATION_ID, flags=Gio.ApplicationFlags.NON_UNIQUE if options.test_script or options.quit_after else Gio.ApplicationFlags.FLAGS_NONE)
     def activate(app):
         if app.get_active_window():
             app.get_active_window().present()

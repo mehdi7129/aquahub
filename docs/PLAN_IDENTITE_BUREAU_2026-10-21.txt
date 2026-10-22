@@ -1,5 +1,5 @@
 AquaHub — plan de correction de l’identité dans le bureau
-21 octobre 2026 — proposition à valider, correction non développée
+Plan du 21 octobre 2026 — réalisé le 22 octobre, correctif 0.2.3 préproduction
 Référence examinée : AquaHub 0.2.2, commit 053b714.
 
 1. Résultat attendu
@@ -9,10 +9,10 @@ comme AquaHub : nom lisible, icône officielle, regroupement correct dans
 GNOME et dans Alt-Tab. Le nom __main__.py ne doit plus servir d’identité à
 l’application. Le titre HTML ou le titre de fenêtre seul ne suffit pas.
 
-Ce document prépare le développement. Aucune correction de runtime, aucun
-nouveau paquet ni aucune installation n’est réalisé par ce lot documentaire.
-La version implémentée reste 0.2.2. Le numéro du futur correctif sera attribué
-lors de sa réalisation ; une proposition ne constitue pas une version livrée.
+Ce document conserve le diagnostic et les critères du plan initial. Le plan
+a ensuite été validé et le correctif 0.2.3 est réalisé. TESTS.txt consigne
+la recette native, le paquet, les mises à niveau et les limites GNOME.
+Les valeurs de la section suivante décrivent la base 0.2.2 avant correction.
 
 2. Écarts confirmés à la lecture des sources
 
@@ -164,10 +164,25 @@ documentation publique, après contrôle de leur contenu et de leurs métadonné
 
 9. Périmètre de validation de ce plan
 
-La présente publication comprend le plan et la documentation du projet.
-Elle ne modifie pas app.py, le constructeur, le système installé ou les
-préférences GNOME. Les scripts fournisseur restent intacts. L’intégration
-du bundle v1.0.1 conserve son propre plan et sa propre qualification.
+La publication initiale du 21 octobre comprenait uniquement ce plan et la
+documentation du projet. Sa mise en œuvre a été autorisée le 22 octobre.
+Le correctif concerne l’identité desktop et le paquet AquaHub ; il conserve
+les scripts fournisseur intacts. L’intégration du bundle v1.0.1 reste un
+chantier distinct, avec son propre plan et sa propre qualification.
+
+Résultat du 22 octobre : 24 contrôles natifs X11 du paquet extrait et dix
+contrôles Wayland passent, dont les deux lancements normaux. Mise à niveau
+0.2.2 → 0.2.3 et réinstallation réussies en VM ; mise à niveau et lancement
+via l’entrée desktop installée vérifiés sur le poste, favori canonique présent.
+Les noms exposés par GNOME sont AquaHub, sans entrée __main__.py dans la
+lecture ciblée. Les comparaisons bundle/conteneurs/réseau/kit sont décrites
+dans TESTS.txt, avec le retry autonome RTCM de la VM distinct de l’installation.
+
+La recette instrumentée ne clôt pas la revue visuelle de toutes les vues
+GNOME : AT-SPI ne livre pas le graphisme de l’icône et une résolution GTK ne
+prouve pas ce rendu. La vérification visuelle d’Alt-Tab, du regroupement et
+des deux échelles reste à compléter. Le correctif ne nécessite pas de reboot
+du PC, de modification d’adresse ou de réinstallation du bundle.
 
 10. Références officielles examinées
 

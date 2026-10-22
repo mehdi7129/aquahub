@@ -170,6 +170,21 @@ Icon=com.aquadrone.aquahub
 Terminal=false
 Categories=System;
 StartupNotify=true
+StartupWMClass=Com.aquadrone.aquahub
+""")
+    # The first-run assistant is a separate GTK application. Keep it resolvable
+    # by the desktop shell without adding a second entry to the applications menu.
+    write(package/"usr/share/applications/com.aquadrone.aquahub.setup.desktop", """[Desktop Entry]
+Type=Application
+Name=AquaHub — Installation
+Comment=Installation et réparation du poste Aqua Hub
+Exec=/usr/bin/aquahub --setup
+Icon=com.aquadrone.aquahub
+Terminal=false
+Categories=System;
+StartupNotify=true
+StartupWMClass=com.aquadrone.aquahub.setup
+NoDisplay=true
 """)
     write(package/"usr/share/icons/hicolor/scalable/apps/com.aquadrone.aquahub.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#111"/><path d="M25 91 54 32h20l29 59H82l-6-14H51l-6 14zm33-31h12l-6-15z" fill="#fff"/></svg>\n')
     write(package/"usr/share/metainfo/com.aquadrone.aquahub.metainfo.xml", f"""<?xml version="1.0" encoding="UTF-8"?>

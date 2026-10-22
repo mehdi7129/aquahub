@@ -139,13 +139,34 @@ de la route existants, sans modification des IP par AquaHub.
 Le bureau affiche __main__.py au lieu d’AquaHub
 
 Le titre de la fenêtre et l’identité de l’application dans GNOME sont
-distincts. Dans 0.2.2, le nom du programme, l’identifiant GTK et celui du
-lanceur ne sont pas encore harmonisés. Le problème concerne le regroupement
-de la fenêtre, son nom et son icône ; il ne justifie pas de réinstaller
-Docker, de reconfigurer les appareils ou de modifier le bundle fournisseur.
-Le correctif est seulement planifié : voir PLAN_IDENTITE_BUREAU_2026-10-21.txt.
-Ne pas le présenter comme livré ni supprimer les préférences du bureau
-pour masquer le symptôme.
+distincts. Le correctif 0.2.3 aligne le nom humain AquaHub, le nom de programme,
+l’identifiant GTK et l’icône sur les métadonnées du lanceur existant.
+Les versions précédentes peuvent encore exposer le nom du module Python.
+
+Après une mise à niveau, fermer complètement l’ancienne fenêtre puis rouvrir
+AquaHub depuis le menu ou le favori existant. L’ancien identifiant GTK est
+différent : une fenêtre restée ouverte ne recharge pas les nouvelles
+métadonnées et peut coexister temporairement avec la nouvelle identité.
+Ne pas réinitialiser les préférences GNOME, supprimer les favoris ou vider
+les caches personnels. Un redémarrage du PC n’est pas une étape habituelle
+de cette correction.
+
+Si le problème persiste, vérifier la version réellement installée et le
+lanceur utilisé : com.aquadrone.aquahub.desktop, nom AquaHub, icône
+com.aquadrone.aquahub, commande aquahub. Identifier un éventuel raccourci local
+obsolète avant de proposer son remplacement ; conserver les favoris qui
+référencent déjà le lanceur canonique. Sous X11, la classe principale mesurée
+est Com.aquadrone.aquahub et _GTK_APPLICATION_ID vaut com.aquadrone.aquahub.
+Sous Wayland, vérifier séparément l’identité native et le rattachement GNOME ;
+une capture du contenu WebKit ne prouve pas l’icône retenue par le bureau.
+
+Le premier lancement avant installation complète ouvre l’assistant distinct
+AquaHub — Installation, identifié par com.aquadrone.aquahub.setup et utilisant
+la même icône. Son entrée desktop NoDisplay=true est volontairement absente
+du menu : il n’est pas nécessaire de créer un second favori pour l’assistant.
+Voir PLAN_IDENTITE_BUREAU_2026-10-21.txt et TESTS.txt pour le périmètre de recette.
+Ce symptôme ne justifie aucune réinstallation de Docker, reconfiguration des
+appareils ou modification du bundle fournisseur.
 
 Retour arrière refusé
 

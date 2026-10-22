@@ -5,7 +5,82 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-0. Correctif 0.2.2 — vérification du 21 octobre 2026
+0. Correctif 0.2.3 — vérification du 22 octobre 2026
+
+Suite Python générique : 278 cas découverts, 270 exécutés avec succès et huit
+ignorés sans leurs préconditions facultatives. Les neuf tests de packaging
+passent, avec validation des deux entrées desktop réellement extraites dans
+les deux modes de construction. TypeScript, compilation et 28 tests de domaine
+JavaScript passent ; le parcours WebKit de démonstration repasse 19/19.
+Les recettes visuelles détaillées 0.2.2 ci-dessous n’ont pas toutes été rejouées
+pour ce correctif limité aux identités natives et à la version affichée.
+
+Paquet applicatif 0.2.3 : 146764 octets,
+SHA-256 404b741aed6aedc2a5f3fe51e4dd1b3f7f75ef91f9a74be34683b2612525dc1d.
+Le paquet ne contient aucun payload fournisseur. Les ressources frontend et
+les modules livrés sont comparés aux sources et au build correspondant.
+
+Nouveau banc reproductible, depuis la racine du dépôt :
+
+  dpkg-deb -x dist/aquahub-application_0.2.3_amd64.deb ./local-private/candidate
+  python3 frontend/tests/run_desktop_identity.py --package-root ./local-private/candidate
+
+Il demande dbus-run-session, Xvfb, xprop et xwininfo, plus GTK/WebKit et GI.
+Il crée sa propre session D-Bus sans autoactivation de services et son Xvfb
+sans TCP. Ni agent réel, ni Docker, ni drone, ni installation de paquet.
+Le rapport ui-desktop-identity-result.json est local et ignoré par Git.
+
+Les 24 contrôles du paquet extrait passent : noms GLib, identifiant GTK,
+titre, icône par défaut et fenêtre, résolution/rastérisation à 32/64 dans un
+thème hicolor contenant uniquement l’icône du candidat, propriétés X11,
+dialogue d’erreur avant Gtk.Application, entrées Gio et assistant GTK4 sans
+clic d’installation. Le nom GLib est fixé avant l’import GTK/GDK ; la sonde
+respecte cet ordre pour ne pas masquer le défaut.
+
+WM_CLASS principal mesuré : com.aquadrone.aquahub, Com.aquadrone.aquahub.
+WM_CLASS assistant mesuré : com.aquadrone.aquahub.setup dans les deux champs.
+StartupWMClass reprend la classe mesurée de chacun. Sous X11, l’identifiant
+_GTK_APPLICATION_ID correspond également à son entrée desktop.
+Deux lancements normaux sans --test-script ni --quit-after présentent la même
+fenêtre : activation du premier processus, sortie réussie du second et aucune
+seconde fenêtre visible. Ces options QA désactivant l’unicité sont exclues.
+
+Une sonde privée distincte sur le même paquet passe dix contrôles Wayland :
+GdkWaylandDisplay, propriétés GLib/GTK, deux lancements normaux et protocole
+xdg_toplevel.set_app_id canonique pour le principal et l’assistant .setup.
+Ce relevé est réalisé sur la session Wayland avec bus et état isolés, données
+fictives et socket inutilisée. Ce n’est pas le banc X11 public précédent.
+
+Recette système en VM Debian 13 : baseline 0.2.2, mise à niveau vers 0.2.3,
+puis réinstallation du même paquet. Quatorze invariants sont vrais après
+chaque opération : bundle et unité fournisseur, configurations, identité des
+conteneurs/images/montages, réseau IPv4/IPv6, kit et marqueur d’installation.
+Les neuf conteneurs sont en cours, les 362 fichiers du kit sont conformes
+aux sommes de contrôle et dpkg --verify ne signale aucun fichier altéré.
+StartedAt de RTCM a changé lors de sa relance autonome hors ligne déjà connue ;
+aucun autre conteneur fournisseur n’a redémarré. Le banc ne demande aucune
+relance fournisseur. La VM utilise un overlay privé et un réseau QEMU isolé ;
+son disque de base est conservé et l’overlay arrêté proprement à la fin.
+
+Recette sur le poste existant : mise à niveau 0.2.2 → 0.2.3, agent actif et
+aucune tâche en cours. Quinze fichiers du bundle/configurations ont les mêmes
+empreintes et modes, les neuf conteneurs les mêmes identités/images/états/
+démarrages/montages, le réseau le même relevé IPv4/IPv6 et les 363 fichiers du
+kit le même inventaire taille/date/mode. Vérification dpkg sans différence.
+Lancement réel via Gio.DesktopAppInfo depuis l’entrée desktop installée :
+fenêtre AquaHub, icône déclarée canonique, second lancement vers le même PID,
+favori canonique présent. Une lecture AT-SPI ciblée de GNOME retrouve le bouton
+et le libellé AquaHub, sans entrée __main__.py. Aucun réglage GNOME n’est changé.
+
+Limites : AT-SPI expose les noms, pas le dessin du bouton. La résolution
+d’icône et le protocole natif ne constituent pas une capture visuelle du dock.
+La revue visuelle complète du regroupement, d’Alt-Tab, de l’icône dans toutes
+les vues GNOME et aux deux échelles reste à compléter. Aucune capture WebKit
+n’est utilisée comme preuve de cette partie. Ni première installation de kit
+client générique, ni configuration physique d’un drone rejouée pour ce lot.
+Rapports VM, traces Wayland et lectures du poste restent privés, hors dépôt.
+
+0 bis. Correctif 0.2.2 — vérification du 21 octobre 2026
 
 Suite Python : 278 cas découverts, 270 exécutés avec succès et huit ignorés
 sans opt-in ; aucun changement de logique backend. TypeScript, compilation

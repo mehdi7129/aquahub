@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.2
+Préproduction 0.2.3
 
 1. Disponibilité et installation
 
@@ -14,6 +14,11 @@ cliquer Installer, autoriser dans la boîte système, puis ouvrir AquaHub
 dans le menu des applications. L’assistant AquaHub installe ses composants
 depuis le kit local, puis propose Ouvrir AquaHub. Le client n’a pas besoin
 de Node, npm, pip ou d’une commande de développement.
+
+Le lanceur et la fenêtre portent le nom AquaHub et utilisent son icône.
+Après une mise à niveau depuis 0.2.2, fermer la fenêtre déjà ouverte puis
+relancer AquaHub depuis son icône habituelle pour charger la nouvelle version.
+Le favori existant est conservé ; aucun redémarrage du PC n’est nécessaire.
 
 Ne pas interrompre une étape d’installation. En cas d’échec, lire le détail
 et résoudre sa cause avant de réessayer. Ne pas supprimer une configuration,

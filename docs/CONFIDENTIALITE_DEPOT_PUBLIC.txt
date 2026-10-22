@@ -1,5 +1,6 @@
 AquaHub — contenu du dépôt public et revue de confidentialité
 Revue documentaire du 21 octobre 2026, base technique 0.2.2 / 053b714.
+Complément du 22 octobre : correctif 0.2.3 et banc d’identité natif.
 
 1. Ce qui est public
 
@@ -31,6 +32,12 @@ sans supprimer une garde ou une constante fonctionnelle à l’aveugle.
 L’audit de la base 053b714 a porté sur 102 fichiers suivis, cinq commits
 atteignables et 203 blobs historiques disponibles dans le clone local.
 Les nouveaux documents et le diff de cette publication sont relus séparément.
+
+Le complément 0.2.3 relit le diff et le nouveau banc natif, sans élargir
+artificiellement l’audit historique initial. Aucun chemin personnel, secret,
+email privé, URL authentifiée réelle ou journal de banc n’est détecté dans
+ces ajouts. Les rapports AT-SPI/VM, traces de protocole et comparaisons du
+poste restent hors dépôt. Aucun nouveau visuel de session réelle n’est publié.
 
 Résultat : aucun jeton authentique, clé privée exploitable, email privé,
 chemin de compte personnel ou URL authentifiée réelle n’a été détecté.

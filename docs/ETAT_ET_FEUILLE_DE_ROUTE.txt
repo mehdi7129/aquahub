@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.2 — état du code et qualification à poursuivre
+Préproduction 0.2.3 — état du code et qualification à poursuivre
 
 Développé
 
@@ -69,14 +69,22 @@ Les invariants du bundle, conteneurs, réseau et kit de réparation sont restés
 identiques pendant cette recette. Les préconditions et limites sont dans
 TESTS.txt ; il ne s’agit pas d’une qualification d’un kit commercial générique.
 
-Correctif ciblé proposé : identité dans le bureau
+Correctif 0.2.3 : identité dans le bureau
 
-Le nom __main__.py et une icône générique peuvent apparaître pour la fenêtre.
-Des écarts entre identifiant GTK, lanceur et nom d’icône sont confirmés dans
-0.2.2. Le plan PLAN_IDENTITE_BUREAU_2026-10-21.txt propose leur alignement et
-la recette GNOME/Wayland/X11, des favoris et de l’instance unique.
-Ce correctif est au stade du plan : aucun changement de version ou de code
-d’identité ne fait partie de la publication documentaire présente.
+Le nom AquaHub et l’identité com.aquadrone.aquahub sont déclarés avant GTK ;
+l’icône est celle du lanceur existant, conservé pour les favoris. L’assistant
+possède son propre lanceur masqué du menu. Le paquet extrait passe 24 contrôles
+natifs X11 ; une sonde Wayland distincte passe dix contrôles. L’instance unique
+est testée avec deux lancements normaux, sans les options QA NON_UNIQUE.
+
+Mise à niveau 0.2.2 → 0.2.3 et réinstallation en VM réussies. Sur le poste,
+le lancement par l’entrée desktop et le nom exposé par GNOME ont été observés.
+Les invariants du bundle, des conteneurs, du réseau et du kit sont conservés ;
+la relance autonome RTCM hors ligne de la VM est documentée séparément.
+La lecture des propriétés et des noms ne prouve pas le dessin de l’icône
+dans toutes les vues du shell. La revue visuelle complète d’Alt-Tab et des
+échelles du bureau reste à compléter ; voir TESTS.txt et le plan réalisé
+PLAN_IDENTITE_BUREAU_2026-10-21.txt pour la portée exacte de la recette.
 
 Priorité 1 : terminer le contrat fournisseur
 

@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.2.2. Il complète
+Ce document décrit les sources de la préproduction 0.2.3. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -83,6 +83,21 @@ __main__.py lance app.main(). app.py charge GTK 3 et WebKitGTK 4.1, choisit les
 ressources locales et injecte le pont dans le document autorisé. Les appels
 potentiellement lents passent par un ThreadPoolExecutor ; GLib.idle_add
 ramène les résultats sur le thread de l’interface.
+
+Depuis 0.2.3, app.py déclare le nom humain AquaHub et le nom de programme
+com.aquadrone.aquahub avec GLib avant l’import de GTK. Gtk.Application,
+le nom d’icône, le lanceur desktop et le métainfo partagent l’identifiant
+com.aquadrone.aquahub ; le titre de fenêtre est AquaHub. Une icône de fenêtre
+par défaut couvre aussi les dialogues d’erreur précédant la fenêtre principale.
+La commande aquahub et le basename com.aquadrone.aquahub.desktop sont conservés.
+
+La mesure d’une vraie fenêtre GTK3 sous X11 donne WM_CLASS
+« com.aquadrone.aquahub », « Com.aquadrone.aquahub » et _GTK_APPLICATION_ID
+com.aquadrone.aquahub. StartupWMClass utilise la seconde valeur mesurée,
+Com.aquadrone.aquahub. Ce champ aide le rattachement sous X11 ; il ne remplace
+pas l’identifiant applicatif utilisé sous Wayland. Le fonctionnement normal
+reste en instance unique ; les options de recette --test-script ou --quit-after
+emploient volontairement NON_UNIQUE et ne prouvent pas ce comportement.
 
 bridge.py ne dépend pas de GTK et peut être testé sans affichage. Il contient
 RpcClient, les limites de transport, les validations d’URL locale, le choix
@@ -263,6 +278,14 @@ contrôles et l’adoption/installation de Docker, du bundle, de Portainer et du
 service AquaHub. upgrade_guard.py empêche un remplacement ou une suppression
 du paquet pendant une tâche active.
 
+L’assistant GTK4 conserve une identité distincte, com.aquadrone.aquahub.setup,
+avec le nom et le titre AquaHub — Installation, le nom de programme correspondant
+et l’icône principale. Son entrée com.aquadrone.aquahub.setup.desktop porte
+NoDisplay=true : elle permet son identification sans ajouter un second élément
+au menu. La commande de cette entrée lance aquahub --setup. Sa classe X11
+mesurée est com.aquadrone.aquahub.setup, également retenue dans StartupWMClass.
+Ces métadonnées ne changent pas la logique d’installation ni le bundle.
+
 Le service aquahub-agent.service appartient à AquaHub. L’unité fournisseur
 reste distincte. Retirer AquaHub arrête son agent et conserve les services,
 volumes et configurations du bundle ainsi que Docker et Portainer. Le dépôt
@@ -286,8 +309,8 @@ du paquet : tests/test_packaging.py, test_installer_finish.py et upgrade_guard.
 Les handlers et validations sont l’autorité ; la documentation ne permet pas
 de déduire qu’une procédure fournisseur inconnue est déjà compatible.
 
-L’identité GNOME de la fenêtre est un prochain chantier, non corrigé dans
-0.2.2 : le titre AquaHub ne suffit pas à garantir le nom ni l’icône affichés
-par le bureau. Le diagnostic et les critères de qualification sont séparés
-dans docs/PLAN_IDENTITE_BUREAU_2026-10-21.txt. Ce plan ne modifie ni l’agent
-ni le fonctionnement du bundle fournisseur.
+Le diagnostic initial et les critères de qualification de l’identité bureau
+sont conservés dans docs/PLAN_IDENTITE_BUREAU_2026-10-21.txt. L’implémentation
+0.2.3 ne dispense pas de la recette du paquet et du bureau : les propriétés
+X11, l’identité Wayland et les observations visuelles GNOME sont des preuves
+distinctes. Consulter docs/TESTS.txt pour les résultats effectivement acquis.

@@ -1,5 +1,5 @@
 AquaHub — décisions techniques à préserver
-Référence : code 0.2.2. Les propositions futures sont marquées séparément.
+Référence : code 0.2.3. Les propositions futures sont marquées séparément.
 
 1. Application locale, agent distinct
 
@@ -127,10 +127,37 @@ publique n’est pas un installateur client qualifié.
 
 Repères : TESTS.txt, CHANGELOG.md et ETAT_ET_FEUILLE_DE_ROUTE.txt.
 
-10. Décisions encore proposées
+10. Une identité bureau cohérente, sans nouveau lanceur principal
 
-Identité bureau : aligner application, nom humain, lanceur et icône ; voir
-PLAN_IDENTITE_BUREAU_2026-10-21.txt. Ce correctif n’est pas implémenté.
+Décision implémentée en 0.2.3 : garder AquaHub comme nom humain et titre,
+com.aquadrone.aquahub comme identifiant GTK, nom de programme et nom d’icône.
+Définir les noms GLib avant l’import de GTK ; conserver le lanceur
+com.aquadrone.aquahub.desktop et la commande aquahub déjà distribués.
+L’icône par défaut couvre également les dialogues d’erreur initiaux.
+
+Pourquoi : le titre HTML ou celui de la fenêtre ne suffit pas au rattachement
+par le bureau. Conserver le basename du lanceur préserve les favoris existants.
+Un changement de métadonnées ne justifie ni réinstallation du bundle ni
+réinitialisation des préférences GNOME.
+
+StartupWMClass provient d’une mesure native : Com.aquadrone.aquahub pour
+la fenêtre GTK3, com.aquadrone.aquahub.setup pour l’assistant GTK4. La seconde
+application conserve son identité et son titre AquaHub — Installation, utilise
+l’icône officielle et possède une entrée desktop NoDisplay=true. Il n’y a donc
+pas de seconde entrée visible dans le menu. Cette distinction ne modifie
+aucune commande d’installation fournisseur.
+
+La classe X11 ne remplace pas l’identité Wayland. Les contrôles natifs,
+l’instance unique et le rendu visuel GNOME doivent garder leurs preuves propres.
+Fermer l’ancienne fenêtre avant d’ouvrir le correctif : l’ancien identifiant
+GTK ne partage pas le même nom D-Bus. Ne pas supprimer les favoris ou le profil
+du bureau pour éviter cette coexistence temporaire.
+
+Repères : desktop/aquahub_desktop/app.py, installer/bootstrap.c,
+installer/build_package.py, tests/test_packaging.py,
+PLAN_IDENTITE_BUREAU_2026-10-21.txt et TESTS.txt.
+
+11. Décisions encore proposées
 
 Bundle v1.0.1 : adaptateur Git + registre, profils de compatibilité et
 qualification du correctif WireGuard ; voir le plan d’intégration dédié.

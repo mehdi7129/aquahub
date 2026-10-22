@@ -153,6 +153,7 @@ static void activate(GtkApplication *application, gpointer data) {
     g_object_unref(style);
     assistant->window = gtk_application_window_new(application);
     gtk_window_set_title(GTK_WINDOW(assistant->window), "AquaHub — Installation");
+    gtk_window_set_icon_name(GTK_WINDOW(assistant->window), "com.aquadrone.aquahub");
     gtk_window_set_default_size(GTK_WINDOW(assistant->window), 650, 570);
     g_signal_connect(assistant->window, "close-request", G_CALLBACK(close_requested), assistant);
 
@@ -207,6 +208,8 @@ static void activate(GtkApplication *application, gpointer data) {
 int main(int argc, char **argv) {
     Assistant assistant = {0};
     /* --setup is consumed by /usr/bin/aquahub; no root GUI is ever started. */
+    g_set_application_name("AquaHub — Installation");
+    g_set_prgname("com.aquadrone.aquahub.setup");
     GtkApplication *application = gtk_application_new("com.aquadrone.aquahub.setup", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect(application, "activate", G_CALLBACK(activate), &assistant);
     int result = g_application_run(G_APPLICATION(application), argc, argv);

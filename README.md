@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.2.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.3.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -19,7 +19,7 @@ Capture de l’interface 0.2.2 avec données fictives uniquement.
 
 ## Fonctionnalités
 
-| Fonction | État dans 0.2.2 | Limite à connaître |
+| Fonction | État dans 0.2.3 | Limite à connaître |
 | --- | --- | --- |
 | Supervision | Huit services reconnus, contours colorés et détail par service | État du conteneur et santé distincts ; données anciennes neutralisées |
 | Relances | Tâche ciblée visible, résultat et observation après intervention | WireGuard reste protégé ; toutes les actions réseau ne sont pas ouvertes |
@@ -30,7 +30,7 @@ Capture de l’interface 0.2.2 avec données fictives uniquement.
 | Mise à jour AquaHub | Recherche de Releases, téléchargement vérifié et installation confirmée | Un commit ou un ZIP de sources ne suffit pas ; aucun installateur public qualifié publié à ce stade |
 | Mise à jour du bundle | Inspection et application des livraisons `image-refresh-v1` reconnues | Le futur flux Git + registre du fournisseur n’est pas encore implémenté |
 | Installation | Constructeur de paquet applicatif et assistant de kit complet hors ligne | Kit fournisseur/client externe, privé s’il contient des configurations ou secrets |
-| Identité dans GNOME | Application utilisable, anomalie de nom/icône identifiée | Correction préparée dans un plan, non développée à ce stade |
+| Identité dans le bureau | Nom AquaHub, identifiant natif et icône alignés sur le lanceur existant | Fermer l’ancienne fenêtre avant de rouvrir après mise à niveau ; portée des contrôles GNOME dans les tests |
 
 Les adresses IP existantes ne sont pas administrées par l’interface. Les actions
 réseau sans précontrôle suffisant restent bloquées. Les contrôles manuels des
@@ -49,20 +49,17 @@ son comportement d’échec. La santé fonctionnelle reste distincte de l’éta
 | 0.2.0 | Canal applicatif séparé du bundle, paquet léger, suivi nommé des configurations et détail des contrôles manuels |
 | 0.2.1 | Précontrôle sans mot de passe administrateur, exports des logs, relances réseau ciblées et supervision simplifiée |
 | 0.2.2 | Barre de progression corrigée, retour visuel des relances, gestion de l’ancien cache et des réponses perdues, titres et espacements harmonisés |
+| 0.2.3 | Identité native, nom et icône du bureau harmonisés ; assistant distinct sans second raccourci dans le menu |
 
 Les [notes de version](CHANGELOG.md) décrivent le code livré. Les
 [résultats de validation](docs/TESTS.txt) séparent tests génériques, parcours
-graphiques, recettes de paquet et essais matériels. La recette 0.2.2 documente
-notamment 270 tests Python réussis et huit ignorés sans options, 28 tests de
-domaine JavaScript, les parcours natifs et une mise à niveau réelle ciblée.
+graphiques, recettes de paquet et essais matériels. La recette 0.2.3 documente
+270 tests Python réussis et huit ignorés sans options, 28 tests de domaine
+JavaScript, les identités natives et les mises à niveau du paquet applicatif.
 Ces résultats ne qualifient pas une flotte ou un kit client générique.
 
 ## Prochains chantiers
 
-- **Nom et icône dans le bureau** : aligner l’identité GTK, le lanceur et
-  l’icône, puis vérifier GNOME, Wayland/X11 et les favoris. Le
-  [plan de développement](docs/PLAN_IDENTITE_BUREAU_2026-10-21.txt) est proposé
-  à la validation ; aucun correctif d’identité n’est encore implémenté.
 - **Bundle fournisseur v1.0.1** : préparer le flux Git + registre, préserver
   les configurations client et qualifier le correctif WireGuard. Voir le
   [plan distinct](docs/PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt).

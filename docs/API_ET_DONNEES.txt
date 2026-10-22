@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.2","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.3","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
