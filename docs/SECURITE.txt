@@ -1,4 +1,5 @@
 AquaHub — frontières de confiance et invariants
+Référence : préproduction 0.2.5.
 
 Ce document décrit les garde-fous implémentés, leur portée et les règles de
 contribution. Il ne constitue pas une certification ni une garantie contre
@@ -130,8 +131,31 @@ transport restent des opérations administratives séparées.
 
 Les scripts fournisseur ne sont pas téléchargés puis exécutés à l’aveugle.
 Leur empreinte doit correspondre au contrat connu. Le code est copié dans un
-répertoire privé et exécuté avec des garde-fous de transport. Les fichiers
-distants concernés sont sauvegardés et le retour après redémarrage est vérifié.
+répertoire privé et exécuté sans modification, avec des garde-fous de transport.
+Depuis 0.2.5, la génération du hub s’écrit uniquement dans un fichier régulier
+de ce miroir privé. Aucun lien ni descripteur inscriptible n’expose le hub actif
+au script. Le transport Docker recharge explicitement le bundle actif et non
+le miroir. AquaHub n’ouvre pas la configuration active du hub en écriture.
+
+Le précontrôle exige que toutes les sections requises par le générateur aient
+exactement leurs options dans le hub actif, avec noms et casse conservés et
+valeurs identiques hors normalisation des adresses. Une option supplémentaire
+dans une section requise est refusée : elle pourrait modifier le filtrage ou
+le routage. Les autres sections de la flotte restent intactes. DEFAULT vide
+ou non vide, doublons de sections/options et variantes de casse ambiguës sont
+refusés. Une cible nécessitant un ajout ou une modification réseau reste
+interdite, par exemple 6 absent d’un hub 1..5.
+
+L’empreinte attendue du hub actif provient des octets réellement comparés ;
+un changement pendant le précontrôle est refusé. Elle est distincte de celle
+du résultat généré privé. Les deux résultats sont vérifiés après la procédure,
+puis le hub actif est vérifié pendant les contrôles de retour du drone. Les
+lectures MAVLink sont bornées, O_NOFOLLOW et O_NONBLOCK, et exigent un fichier
+régulier : un lien ou un FIFO ne peut servir à cette lecture. Ces gardes ne
+constituent pas une protection contre un administrateur root malveillant.
+
+Les fichiers distants concernés sont sauvegardés et le retour après redémarrage
+est vérifié.
 Les contrôles de matériel ne sont pas déclarés réussis par une simulation.
 La progression indique douze jalons observés, sans interpolation temporelle ;
 elle n’est pas une validation des cinq contrôles manuels. Les deux rappels

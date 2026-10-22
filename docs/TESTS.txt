@@ -5,7 +5,66 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-0. Correctif 0.2.4 — configuration sans mot de passe administrateur du PC
+0. Version 0.2.5 — configuration ciblée et diagnostic de reconnexion
+
+Vérification du 22 octobre 2026 : 291/291 tests Python réussis avec les
+préconditions Docker, GTK/WebKit et fournisseur explicitement activées.
+Les trois lectures Docker restent en lecture seule ; les scripts fournisseur
+réels utilisent des transports interceptés. Aucun drone physique n’est
+configuré par cette suite. Sans ces options, huit cas sont ignorés et les
+283 autres sont exécutables par la CI publique. TypeScript, compilation et
+28 tests de domaine JavaScript passent.
+
+Les 41 tests drone couvrent la conservation exacte de la configuration active
+du hub, la couverture des sections requises pour la cible et les refus des
+entrées ambiguës, liens et fichiers spéciaux. Deux tests de contrat exécutent
+le vrai générateur et le vrai deploy.py, copiés sans modification, avec des
+transports simulés. Un hub contenant déjà 1..5 accepte les cibles dans l’ordre
+5, 3, 1, 4, 2. Les octets, inode, date et mode de son fichier actif en lecture
+seule restent identiques, comme l’ensemble du bundle de fixture. Le numéro 6
+reste refusé s’il exige d’étendre le réseau actuellement couvert.
+
+Cinq tests du collecteur réseau vérifient les sorties et délais bornés,
+les fichiers privés, le refus des liens/FIFO et le statut indéterminé d’une
+comparaison incomplète. Deux captures courtes de lecture ont exercé le
+collecteur sur le poste, dont une avec sondes TCP, DNS et HTTPS. Les longues
+captures n’ont observé aucun changement de carrier ; l’opérateur a reporté
+l’essai physique. Aucune cause de la panne RJ45 ni correction n’est déduite
+de ces relevés. Voir DIAGNOSTIC_RECONNEXION_ETHERNET.txt.
+
+Paquet applicatif 0.2.5 : 147334 octets,
+SHA-256 294b545b1fa407707dfd14edfa66bff55254979512ee60c7f4a9de540619dd98.
+Vingt-cinq comparaisons relient les modules livrés, finish.py et le frontend
+aux sources/build testés et à l’empreinte du paquet. Le candidat extrait
+réussit le parcours GTK/WebKit de démonstration 19/19, sans agent réel.
+
+Recette VM Debian 13 : baseline 0.2.4 stabilisée avant mesure, mise à niveau
+vers 0.2.5 puis réinstallation 0.2.5. Les quatorze invariants passent après
+chaque opération : bundle, unité fournisseur, configurations, images,
+identités et montages des conteneurs, réseau IPv4/IPv6, kit et marqueur
+d’installation. Les trois endpoints HTTP répondent 200, les neuf conteneurs
+sont actifs et les 362 fichiers du kit sont vérifiés par empreinte.
+dpkg --verify est propre et les deux lanceurs desktop sont valides.
+RTCM a effectué son retry autonome hors ligne connu pendant la réinstallation
+(60,843 s entre démarrages), sans relance fournisseur demandée par le banc.
+L’overlay est arrêté proprement et la base reste inchangée.
+
+Mise à niveau réelle du poste 0.2.4 → 0.2.5 réussie : version RPC 0.2.5,
+agent actif, aucune tâche en cours et dpkg --verify propre. Quinze fichiers
+du bundle/configurations gardent leurs empreintes et modes ; les neuf
+conteneurs conservent identités/images/états/démarrages/montages. Le relevé
+réseau IPv4/IPv6 et l’inventaire taille/date/mode des 363 fichiers du kit
+restent identiques. Le précontrôle réel Aqua_Drone_5 est autorisé avec tous
+ses contrôles réussis, depuis le compte opérateur, sans élévation interactive.
+Aucune configuration ni relance matérielle ne suit ce précontrôle.
+
+Limites : aucune première installation client vierge, configuration physique
+multi-drone, coupure/reconnexion RJ45 ni nouvelle recette visuelle GNOME.
+Le workflow public est ajouté ; son exécution GitHub doit être vérifiée dans
+Actions pour le commit concerné, séparément des résultats locaux ci-dessus.
+Les rapports, journaux, captures et configurations réels restent privés.
+
+0 bis. Correctif 0.2.4 — configuration sans mot de passe administrateur du PC
 
 Vérification du 22 octobre 2026. Suite générique : 280 tests découverts,
 272 réussis et huit ignorés sans leurs préconditions facultatives. Le module
@@ -49,7 +108,7 @@ d’autorisation. Les résultats natifs et système 0.2.3 restent historiques ;
 ils ne sont pas présentés comme de nouveaux essais 0.2.4. La délégation est
 limitée au compte opérateur autorisé ; les accès SSH restent distincts.
 
-0 bis. Correctif 0.2.3 — vérification du 22 octobre 2026
+0 ter. Correctif 0.2.3 — vérification du 22 octobre 2026
 
 Suite Python générique : 278 cas découverts, 270 exécutés avec succès et huit
 ignorés sans leurs préconditions facultatives. Les neuf tests de packaging
@@ -124,7 +183,7 @@ n’est utilisée comme preuve de cette partie. Ni première installation de kit
 client générique, ni configuration physique d’un drone rejouée pour ce lot.
 Rapports VM, traces Wayland et lectures du poste restent privés, hors dépôt.
 
-0 ter. Correctif 0.2.2 — vérification du 21 octobre 2026
+0 quater. Correctif 0.2.2 — vérification du 21 octobre 2026
 
 Suite Python : 278 cas découverts, 270 exécutés avec succès et huit ignorés
 sans opt-in ; aucun changement de logique backend. TypeScript, compilation
@@ -260,6 +319,8 @@ Familles principales :
   test_installer_finish.py : adoption/installation avec opérations simulées.
   test_packaging.py : intégrité, contenu du .deb et portée des scripts Debian.
   test_upgrade_guard.py : exclusion avec une tâche active et garde du paquet.
+  test_network_capture.py : limites du diagnostic développeur, fichiers privés
+                            et comparaison incomplète des empreintes.
 
 4. Frontend : type-check, compilation et règles métier
 

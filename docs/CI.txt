@@ -1,0 +1,115 @@
+AquaHub — vérifications automatiques des sources publiques
+
+1. Déclenchement et portée
+
+Le workflow .github/workflows/ci.yml s'exécute pour les propositions de
+modification (pull requests), les envois sur main et les demandes manuelles
+depuis l'onglet Actions de GitHub. Il dispose seulement du droit contents:read.
+Le checkout ne conserve pas les identifiants GitHub dans la copie de travail.
+Aucun secret du dépôt ou environnement client n'est nécessaire.
+
+Les exécutions obsolètes d'une même branche ou proposition sont annulées.
+La durée maximale d'un job est de 25 minutes. Aucun binaire, rapport brut,
+journal de banc ou archive fournisseur n'est publié par ce workflow.
+
+La présence du workflow ne prouve pas une exécution GitHub réussie. Vérifier
+le résultat associé au commit dans l'onglet Actions ; ne pas déduire ce statut
+des seules recettes locales consignées dans docs/TESTS.txt.
+
+2. Environnement et dépendances
+
+Le runner GitHub ubuntu-24.04 héberge un conteneur Debian 13 linux/amd64.
+L'image officielle est fixée au digest du manifeste de cette architecture :
+
+  debian:13@sha256:15a71cc87173e191d5046f9c4288db4e8954b67f92e48d9587087826b0afe562
+
+Le digest a été lu dans l'API officielle Docker Hub lors de la préparation :
+https://hub.docker.com/v2/repositories/library/debian/tags/13
+
+actions/checkout v4.2.2 est fixé au commit amont
+11bd71901bbe5b1630ceea73d27597364c9af683, vérifié via :
+https://api.github.com/repos/actions/checkout/git/ref/tags/v4.2.2
+
+La préparation installe les outils Debian : Python 3, Node.js/npm, compilateur
+C, pkg-config, dpkg-dev, libgtk-4-dev et desktop-file-utils. Le compilateur
+construit l'assistant GTK 4 mais ne l'exécute pas. Les commandes et versions de
+Python/Node/npm sont visibles dans le journal de préparation. npm ci utilise
+frontend/package-lock.json ; aucune dépendance pip n'est requise.
+
+Seule la préparation des outils et des permissions s'effectue comme root
+dans le conteneur éphémère. Le frontend, les tests Python et les constructions
+de paquets s'exécutent ensuite avec l'utilisateur non privilégié aquahub-ci.
+Cela exerce aussi le refus de l'assistant privilégié sans autorisation.
+
+Le réseau est nécessaire pour GitHub, les miroirs Debian et npm. La base de
+l'image est figée, mais apt reçoit les correctifs des dépôts Debian 13 : les
+versions des paquets système ne sont pas gelées dans un snapshot. Il s'agit
+d'un environnement de qualification explicite et réutilisable, pas d'une
+garantie de compilation identique octet pour octet. Mettre à jour le digest
+et les actions volontairement après revue ; conserver la qualification des
+paquets effectivement livrés séparée de la CI générique.
+
+3. Contrôles exécutés
+
+Dans frontend : npm ci, npm run check, npm test, puis npm run build.
+Cela vérifie les types TypeScript, les règles de domaine JavaScript et la
+construction des trois ressources livrées. La référence 0.2.5 compte 28 tests
+JavaScript ; le journal de chaque exécution donne le nombre réellement testé.
+
+Depuis la racine, PYTHONPATH=agent:desktop python3 -m unittest discover -s
+tests -v exécute la suite publique. Les variables suivantes sont forcées :
+
+  AQUAHUB_TEST_DOCKER=0
+  AQUAHUB_TEST_GTK=0
+  AQUAHUB_SUPPLIER_BUNDLE=     (chaîne vide)
+
+La référence 0.2.5 découvre 291 tests : 283 passent et huit restent ignorés
+dans la recette générique sans opt-in. Le module drone comprend 41 tests.
+Les huit cas facultatifs sont trois lectures Docker réelles, deux recettes
+du script fournisseur local et trois recettes GTK/WebKit explicites. Les
+préconditions de construction Debian sont installées : les tests de paquets
+ne doivent donc pas être ignorés faute de compilateur ou de dpkg-deb.
+Le workflow ne fige pas ces compteurs : les nouveaux tests doivent pouvoir
+s'ajouter, et unittest affiche les résultats et raisons des cas ignorés.
+
+Les tests de packaging construisent et extraient leurs fixtures temporaires,
+dans les deux modes du constructeur, puis vérifient intégrité, permissions,
+identités desktop et portée des scripts Debian. Les données du kit de fixture
+sont synthétiques ; aucun bundle réel ne doit être ajouté pour les remplacer.
+
+Enfin, le job construit un paquet applicatif à partir des vraies sources et
+du frontend compilé. Il l'extrait sans installation, vérifie version,
+architecture, marqueur application-only et absence du kit fournisseur, compare
+les trois ressources frontend au build testé, valide les entrées desktop et
+la syntaxe shell des scripts de maintenance. Le candidat temporaire est
+supprimé à la fin de cette étape. La CI ne crée ni Release ni publication.
+
+4. Ce que cette CI ne valide pas
+
+Elle ne démarre pas l'agent système, n'installe pas AquaHub, n'exécute pas ses
+scripts de maintenance Debian et ne demande aucune élévation PolicyKit.
+Aucun accès ou identifiant de banc n'est fourni pour Docker, Portainer, SSH,
+un drone, une identité client ou un dépôt privé fournisseur. Le runner utilise
+un conteneur pour la CI ; aucun daemon Docker n'est fourni aux tests.
+
+Les tests graphiques GTK/WebKit, X11/Wayland et GNOME restent des recettes
+distinctes. La validation des paquets extraits ne prouve ni installation,
+mise à niveau, réparation, kit client hors ligne, reconnexion Ethernet,
+configuration physique d'un Aqua_Drone, ni conservation du réseau client.
+Pour ces opérations, suivre docs/TESTS.txt et les plans de qualification avec
+preuves privées, en conservant les scripts fournisseur inchangés.
+
+5. Relecture et reproduction
+
+Avant d'envoyer une modification de workflow, analyser son YAML et vérifier
+la syntaxe de tous ses blocs shell. Sur un poste Debian 13 préparé, les
+commandes frontend et Python peuvent aussi être rejouées sans sudo depuis
+la racine ; docs/TESTS.txt détaille les dépendances et les recettes facultatives.
+Ne pas exécuter l'étape apt du workflow sur le poste d'un client pour tester
+la CI : elle concerne seulement le conteneur jetable du runner GitHub.
+
+Un échec de téléchargement ou d'installation des dépendances peut être un
+incident d'infrastructure. Le distinguer d'un échec de test ; ne pas masquer
+un échec par continue-on-error, un secret ajouté au workflow ou l'activation
+des recettes matérielles. Une évolution des dépendances et de l'image doit
+passer par la même revue de code que le reste du projet.

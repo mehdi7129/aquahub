@@ -1,4 +1,5 @@
 AquaHub — dépannage du développement
+Référence : préproduction 0.2.5.
 
 Le diagnostic commence par le mode utilisé : démo, fixture synthétique ou
 agent réel. Ne pas corriger un problème de banc en relâchant une garde du
@@ -48,6 +49,43 @@ La première association SSH et les réglages de transport gardent leur propre
 autorisation. Une maintenance en cours peut aussi refuser le précontrôle ou
 la configuration sans demander de mot de passe. Aucun de ces refus ne justifie
 de modifier les scripts fournisseur ou une adresse IP.
+
+Un numéro inférieur à la flotte du hub est refusé
+
+Les versions antérieures à 0.2.5 pouvaient renvoyer fleet_reduction, par
+exemple pour choisir 3 sur un hub préparé pour 1..5. Vérifier les versions
+du desktop et de l’agent. Depuis 0.2.5, le hub actif reste intégralement
+conservé ; la génération fournisseur est isolée dans un fichier privé.
+Le précontrôle compare toutes les sections et options requises, sans se
+limiter au numéro, aux groupes ou aux adresses. Il n’impose pas un ordre
+croissant aux appareils déjà couverts.
+
+Un refus ip_change_forbidden reste attendu si une section manque ou si un
+champ requis diffère : port, mode, filtre, adresse ou autre option. Les
+options supplémentaires dans une section requise sont aussi refusées. Une
+cible 6 sur un hub 1..5 nécessite une extension et reste bloquée ; ne pas
+modifier la configuration du hub ni les scripts pour contourner ce contrôle.
+Une configuration ambiguë, notamment DEFAULT ou doublons de casse, donne
+invalid_config. configuration_changed signifie que les octets ont changé
+pendant ou depuis le précontrôle ; vérifier la cause avant d’en créer un autre.
+
+Dans la recette fournisseur interceptée, contrôler séparément le fichier
+généré privé et le hub actif initial : leurs SHA attendus peuvent différer.
+Un postcheck_failed ne justifie pas de copier le premier sur le second.
+La réussite exige le hub initial intact et le retour stable du bon drone.
+Voir CONTRAT_BUNDLE.txt et REPRISE_DEVELOPPEMENT.txt, section 16.
+
+Internet ne revient pas après reconnexion du câble RJ45
+
+Le symptôme est inscrit dans PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt.
+La version 0.2.5 ne livre pas de correction réseau et ne prétend pas en
+connaître la cause. Une capture physique avant déconnexion, pendant la panne
+et après reconnexion attend l’opérateur. Distinguer lien Ethernet, profils,
+adresses, routes, résolution DNS et accès Internet pour établir le diagnostic.
+Ne pas relancer un drone, modifier une IP, changer un DNS ou réécrire un profil
+réseau pour obtenir un résultat artificiellement favorable. Les fichiers
+fournisseur restent intacts ; si le défaut leur appartient, transmettre les
+preuves expurgées au fournisseur plutôt que corriger ses sources.
 
 Les badges sont gris alors que le dernier état disait En cours
 

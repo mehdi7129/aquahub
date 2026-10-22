@@ -3,6 +3,23 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.5 — configuration ciblée et qualification V1, préproduction
+
+- Le hub actif reste intégralement conservé pendant la configuration d’un
+  drone. Les scripts fournisseur inchangés génèrent leur fichier de hub dans
+  un miroir privé régulier ; seules les configurations de la cible sont envoyées.
+- Toutes les sections et options requises sont comparées avant l’opération.
+  Les autres appareils déjà couverts sont conservés ; une extension qui exige
+  de modifier la configuration réseau reste refusée. Aucun script ni IP modifié.
+- Lectures MAVLink bornées, fichiers réguliers sans suivi de lien ; refus des
+  configurations ambiguës et vérification de l’empreinte initiale du hub.
+- Capture privée et bornée du lien Ethernet, NetworkManager, routage, DNS et
+  sondes facultatives. Outil développeur en lecture seule ; aucune réparation
+  de la perte d’Internet après reconnexion n’est annoncée.
+- Workflow Debian 13 des tests génériques et du paquet extrait, sans accès
+  fournisseur, Docker réel ou installation. La réussite locale et le statut
+  d’exécution GitHub restent des preuves distinctes.
+
 ## 0.2.4 — configuration sans mot de passe administrateur du PC, préproduction
 
 - Configuration d’un Aqua_Drone accessible au compte opérateur autorisé sans

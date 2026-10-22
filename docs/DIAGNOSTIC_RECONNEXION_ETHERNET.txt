@@ -1,0 +1,183 @@
+AquaHub — diagnostic privé de la reconnexion Ethernet
+
+1. Objectif et état de la qualification
+
+L'incident signalé est une perte d'Internet après débranchement puis
+rebranchement du câble RJ45, avec récupération après redémarrage du PC.
+scripts/capture_network_reconnect.py prépare les observations nécessaires
+pour comparer le lien physique, NetworkManager, les adresses, les routes,
+les règles et le DNS pendant cet incident.
+
+Cet outil est destiné au développeur. Nous lançons et analysons la capture ;
+le client n'a pas à ouvrir un terminal ni à exécuter ces commandes. Ce n'est
+pas une nouvelle étape de configuration d'un Aqua_Drone dans l'application.
+
+L'outil ne corrige pas la panne. Aucune capture n'a encore démontré la cause
+du défaut ni sa réparation : il manque une reproduction réelle avec retrait
+et remise du câble pendant l'enregistrement. Des relevés faits après un
+redémarrage ne reconstituent pas le défaut antérieur. Ils décrivent le boot
+identifié dans metadata.json et ne doivent pas être présentés comme une
+preuve avant/après l'incident.
+
+Voir docs/PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt pour les décisions
+et la recette de reconnexions répétées restant à effectuer. Les scripts et
+configurations fournisseur doivent rester inchangés.
+
+2. Observations, sans reconfiguration
+
+La capture relève :
+
+  - l'état et les détails NetworkManager avec nmcli ;
+  - les liens, adresses IPv4/IPv6, routes de toutes les tables et règles IP ;
+  - le carrier, l'état, l'adresse matérielle et le pilote des interfaces
+    physiques exposées par /sys/class/net ;
+  - la cible et le contenu borné des fichiers de résolution DNS ;
+  - l'état des unités NetworkManager, aqua-hub et aquahub-agent ;
+  - les journaux NetworkManager et noyau du démarrage courant ;
+  - des empreintes avant/après des fichiers NetworkManager existants et,
+    si --bundle est fourni, des fichiers fournisseur existants.
+
+Les commandes sont des lectures. Aucun profil réseau, IP, route, DNS ou
+pare-feu n'est modifié. Aucun service n'est arrêté ou redémarré, aucun script
+fournisseur n'est exécuté et aucune configuration n'est envoyée à un drone.
+
+Les sondes actives sont désactivées par défaut. --probes ajoute une connexion
+TCP vers 1.1.1.1:443, une résolution DNS de www.debian.org et une requête HTTPS
+HEAD vers ce même site. Avec --drone-number N, une ouverture TCP sur le port
+SSH du profil existant 192.168.(200+N).2 est également essayée. Cette dernière
+n'authentifie aucune session SSH et n'exécute aucune commande. L'adresse est
+seulement une destination observée : elle n'est ni assignée ni modifiée.
+
+Une sonde TCP réussie montre la joignabilité de sa seule destination. DNS et
+HTTPS sont des observations distinctes. Leur échec ne suffit pas à conclure
+que le câble, NetworkManager ou le bundle est responsable. Un outil absent
+ou une permission insuffisante est consigné comme indisponibilité ou échec,
+sans installation implicite ni tentative de réparation.
+
+3. Durée, volume et droits
+
+--seconds : entier de 1 à 3600 secondes, 600 par défaut.
+--interval : intervalle visé entre échantillons, de 1 à 60 secondes, 2 par défaut.
+--probe-interval : de 5 à 300 secondes, 10 par défaut ; utile avec --probes.
+--drone-number : de 1 à 6, optionnel ; ne sert qu'à la sonde TCP active.
+--bundle : chemin optionnel vers le bundle existant à empreinter en lecture.
+
+Les durées d'une commande et d'une sonde sont bornées. Un relevé lent peut
+dépasser l'intervalle demandé ; les horodatages réels font foi. La durée
+limite la boucle d'échantillonnage : un relevé en cours et les journaux finaux
+peuvent prolonger la fin effective de quelques secondes.
+
+samples.jsonl est limité à 64 Mio. À cette limite, l'outil cesse d'ajouter
+des échantillons et enregistre reason=size_limit. Métadonnées, bilan et deux
+exports de journaux finaux s'ajoutent à ce volume ; ce n'est donc pas une
+limite globale de 64 Mio pour tout le dossier.
+
+Chaque commande garde au maximum 256 Kio de sortie standard et 4 Kio d'erreur.
+Une sortie trop importante entraîne son arrêt et le statut truncated.
+Les journaux intermédiaires sont collectés au plus toutes les dix secondes,
+avec au plus 200 entrées par source et relevé ; ils sont inclus dans la limite
+des échantillons. En fin de capture, deux exports séparés, NetworkManager et
+noyau, demandent au plus 2000 entrées chacun, avec le même plafond d'octets
+et cinq secondes maximum par commande. Les requêtes restent sur le démarrage
+courant (-b) et depuis le début de la capture ou le dernier relevé périodique.
+Ces plafonds peuvent laisser des lacunes lors d'une forte activité : ne pas
+traiter une absence dans le relevé comme la preuve qu'un événement n'a pas eu lieu.
+
+L'outil fonctionne sans root, mais les journaux système et certaines
+empreintes peuvent être partiels faute de droits. Pour le diagnostic complet,
+le développeur peut lancer la collecte comme root. Cela n'ajoute aucune
+demande administrateur au parcours client de configuration d'un Aqua_Drone.
+
+--output doit désigner un dossier parent existant privé, attendu en mode
+0700, appartenant à l'UID qui exécute le script ou à root et accessible à ce
+compte. Une exécution comme root nécessite donc un parent appartenant à root.
+Le script refuse un parent accessible au groupe ou aux autres comptes.
+Il crée un sous-dossier capture-<date UTC>-<PID> en mode 0700 et des fichiers
+en mode 0600. Les fichiers existants ne sont pas remplacés. Chaque échantillon
+est flushé puis fsyncé ; les fichiers JSON et leur dossier sont aussi fsyncés.
+Ces écritures réduisent la perte en cas de coupure sans garantir la persistance
+face à toute panne matérielle.
+
+4. Reproduction pour le développeur
+
+Commandes depuis la racine du dépôt, avec chemins génériques. Ce sont des
+commandes de diagnostic développeur, pas des instructions destinées au client.
+Choisir un sous-dossier neuf ; ./local-private est exclu du dépôt public.
+
+  mkdir -p -m 700 ./local-private
+  mkdir -m 700 ./local-private/ethernet
+  python3 scripts/capture_network_reconnect.py --output ./local-private/ethernet --seconds 600 --interval 2
+
+Cette première commande de capture reste passive. Le développeur peut ajouter
+--probes --probe-interval 10 pour distinguer joignabilité IP, DNS et HTTPS.
+Il peut ajouter --drone-number 5 pour observer la destination TCP du profil 5,
+et --bundle ./chemin-vers-le-bundle-existant pour comparer ses empreintes.
+Le dernier chemin est un exemple à remplacer ; aucun bundle réel n'est livré
+avec cet outil public.
+
+Pour une collecte complète lancée par le développeur avec son autorisation
+administrateur, préparer un parent root distinct, sans modifier celui du client :
+
+  sudo -n install -d -m 0700 -o root -g root ./local-private/ethernet-root
+  sudo -n python3 scripts/capture_network_reconnect.py --output ./local-private/ethernet-root --seconds 600 --interval 2 --probes
+
+-n refuse de demander un mot de passe si l'autorisation développeur n'est
+pas déjà disponible. Le client n'a pas à lancer ces commandes. Ne pas ajouter
+de règle système globale pour contourner un refus d'accès aux journaux.
+
+Une fois le début de capture confirmé, conserver quelques relevés câble
+branché, noter l'heure du retrait physique puis celle de la remise du câble,
+et laisser enregistrer le retour ou la perte persistante de connectivité.
+Le développeur lance cette collecte ; l'utilisateur réalise seulement la
+manipulation physique convenue. Ne pas remplacer le retrait réel par une
+reconfiguration réseau ou une relance fournisseur : ce serait un autre essai.
+
+La capture peut se terminer à la durée prévue ou être arrêtée proprement par
+SIGINT/SIGTERM. Une coupure brutale peut laisser samples.jsonl et metadata.json
+sans result.json ni journaux finaux : conserver ce résultat partiel privé.
+Si un reboot est nécessaire pour récupérer la connexion, conserver les données
+précédentes avant d'ouvrir une nouvelle capture dans un autre sous-dossier.
+
+5. Lecture des résultats et limites de preuve
+
+metadata.json : paramètres, début UTC, boot_id et empreintes initiales.
+samples.jsonl : un objet JSON par relevé, horaires, états, sondes et statuts.
+result.json : fin, nombre d'échantillons, raison d'arrêt et empreintes finales.
+networkmanager.json et kernel.json : exports finaux bornés et statut de commande.
+
+Relier une perte de carrier aux événements NetworkManager, puis comparer les
+adresses, la route par défaut, les règles et les résolveurs après reconnexion.
+Comparer séparément les sondes IP, DNS et HTTPS lorsqu'elles sont activées.
+Corréler les horaires dans le même boot_id. Une comparaison entre deux boots
+doit être annoncée comme telle : elle ne montre pas ce qui se passait pendant
+une interruption non capturée.
+
+configuration_fingerprints_unchanged vaut true seulement si les deux relevés
+d'empreintes sont identiques et complets pour les chemins sélectionnés.
+false indique une différence. null signifie que la comparaison est incomplète
+(fichier indisponible, trop volumineux ou limite de parcours atteinte).
+Le parcours des empreintes est borné à 1024 chemins et quatre Mio par fichier.
+Une empreinte identique ne prouve ni le contenu de tous les fichiers système,
+ni les changements transitoires entre les deux relevés, ni la santé réseau.
+
+Cinq tests synthétiques de test_network_capture.py couvrent les sorties de
+commande bornées, les processus qui ferment leurs pipes sans se terminer,
+la lecture bornée et le refus des liens/FIFO, les droits et l'absence
+d'écrasement des rapports, puis le refus de déclarer identiques des empreintes
+incomplètes. Ils ne contactent aucun réseau. Ils valident l'outil de collecte ;
+ils ne constituent pas une reproduction ou une réparation de l'incident RJ45.
+
+6. Confidentialité
+
+Le dossier de capture est privé. Il peut contenir adresses IP/MAC, noms de
+machines ou connexions, chemins personnels, DNS, routes, identités de services,
+empreintes de configurations et des messages de journaux contenant des secrets.
+Le marquage sensitive=true et les permissions ne filtrent pas ces contenus.
+Ne publier ni capture brute, ni extrait de journal, ni configuration du banc
+dans GitHub, une Release, une issue ou une capture d'écran publique.
+
+La restitution publique doit rester un diagnostic rédigé et anonymisé, avec
+adresses de documentation et sans identité client. Pour demander une correction
+au fournisseur, préparer un extrait minimal revu et transmis par le canal privé
+convenu. Conserver les preuves nécessaires localement puis appliquer la politique
+de conservation du diagnostic ; le script ne nettoie pas les anciennes captures.

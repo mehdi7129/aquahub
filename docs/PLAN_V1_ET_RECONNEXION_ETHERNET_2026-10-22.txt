@@ -1,5 +1,6 @@
 AquaHub — plan de consolidation V1 et reconnexion Ethernet
 22 octobre 2026 — référence de code : préproduction 0.2.4
+Avancement : lot de configuration ciblée développé en 0.2.5 ; diagnostic réseau en cours.
 
 1. Périmètre confirmé
 
@@ -186,6 +187,27 @@ Pour chaque lot : scénario reproductible, changements AquaHub limités au
 périmètre, vérification des invariants, résultats et limites documentés,
 puis paquet/version qualifiés lorsque le code a changé. Aucun nouveau paquet,
 changement de version ou correctif de fonctionnement n’est créé par ce document.
+
+5. Avancement du premier lot de développement 0.2.5
+
+La configuration ciblée utilise maintenant un fichier de hub privé régulier
+dans le miroir d’exécution des scripts fournisseur intacts. Le hub actif
+reste inchangé. Toutes les sections et options requises sont comparées ;
+une cible déjà couverte peut être choisie dans un ordre quelconque, tandis
+qu’une extension nécessitant un changement réseau reste refusée.
+Les tests fournisseur sur transports interceptés couvrent 5, 3, 1, 4 et 2,
+avec conservation du contenu, de l’inode, de la date et du mode du hub témoin.
+Ce résultat ne remplace pas la recette physique des différents appareils.
+
+scripts/capture_network_reconnect.py prépare une capture bornée, privée et
+en lecture seule. La première collecte observe une connexion fonctionnelle ;
+aucune coupure physique n’a encore été enregistrée. L’incident reste donc
+à reproduire et aucune cause ni réparation n’est annoncée. Les journaux bruts
+ne sont pas publiés ; voir DIAGNOSTIC_RECONNEXION_ETHERNET.txt.
+
+La CI générique est définie séparément. Ses préconditions et limites sont
+décrites dans CI.txt. La restauration, la rétention, les mises à jour du
+bundle et la livraison client restent des lots distincts non terminés.
 
 Références officielles pour le diagnostic :
 https://systemd.io/NETWORK_ONLINE/

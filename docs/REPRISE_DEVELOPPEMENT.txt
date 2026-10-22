@@ -1,5 +1,5 @@
 AquaHub — reprendre le développement
-Référence : préproduction 0.2.4
+Référence : préproduction 0.2.5
 
 1. Commencer ici
 
@@ -262,7 +262,7 @@ lanceurs extraits et l’assistant sans cliquer sur son installation.
 
 Après mise à niveau de 0.2.2, fermer l’ancienne fenêtre puis rouvrir AquaHub.
 Ne pas réinitialiser les favoris ou les préférences de session. Le flux
-Git + registre du bundle reste le prochain chantier séparé ; ce correctif
+Git + registre du bundle reste un chantier séparé ; ce correctif
 ne modifie aucun script fournisseur ni aucune adresse.
 
 15. Configuration sans mot de passe administrateur du PC — 0.2.4
@@ -289,3 +289,51 @@ Ne pas élargir une règle PolicyKit ou sudoers. L’accès SSH déjà configur�
 distinct du mot de passe administrateur du PC ; cette exception ne crée pas
 d’accès, n’approuve pas de nouvelle empreinte et ne change ni les scripts
 fournisseur ni les IP. Voir SECURITE.txt et API_ET_DONNEES.txt.
+
+16. Configuration ciblée sans réécriture du hub — 0.2.5
+
+Le précontrôle accepte un numéro inférieur à la flotte déjà préparée sans
+réduire celle-ci. hub_covers_generated(current, generated) exige chaque section
+requise du fournisseur et toutes ses options ; les sections supplémentaires
+restent dans le hub actif. Conserver la casse des noms d’options et de sections,
+normaliser uniquement les adresses, refuser les options supplémentaires dans
+une section requise, DEFAULT et les doublons ambigus de casse. La section
+General, les modes, ports, filtrages et multicast comptent autant que les
+adresses/groupes.
+Une cible absente, par exemple 6 sur hub 1..5, reste bloquée ; aucune extension
+réseau n’est autorisée par cette correction.
+
+_deploy exécute les octets reconnus de deploy.py et du générateur dans un
+miroir privé. Sa configuration hub est un fichier régulier privé ; aucun lien
+/proc/self/fd ni pass_fds ne donne accès en écriture au hub actif. Le garde
+Docker vise explicitement le Compose, le projet et le dossier du bundle actif.
+Il recharge donc sa flotte intégrale, alors que les trois fichiers du drone
+choisi proviennent du miroir. Ne pas modifier les sources fournisseur ni y
+injecter un wrapper Python pour obtenir cette séparation.
+
+Le plan garde deux empreintes distinctes : generated_hub_sha pour le résultat
+privé et expected_hub_sha pour les octets initiaux du hub actif. Le précontrôle
+vérifie que les empreintes correspondent aux octets comparés ; _deploy et les
+postcontrôles de retour du drone exigent ensuite le hub actif initial. Le
+lecteur commun _read_mavlink est borné et exige un fichier régulier ouvert
+O_RDONLY | O_NOFOLLOW | O_NONBLOCK ; _read_hub l’utilise sur le fichier actif.
+Les postlectures ne doivent pas redevenir des hash de chemins non contrôlés.
+
+Les tests de cette version incluent 41 cas drone et 2 cas fournisseur, avec
+les cibles 5→3→1→4→2 et des configurations propres à chaque numéro. Le vrai
+fournisseur est lu depuis un bundle local explicitement fourni ; tous les
+transports sont interceptés et les clés sont synthétiques. Le hub témoin porte
+un commentaire et est protégé en lecture seule : contenu, mode, inode et mtime
+doivent rester identiques, ainsi que tous les fichiers du bundle témoin. Les
+refus de cible absente, différence de champ, casse ambiguë, DEFAULT, course
+pendant le précontrôle et FIFO sont couverts. Les contrôles d’identité, UID,
+autorisation et maintenance de 0.2.4 restent en place.
+
+La qualification globale des sources passe 291 tests Python sans omission,
+avec opt-ins Docker consultatif, GTK/Xvfb et fournisseur intercepté ; les
+28 tests JavaScript, la vérification TypeScript et le build passent également.
+Voir TESTS.txt pour les commandes et les limites exactes. Aucune configuration
+physique de drone n’a été exécutée pour cette qualification 0.2.5. Le diagnostic
+de reconnexion RJ45 reste distinct : aucune correction réseau n’est livrée ici,
+la capture d’une coupure/reconnexion physique attend l’opérateur. Voir
+PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt.

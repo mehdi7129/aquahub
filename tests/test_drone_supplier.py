@@ -26,6 +26,11 @@ SUPPLIER = Path(SUPPLIER_LOCATION) if SUPPLIER_LOCATION else None
 @unittest.skipUnless(SUPPLIER is not None and (SUPPLIER / "deploy.py").is_file(), "Fournisseur local absent ; fournir AQUAHUB_SUPPLIER_BUNDLE pour cette recette.")
 class SupplierContractTests(unittest.TestCase):
     def test_actual_supplier_script_private_mirror_and_exact_generated_files(self):
+        for number in (5, 3, 1, 4, 2):
+            with self.subTest(number=number):
+                self._assert_actual_supplier_target(number)
+
+    def _assert_actual_supplier_target(self, number):
         with tempfile.TemporaryDirectory(prefix="aquahub-supplier-test-") as temporary:
             root = Path(temporary)
             app = App(root)
@@ -38,8 +43,11 @@ class SupplierContractTests(unittest.TestCase):
             hub.parent.mkdir(parents=True)
             drone = root / "drone-expected.conf"
             subprocess.run([sys.executable, "-I", "-B", str(generator), "f::1", "5", str(hub)], check=True, stdout=subprocess.DEVNULL)
-            subprocess.run([sys.executable, "-I", "-B", str(generator), "drone", "5", str(drone)], check=True, stdout=subprocess.DEVNULL)
+            subprocess.run([sys.executable, "-I", "-B", str(generator), "drone", str(number), str(drone)], check=True, stdout=subprocess.DEVNULL)
+            hub.write_bytes(b"# Existing fleet: preserve this file byte for byte.\n" + hub.read_bytes())
+            hub.chmod(0o400)
             hub_before, inode_before = hub.read_bytes(), hub.stat().st_ino
+            mtime_before, mode_before = hub.stat().st_mtime_ns, hub.stat().st_mode
             remote_config = drone.read_text()
             def runner(args, **kwargs):
                 if args[0] == "/usr/bin/ssh" and args[-1] == module.REMOTE_READ:
@@ -48,15 +56,17 @@ class SupplierContractTests(unittest.TestCase):
                     return module._bounded_run(args, **kwargs)
                 raise AssertionError("Unexpected real command: " + repr(args))
             manager = DroneManager(app, runner=runner)
-            for number in range(1, 7):
-                path = manager._wg_path(number)
+            for candidate in range(1, 7):
+                path = manager._wg_path(candidate)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(WG_BYTES)
+            bundle_before = {str(path.relative_to(app.config.bundle_path)): module.sha256_file(path)
+                             for path in app.config.bundle_path.rglob("*") if path.is_file()}
             credentials = {"options": [], "fingerprint": IDENTITY["host_key_fingerprint"],
-                "host": "root@192.168.205.2", "env": {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}}
+                "host": "root@" + module.drone_address(number), "env": {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}}
             manager._hub_network = lambda: {"addresses": [], "routes": []}
             with patch.object(manager, "_ssh_credentials", return_value=credentials):
-                preflight = manager.preflight({"number": 5}, RequestContext(os.getuid(), os.getpid()))
+                preflight = manager.preflight({"number": number}, RequestContext(os.getuid(), os.getpid()))
             self.assertTrue(preflight["allowed"], preflight)
             plan = manager.preflights[preflight["preflight_id"]]
             remote_dir, log_path = root / "remote", root / "transport.jsonl"
@@ -72,17 +82,17 @@ with pathlib.Path(LOG).open("a") as stream: stream.write(json.dumps([name,args])
 if name=="scp":
     source,target=args[-2:]
     host,remote=target.split(":",1)
-    assert host=="root@192.168.205.2"
+    assert host==TARGET
     assert remote in ("/etc/mavlink-router/main.conf","/etc/wireguard/wg0.conf","/etc/dmx/main.config")
     filename={"/etc/mavlink-router/main.conf":"mavlink.conf","/etc/wireguard/wg0.conf":"wg0.conf","/etc/dmx/main.config":"dmx.config"}[remote]
     shutil.copyfile(source,pathlib.Path(REMOTE)/filename)
 elif name=="ssh":
-    assert args[-2]=="root@192.168.205.2"
+    assert args[-2]==TARGET
     assert args[-1] in ("mkdir -p /etc/dmx","(sleep 1 ; reboot) >/dev/null 2>&1 &")
 elif name=="docker":
     assert args==["compose","restart","net_setup","mavlink_router","gcs_reactor"]
 else: raise AssertionError(name)
-'''.replace("LOG", repr(str(log_path))).replace("REMOTE", repr(str(remote_dir)))
+'''.replace("LOG", repr(str(log_path))).replace("REMOTE", repr(str(remote_dir))).replace("TARGET", repr(credentials["host"]))
                 for tool in ("ssh", "scp", "docker"):
                     script = tools / tool
                     script.write_text(code)
@@ -96,11 +106,28 @@ else: raise AssertionError(name)
             self.assertIn("MQTT_SERVER=192.0.2.10,192.0.2.11", (remote_dir / "dmx.config").read_text())
             self.assertEqual(hub.read_bytes(), hub_before)
             self.assertEqual(hub.stat().st_ino, inode_before)
+            self.assertEqual(hub.stat().st_mtime_ns, mtime_before)
+            self.assertEqual(hub.stat().st_mode, mode_before)
+            private_hub = plan["runtime"] / "config/mavlink/config.conf"
+            self.assertFalse(private_hub.is_symlink())
+            self.assertNotEqual(private_hub.stat().st_ino, inode_before)
+            self.assertEqual(private_hub.read_bytes(), (plan["stage"] / "hub.conf").read_bytes())
+            self.assertEqual(module.sha256_file(hub), plan["expected_hub_sha"])
+            self.assertNotEqual(private_hub.read_bytes(), hub_before)
             self.assertFalse((app.config.bundle_path / "build").exists())
             calls = [json.loads(line) for line in log_path.read_text().splitlines()]
             self.assertEqual([call[0] for call in calls], ["scp", "docker", "scp", "ssh", "scp", "ssh"])
-            self.assertEqual(module.sha256_file(plan["runtime"] / "deploy.py"), module.KNOWN_FILES["deploy.py"])
-            self.assertEqual(module.sha256_file(app.config.bundle_path / "deploy.py"), module.KNOWN_FILES["deploy.py"])
+            self.assertEqual({call[1][-2] for call in calls if call[0] == "scp"}, {
+                str(plan["runtime"] / "build" / f"mavlink{number}.conf"),
+                str(plan["runtime"] / "config/wireguard/drones" / manager._wg_path(number).name),
+                str(plan["runtime"] / "build/main.config")})
+            self.assertEqual({str(path.relative_to(app.config.bundle_path)): module.sha256_file(path)
+                              for path in app.config.bundle_path.rglob("*") if path.is_file()}, bundle_before)
+            for relative, expected_sha in module.KNOWN_FILES.items():
+                self.assertEqual(module.sha256_file(app.config.bundle_path / relative), expected_sha)
+                self.assertEqual((app.config.bundle_path / relative).read_bytes(), (SUPPLIER / relative).read_bytes())
+                if relative != "install.sh":
+                    self.assertEqual(module.sha256_file(plan["runtime"] / relative), expected_sha)
             self.assertEqual([value["completed"] for value in app.progress], list(range(3, 10)))
             self.assertTrue(all(value["percent"] < 100 for value in app.progress))
             self.assertEqual(app.progress[-1]["phase"], "reboot")

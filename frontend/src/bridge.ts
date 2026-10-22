@@ -17,7 +17,7 @@ export async function request<T>(method: string, params: Record<string, unknown>
 
 const serviceNames = [ ['mqtt', 'MQTT'], ['fleet-controller', 'Fleet Controller'], ['gcs', 'GCS'], ['reactor', 'Reactor'], ['net-setup', 'Réseau'], ['mavlink-router', 'Routeur MAVLink'], ['rtcm', 'Corrections RTCM'], ['wireguard', 'WireGuard'] ];
 const mockStatus: HubStatus = {
-  version: '0.2.4-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
+  version: '0.2.5-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
   bundle_path: '/opt/exemple/aqua-hub-bundle', active_job: null,
   services: serviceNames.map(([id, name], index) => ({ id, name, state: 'running', health: index < 2 ? 'healthy' : null, image_id: `sha256:demo-${id}`, restarts: 0, started_at: new Date(Date.now() - 3600000).toISOString() })),
 };
@@ -37,7 +37,7 @@ const demoManualChecks = [
   {id:'firmware',label:'Versions Heron',details:'Relever les versions du firmware Heron et du chargeur de démarrage (BL).'},
   {id:'console',label:'Diagnostic matériel MAVLink',details:'Dans la console MAVLink de QGroundControl : uavcan status, gps status et listener esc_status.'},
 ];
-let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.4-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
+let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.5-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
 let demoInstallationStarted = 0;
 
 

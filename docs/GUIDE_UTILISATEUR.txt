@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.4
+Préproduction 0.2.5
 
 1. Disponibilité et installation
 
@@ -138,9 +138,14 @@ final attend le retour stable et les contrôles logiciels ; fermer la fenêtre
 n’arrête pas le travail.
 
 Configurer les appareils l’un après l’autre. Attendre la fin et vérifier le
-résultat du premier avant de sélectionner le suivant. La procédure utilise
-aussi une configuration partagée du hub : le travail parallèle n’est pas
-proposé et une seconde maintenance est bloquée pendant la première.
+résultat du premier avant de sélectionner le suivant. Depuis 0.2.5, choisir
+un numéro inférieur ne réduit pas la flotte du hub : sur un hub déjà préparé
+pour 1..5, ces appareils peuvent être choisis séparément sans ordre croissant.
+La configuration active du hub reste conservée et les scripts fournisseur
+restent inchangés. Un numéro absent nécessitant une extension, par exemple
+6 sur ce hub, est refusé ; AquaHub ne crée pas de nouvelle configuration réseau.
+La procédure peut relancer des services communs du hub : le travail parallèle
+n’est pas proposé et une seconde maintenance est bloquée pendant la première.
 
 Le numéro choisit les fichiers du bundle. AquaHub n’attribue pas d’adresse
 au drone et ne configure ni routeur ni DHCP.

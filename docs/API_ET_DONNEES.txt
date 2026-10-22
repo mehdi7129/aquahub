@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.4","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.5","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -89,6 +89,22 @@ Le plan appartient à l’UID qui l’a créé, expire après 600 secondes et ne
 sont revérifiés avant l’envoi ; les gardes sur le réseau restent inchangées.
 L’accès SSH préalablement configuré reste nécessaire : l’exception locale ne
 crée aucun accès et ne dispense pas d’approuver séparément une empreinte.
+
+Depuis 0.2.5, une cible inférieure à la flotte déjà préparée peut être acceptée
+sans changer la forme des requêtes ni le protocole 1. Le précontrôle vérifie
+que le hub actif couvre toutes les sections et options générées requises ;
+le résultat privé de la procédure fournisseur ne remplace pas le hub actif.
+Les empreintes generated_hub_sha et expected_hub_sha appartiennent au plan
+interne de l’agent, pas aux paramètres transmis par le client. Le résultat
+final de la tâche configure_drone conserve ses champs configured, verified,
+number, address, reboot_verified, ip_unchanged et manual_checklist.
+
+Un numéro absent du hub, par exemple 6 sur une flotte 1..5, ou une différence
+de configuration requise donne un précontrôle allowed=false avec le code
+ip_change_forbidden. Une configuration illisible ou ambiguë donne invalid_config.
+Le refus fleet_reduction n’est plus renvoyé pour un numéro inférieur déjà
+couvert : le hub actif est préservé au lieu d’être régénéré. La configuration
+reste séquentielle et conserve les mêmes gardes d’identité et de maintenance.
 
 Mises à jour du bundle :
   updates.check      Recherche de Releases, sans déploiement.

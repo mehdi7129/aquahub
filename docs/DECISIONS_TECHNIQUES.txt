@@ -1,5 +1,5 @@
 AquaHub — décisions techniques à préserver
-Référence : code 0.2.4. Les propositions futures sont marquées séparément.
+Référence : code 0.2.5. Les propositions futures sont marquées séparément.
 
 1. Application locale, agent distinct
 
@@ -46,9 +46,25 @@ Repères : drone.py, updates.py, network.py et CONTRAT_BUNDLE.txt.
 Décision : appareil et identité SSH vérifiés, précontrôle frais, confirmation
 de cible et opération sérialisée. Le numéro choisit les configurations du bundle.
 
-Pourquoi : les scripts utilisent aussi une configuration partagée du hub.
-Deux configurations concurrentes demanderaient un nouveau contrat. Un profil
-dans le bundle ou une réponse réseau ne prouve pas l’identité physique.
+Pourquoi : la procédure relance des services communs du hub et partage les
+gardes de maintenance. Deux configurations concurrentes demanderaient un nouveau
+contrat. Un profil dans le bundle ou une réponse réseau ne prouve pas l’identité
+physique. Le maintien de la sérialisation ne dépend pas d’une réécriture du hub.
+
+Depuis 0.2.5, le code fournisseur reste intact dans un miroir privé et y génère
+son propre fichier hub. Le hub actif demeure inchangé ; le transport Docker
+charge explicitement cette configuration active. Le précontrôle impose toutes
+les sections et options requises, avec noms et casse stricts, et permet les
+sections supplémentaires de la flotte. Il refuse les options supplémentaires
+d’une section requise et les configurations ambiguës. Les adresses peuvent
+être normalisées ; ports, modes, filtrages et multicast restent comparés.
+
+Pourquoi : choisir séparément 1..5 sur un hub déjà préparé pour 1..5 doit
+conserver sa flotte intégrale, ses octets et les scripts livrés. Une cible
+absente nécessitant une extension réseau, comme 6 sur ce hub, reste refusée.
+Le SHA du résultat privé et celui du hub actif initial sont des attentes
+distinctes ; les postcontrôles ne doivent pas les confondre. La recette avec
+transports interceptés vérifie aussi mode, inode et mtime du hub témoin.
 
 Depuis 0.2.4, vérification préalable et configuration sont sans autorisation
 administrateur interactive du PC pour le compte opérateur configuré. Ce droit

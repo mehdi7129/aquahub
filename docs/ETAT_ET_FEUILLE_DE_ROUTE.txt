@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.4 — état du code et qualification à poursuivre
+Préproduction 0.2.5 — état du code et qualification à poursuivre
 
 Développé
 
@@ -41,6 +41,14 @@ lors de drones.configure pour le compte opérateur autorisé. L’opération res
 une mutation sérialisée avec précontrôle frais et confirmation de l’identité.
 Les accès SSH et les autres interventions gardent leurs protections distinctes.
 Cette évolution ne modifie aucun script fournisseur ni paramètre réseau.
+
+La version 0.2.5 conserve intégralement le hub actif lors d’une configuration.
+Le numéro peut être choisi indépendamment de l’ordre de la flotte déjà couverte :
+les scripts inchangés écrivent leur génération du hub dans un miroir privé.
+Les sections/options requises sont comparées, les empreintes du hub actif
+vérifiées, et toute extension nécessitant un changement réseau reste refusée.
+Un outil privé de capture Ethernet et un workflow de tests génériques sont
+ajoutés. La panne de reconnexion n’est pas encore expliquée ni réparée.
 
 Validations initiales
 
@@ -106,13 +114,15 @@ pas établie. Capturer carrier, NetworkManager, DHCP, routes IPv4/IPv6, DNS et
 retour Internet et celui des Aqua_Drones, sans reboot et sans réécriture réseau.
 Aucune coupure ni relance de réseau n’est provoquée par cette mise à jour du plan.
 
-Configuration de flotte : la garde anti-réduction protège le hub, mais une
-reproduction hub 1..5 puis cible 3 est bloquée. Les cibles 1..4 et l’extension
-à 6 doivent disposer d’un parcours supporté conservant strictement l’existant.
-Ne pas contourner la protection ni modifier les scripts fournisseur.
+Configuration de flotte : le blocage des cibles 1..4 dans un hub 1..5 est
+traité par l’orchestration 0.2.5, sans réécrire le hub actif. Les essais des
+vrais scripts sur transports interceptés couvrent 5, 3, 1, 4 et 2. La recette
+physique reste à compléter ; l’extension à 6 exigeant un changement réseau
+reste volontairement refusée. Aucun script fournisseur n’est modifié.
 
-Ajouter aussi la reprise guidée après interruption, la rétention des fichiers
-de travail et les tests automatiques du dépôt aux travaux avant livraison.
+La reprise guidée après interruption et la rétention des fichiers de travail
+restent à réaliser. La CI est définie dans .github/workflows/ci.yml ; vérifier
+son résultat réel sur GitHub et conserver les essais matériels séparés.
 
 Contrat fournisseur et mises à jour du bundle
 

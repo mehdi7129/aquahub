@@ -109,8 +109,41 @@ def network_fields(text: str) -> tuple:
     return tuple(sorted(fields))
 
 
-def fleet_numbers(text: str) -> set[int]:
-    return {int(value) for value in re.findall(r"\[UdpEndpoint aqua_(\d+)_", text)}
+def hub_covers_generated(current: str, generated: str) -> bool:
+    """Check the supplier's complete required sections without changing the hub.
+
+    Additional sections retain the rest of the installed fleet. Extra options
+    inside a required section are refused because they may change its routing
+    or filtering even when its addresses match.
+    """
+    def sections(text):
+        parser = configparser.ConfigParser(interpolation=None, strict=True)
+        parser.optionxform = str
+        try:
+            parser.read_string(text)
+            if parser.defaults() or re.search(r"(?m)^[ \t]*\[DEFAULT\]", text) or not parser.sections():
+                raise ValueError()
+            if len({section.casefold() for section in parser.sections()}) != len(parser.sections()):
+                raise ValueError()
+            result = {}
+            for section in parser.sections():
+                options = {}
+                for key, value in parser.items(section, raw=True):
+                    value = value.strip()
+                    if key.lower() in ("address", "clientaddress"):
+                        if value.startswith("[") and value.endswith("]"):
+                            value = value[1:-1]
+                        value = str(ipaddress.ip_address(value))
+                    options[key] = value
+                if len({key.casefold() for key in options}) != len(options):
+                    raise ValueError()
+                result[section] = options
+            return result
+        except (configparser.Error, ValueError) as exc:
+            raise ApiError("invalid_config", "Configuration MAVLink du hub illisible ou ambiguë ; aucune écriture autorisée.") from exc
+
+    installed, required = sections(current), sections(generated)
+    return all(installed.get(section) == options for section, options in required.items())
 
 
 def stable_network(addresses: list, routes: list) -> dict:
@@ -389,6 +422,19 @@ class DroneManager:
                 raise ApiError("configuration_missing", "Un fichier requis du bundle est absent.")
         return result
 
+    def _read_mavlink(self, path):
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise ApiError("unsafe_path", "La configuration MAVLink doit être un fichier régulier.")
+            content = stream.read(MAX_READ + 1)
+        if len(content) > MAX_READ:
+            raise ApiError("invalid_config", "La configuration MAVLink dépasse la taille autorisée.")
+        return content
+
+    def _read_hub(self):
+        return self._read_mavlink(self._bundle() / "config/mavlink/config.conf")
+
     def _copy_verified_code(self, relative, target):
         """Execute the same bytes that were checked, from a private directory."""
         descriptor = os.open(self._bundle() / relative, os.O_RDONLY | os.O_NOFOLLOW)
@@ -429,21 +475,19 @@ class DroneManager:
             if saved.get("identity") and saved["identity"] != identity:
                 raise ApiError("identity_mismatch", "L’identité de cet appareil a changé. Association existante conservée ; intervention requise.")
             checks.append({"label": "Clé SSH approuvée et identité stable lues", "ok": True})
-            bundle = self._bundle()
             generator = stage / "generator/main.py"
             self._copy_verified_code("mavlink-config-generator/main.py", generator)
             generated_hub, generated_drone = stage / "hub.conf", stage / "drone.conf"
             self.runner([sys.executable, "-I", "-B", str(generator), "f::1", str(number), str(generated_hub)], timeout=10, env=credentials["env"])
             self.runner([sys.executable, "-I", "-B", str(generator), "drone", str(number), str(generated_drone)], timeout=10, env=credentials["env"])
-            current_hub = (bundle / "config/mavlink/config.conf").read_text()
+            current_hub_bytes = self._read_hub()
+            current_hub = current_hub_bytes.decode("utf-8")
             future_hub, future_drone = generated_hub.read_text(), generated_drone.read_text()
             generated_hub.chmod(0o600)
             generated_drone.chmod(0o600)
-            if not fleet_numbers(current_hub).issubset(fleet_numbers(future_hub)):
-                raise ApiError("fleet_reduction", "Le générateur réduirait la flotte du hub. Choisir ce numéro seul est refusé.")
-            checks.append({"label": "Flotte du hub conservée", "ok": True})
-            if network_fields(current_hub) != network_fields(future_hub):
-                raise ApiError("ip_change_forbidden", "La configuration générée changerait un champ réseau du hub. Aucune IP ne sera modifiée.")
+            if not hub_covers_generated(current_hub, future_hub):
+                raise ApiError("ip_change_forbidden", f"Le hub actif ne couvre pas à l’identique la configuration requise par Aqua_Drone_{number}. Une extension ou modification de sa configuration réseau est refusée ; aucune IP ne sera modifiée.")
+            checks.append({"label": "Flotte et configuration du hub conservées intégralement", "ok": True})
             if network_fields(remote["mavlink"]) != network_fields(future_drone):
                 raise ApiError("ip_change_forbidden", "La configuration générée changerait un champ réseau du drone. Action bloquée.")
             if sha256_file(self._wg_path(number)) != remote["wg_hash"]:
@@ -455,9 +499,12 @@ class DroneManager:
             if not {"mavlink-router.service", "wg0.service", "mqtt-bridge.service", "dmx-scheduler.service"}.issubset(required):
                 raise ApiError("services_unknown", "Les services MAVLink, WireGuard, MQTT et DMX attendus doivent être actifs avant configuration.")
             hashes, hub_network = self._hashes(number), self._hub_network()
+            if hashes["config/mavlink/config.conf"] != hashlib.sha256(current_hub_bytes).hexdigest():
+                raise ApiError("configuration_changed", "La configuration du hub a changé pendant les précontrôles.")
             plan = {"number": number, "stage": stage, "credentials": credentials, "remote": remote,
                 "identity": identity, "hashes": hashes, "hub_network": hub_network,
                 "generated_hub_sha": sha256_file(generated_hub), "generated_drone_sha": sha256_file(generated_drone),
+                "expected_hub_sha": hashes["config/mavlink/config.conf"],
                 "created": time.time(), "uid": uid, "required_services": sorted(required), "used": False}
             with self.lock:
                 self.preflights[token] = plan
@@ -554,36 +601,34 @@ else: refuse()
         return tools
 
     def _deploy(self, plan):
-        # The supplier code remains unchanged. Its private execution mirror has
-        # one intentional live-file mapping: the already-verified hub config.
-        # Holding that regular inode prevents a pathname swap to another file.
-        hub = self._bundle() / "config/mavlink/config.conf"
-        descriptor = os.open(hub, os.O_RDWR | os.O_NOFOLLOW)
-        try:
-            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-                raise ApiError("unsafe_path", "La configuration du hub doit être un fichier régulier.")
-            current = os.read(descriptor, MAX_READ + 1)
-            if len(current) > MAX_READ or hashlib.sha256(current).hexdigest() != plan["hashes"]["config/mavlink/config.conf"]:
-                raise ApiError("configuration_changed", "La configuration du hub a changé avant son ouverture.")
-            runtime = _private_dir(plan["stage"] / "runtime")
-            for relative in ("deploy.py", "mavlink-config-generator/main.py", "docker-compose.yml"):
-                self._copy_verified_code(relative, runtime / relative)
-            hub_mapping = runtime / "config/mavlink/config.conf"
-            hub_mapping.parent.mkdir(parents=True, mode=0o700)
-            hub_mapping.symlink_to(f"/proc/self/fd/{descriptor}")
-            wg_source = self._wg_path(plan["number"])
-            wg_target = runtime / "config/wireguard/drones" / wg_source.name
-            wg_target.parent.mkdir(parents=True, mode=0o700)
-            raw_wg = wg_source.read_bytes()
-            if len(raw_wg) > 128 * 1024 or hashlib.sha256(raw_wg).hexdigest() != plan["remote"]["wg_hash"]:
-                raise ApiError("configuration_changed", "La configuration WireGuard a changé avant son envoi.")
-            wg_target.write_bytes(raw_wg)
-            wg_target.chmod(0o600)
-            plan["runtime"], plan["hub_fd"] = runtime, descriptor
-            return self._deploy_pty(plan)
-        finally:
-            os.close(descriptor)
-            plan.pop("hub_fd", None)
+        # The supplier writes its generated hub configuration only inside this
+        # private mirror. Our Docker transport reloads the unchanged active
+        # bundle, whose complete required sections were checked beforehand.
+        current = self._read_hub()
+        if hashlib.sha256(current).hexdigest() != plan["expected_hub_sha"]:
+            raise ApiError("configuration_changed", "La configuration du hub a changé avant son ouverture.")
+        runtime = _private_dir(plan["stage"] / "runtime")
+        for relative in ("deploy.py", "mavlink-config-generator/main.py", "docker-compose.yml"):
+            self._copy_verified_code(relative, runtime / relative)
+        private_hub = runtime / "config/mavlink/config.conf"
+        private_hub.parent.mkdir(parents=True, mode=0o700)
+        private_hub.write_bytes(current)
+        private_hub.chmod(0o600)
+        wg_source = self._wg_path(plan["number"])
+        wg_target = runtime / "config/wireguard/drones" / wg_source.name
+        wg_target.parent.mkdir(parents=True, mode=0o700)
+        raw_wg = wg_source.read_bytes()
+        if len(raw_wg) > 128 * 1024 or hashlib.sha256(raw_wg).hexdigest() != plan["remote"]["wg_hash"]:
+            raise ApiError("configuration_changed", "La configuration WireGuard a changé avant son envoi.")
+        wg_target.write_bytes(raw_wg)
+        wg_target.chmod(0o600)
+        plan["runtime"] = runtime
+        result = self._deploy_pty(plan)
+        if hashlib.sha256(self._read_mavlink(private_hub)).hexdigest() != plan["generated_hub_sha"]:
+            raise ApiError("postcheck_failed", "La configuration privée générée par le fournisseur diffère du résultat précontrôlé.")
+        if hashlib.sha256(self._read_hub()).hexdigest() != plan["expected_hub_sha"]:
+            raise ApiError("postcheck_failed", "La configuration active du hub a changé ; les sauvegardes sont conservées.")
+        return result
 
     def _deploy_pty(self, plan):
         number = plan["number"]
@@ -602,8 +647,7 @@ else: refuse()
         master, slave = os.openpty()
         runtime = plan.get("runtime", self._bundle())
         proc = subprocess.Popen([sys.executable, "-I", "-B", str(runtime / "deploy.py")],
-            stdin=slave, stdout=slave, stderr=slave, cwd=runtime, env=env, start_new_session=True,
-            pass_fds=(plan["hub_fd"],) if "hub_fd" in plan else ())
+            stdin=slave, stdout=slave, stderr=slave, cwd=runtime, env=env, start_new_session=True)
         os.close(slave)
         chunks, buffer, index = bytearray(), "", 0
         deadline = time.monotonic() + DEPLOY_TIMEOUT
@@ -746,7 +790,7 @@ else: refuse()
                                 "IP et routes du drone": candidate["network"] == before["network"],
                                 "configuration MAVLink": candidate["mavlink"] == expected_mavlink,
                                 "services embarqués": set(plan["required_services"]).issubset(candidate["services"]),
-                                "configuration du hub": sha256_file(self._bundle() / "config/mavlink/config.conf") == plan["generated_hub_sha"],
+                                "configuration du hub": hashlib.sha256(self._read_hub()).hexdigest() == plan["expected_hub_sha"],
                                 "IP et routes du hub": self._hub_network() == plan["hub_network"],
                             }
                             pending_checks = [label for label, ok in postchecks.items() if not ok]
@@ -774,7 +818,7 @@ else: refuse()
                 raise ApiError("postcheck_failed", "La configuration MAVLink attendue n’a pas été vérifiée sur le drone.")
             if not set(plan["required_services"]).issubset(after["services"]):
                 raise ApiError("postcheck_failed", "Un service embarqué attendu n’est pas actif après le retour.")
-            if sha256_file(self._bundle() / "config/mavlink/config.conf") != plan["generated_hub_sha"] or self._hub_network() != plan["hub_network"]:
+            if hashlib.sha256(self._read_hub()).hexdigest() != plan["expected_hub_sha"] or self._hub_network() != plan["hub_network"]:
                 raise ApiError("postcheck_failed", "La configuration ou le réseau du hub diffère du résultat attendu.")
             saved = self._saved()
             saved[str(number)] = {"identity": plan["identity"], "configured": True, "last_seen": time.time()}

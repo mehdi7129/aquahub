@@ -1,4 +1,5 @@
 AquaHub — contrat d’intégration du bundle
+Référence : préproduction AquaHub 0.2.5.
 
 1. Principe
 
@@ -27,9 +28,33 @@ paramètres réseau locaux/distants. Le précontrôle produit un identifiant
 temporaire associé à une cible. L’exécution vérifie à nouveau sa fraîcheur
 et la confirmation d’identité.
 
-Le modèle de flotte du hub ne doit pas être réduit implicitement lorsqu’un
-numéro inférieur est sélectionné. Une procédure qui régénère le hub doit
-conserver les appareils déjà configurés. Les tests de contrat le vérifient.
+Depuis AquaHub 0.2.5, configurer un appareil ne réécrit pas le hub actif.
+Le générateur et deploy.py reconnus sont copiés octet pour octet dans un
+miroir privé ; leur config/mavlink/config.conf est un fichier régulier privé.
+Le fournisseur y génère sa configuration habituelle 1..N, où N est le numéro
+choisi, et transfère uniquement les trois fichiers attendus à cet appareil.
+Le garde Docker relance explicitement les services du bundle actif, dont la
+configuration reste intégrale. Aucun script, générateur ou Compose fournisseur
+n’est modifié ; le nombre d’appareils n’est pas contourné en sélectionnant
+les autres drones.
+
+Avant toute exécution, toutes les sections générées requises doivent exister
+dans le hub actif, avec l’intégralité de leurs options. Les noms et leur casse
+sont conservés, les adresses normalisées et les autres valeurs comparées.
+Les options supplémentaires d’une section requise, DEFAULT et les doublons
+ambigus sont refusés ; les sections de flotte supplémentaires sont conservées.
+Un hub déjà préparé pour 1..5 permet donc de choisir séparément ces appareils,
+sans imposer un ordre croissant. Une cible 6 absente de ce hub reste refusée :
+ajouter ou changer des paramètres réseau n’appartient pas à ce parcours.
+
+generated_hub_sha vérifie les octets produits dans le miroir ; expected_hub_sha
+désigne le hub actif initial, qui doit rester identique après la procédure et
+le retour du drone. La recette utilise les vrais scripts sur fichiers témoins,
+avec SSH, SCP, Docker et reboot interceptés. Elle vérifie les cinq cibles et
+la conservation du contenu, mode, inode et mtime du hub, ainsi que les
+empreintes des autres fichiers du bundle et du code fournisseur. Elle ne
+configure pas de drone physique. Voir TESTS.txt et REPRISE_DEVELOPPEMENT.txt,
+section 16.
 Les erreurs partielles d’un script ne deviennent pas des réussites parce
 que son code de retour final est zéro.
 

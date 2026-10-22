@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.2.4. Il complète
+Ce document décrit les sources de la préproduction 0.2.5. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -203,9 +203,29 @@ la barre conserve son remplissage dès qu’un pourcentage réel est disponible,
 même lorsque indeterminate indique une attente. Un spinner séparé signale
 l’activité ; la barre n’est indéterminée qu’en l’absence de pourcentage.
 100 % attend les contrôles finaux.
-La configuration est séquentielle : le générateur modifie aussi un fichier
-partagé du hub, ce qui interdit de configurer plusieurs appareils en parallèle
-sans nouveau contrat. Voir docs/SECURITE.txt.
+Depuis 0.2.5, le numéro sélectionné est indépendant de la taille de la flotte
+déjà préparée sur le hub. hub_covers_generated() compare chaque section requise
+par le générateur fournisseur et toutes ses options au hub actif. Les noms
+de sections et d’options restent stricts ; seules les écritures équivalentes
+des adresses sont normalisées. Les sections supplémentaires de la flotte sont
+conservées ; options supplémentaires dans une section requise, DEFAULT et
+doublons ambigus de casse sont refusés. Une cible absente nécessitant une
+extension réseau, par exemple 6 sur un hub 1..5, reste bloquée.
+
+Le générateur et deploy.py sont exécutés sans modification dans un miroir
+privé. config/mavlink/config.conf y est un fichier régulier privé, sans lien
+ni descripteur inscriptible vers le hub actif. Le transport Docker contrôlé
+relance les services du bundle actif avec sa configuration inchangée. Le SHA
+generated_hub_sha vérifie le résultat privé ; expected_hub_sha désigne les
+octets initiaux du hub actif, revérifiés après la procédure et au retour du
+drone. Les lectures MAVLink sont bornées, sans suivi de lien, avec contrôle
+de fichier régulier et ouverture non bloquante pour refuser aussi un FIFO.
+La recette fournisseur interceptée conserve contenu, mode, inode et mtime du
+hub témoin, y compris pour les cibles inférieures à sa flotte.
+
+La configuration reste séquentielle : elle relance des services communs du
+hub et partage les gardes de maintenance. Aucune configuration parallèle n’est
+proposée. Voir docs/SECURITE.txt et REPRISE_DEVELOPPEMENT.txt, section 16.
 
 updates.py inspecte les archives, valide un manifeste et prépare les tâches.
 Le contrat d’application implémenté est image-refresh-v1 : changement d’images

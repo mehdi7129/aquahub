@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
+import sys
 import tarfile
 import tempfile
 import threading
@@ -113,6 +115,36 @@ class DroneParsingTests(unittest.TestCase):
         for invalid in ("not a config", "[Endpoint]\nAddress=garbage\n", "[Endpoint]\nPort=42\n"):
             with self.assertRaises(ApiError):
                 network_fields(invalid)
+
+    def test_hub_coverage_checks_complete_sections_and_preserves_extra_fleet(self):
+        required = ("[General]\nDebugLogLevel=info\nMavlinkDialect=auto\nDeDuplicationPeriod=300\n"
+                    "[UdpEndpoint aqua_1_ipv6]\nMode=server_connected\nAddress=[fd00:100::1]\n"
+                    "Port=14555\nClientAddress=[f::1]\nClientPort=14550\nAllowSrcSysIn=255\n"
+                    "AllowSrcSysOut=1\nSendGroup=aqua_1\n"
+                    "[UdpEndpoint gcs_multicast]\nMode=server\nAddress=[::]\nPort=14556\n")
+        installed = required + "[UdpEndpoint aqua_2_ipv4_1]\nMode=server\nAddress=192.168.101.2\nPort=14558\n"
+        self.assertTrue(module.hub_covers_generated(installed, required))
+        self.assertTrue(module.hub_covers_generated(installed.replace("[f::1]", "[000f:0000:0000:0000:0000:0000:0000:0001]"), required))
+        for before, after in (("Port=14555", "Port=14554"), ("ClientPort=14550", "ClientPort=14551"),
+                              ("Mode=server_connected", "Mode=server"), ("AllowSrcSysIn=255", "AllowSrcSysIn=1"),
+                              ("AllowSrcSysOut=1", "AllowSrcSysOut=2"), ("MavlinkDialect=auto", "MavlinkDialect=common"),
+                              ("DeDuplicationPeriod=300", "DeDuplicationPeriod=0"),
+                              ("Port=14556", "Port=14557"), ("SendGroup=aqua_1", "SendGroup=aqua_2"),
+                              ("ClientAddress=[f::1]", "ClientAddress=[f::2]"),
+                              ("Address=[fd00:100::1]", "Address=[fd00:100::2]"),
+                              ("Port=14555", "pOrT=14555"),
+                              ("Port=14555", "Port=14555\nAllowMsgIdOut=0")):
+            with self.subTest(change=before):
+                self.assertFalse(module.hub_covers_generated(installed.replace(before, after), required))
+        self.assertFalse(module.hub_covers_generated(required.partition("[UdpEndpoint gcs_multicast]")[0], required))
+        for ambiguous in (required + "[General]\nOther=1\n", required.replace("Port=14555", "Port=14555\nPort=14555"),
+                          required + "[general]\nOther=1\n", required.replace("Port=14555", "Port=14555\npOrT=14555"),
+                          required + "[udpendpoint aqua_1_ipv6]\nAddress=[fd00:100::1]\n",
+                          "[DEFAULT]\nMode=server\n" + required, "[DEFAULT]\n" + required,
+                          required.replace("Address=[::]", "Address=[[::]]")):
+            with self.subTest(config=ambiguous), self.assertRaises(ApiError) as caught:
+                module.hub_covers_generated(ambiguous, required)
+            self.assertEqual(caught.exception.code, "invalid_config")
 
     def test_read_only_remote_snapshot_parsing(self):
         value = parse_remote(remote_payload())
@@ -361,12 +393,65 @@ class DroneManagerTests(unittest.TestCase):
         self.assertEqual(self.app.jobs, [])
         self.assertTrue(all("-I" in args for args, _ in self.runner.calls if args[-1].endswith(".conf")))
 
-    def test_fleet_reduction_refused_without_sending_files(self):
+    def test_existing_larger_fleet_is_preserved_without_sending_files(self):
         (self.app.config.bundle_path / "config/mavlink/config.conf").write_text(hub_config(6))
         result = self.preflight()
-        self.assertFalse(result["allowed"])
-        self.assertEqual(result["code"], "fleet_reduction")
+        self.assertTrue(result["allowed"], result)
+        plan = self.manager.preflights[result["preflight_id"]]
+        self.assertNotEqual(plan["expected_hub_sha"], plan["generated_hub_sha"])
+        self.assertEqual((self.app.config.bundle_path / "config/mavlink/config.conf").read_text(), hub_config(6))
         self.assertFalse(any(args[0].endswith("scp") for args, _ in self.runner.calls))
+
+    def test_fleet_targets_can_be_checked_in_any_order_but_extension_is_refused(self):
+        hub = self.app.config.bundle_path / "config/mavlink/config.conf"
+        original = hub.read_bytes()
+        for number in (5, 3, 1, 4, 2):
+            self.runner.remote_kwargs["mavlink"] = drone_config(number)
+            result = self.manager.preflight({"number": number}, self.context)
+            self.assertTrue(result["allowed"], result)
+            self.assertEqual(result["number"], number)
+            self.assertEqual(hub.read_bytes(), original)
+        result = self.manager.preflight({"number": 6}, self.context)
+        self.assertFalse(result["allowed"])
+        self.assertEqual(result["code"], "ip_change_forbidden")
+        self.assertIn("Aqua_Drone_6", result["message"])
+        self.assertIn("extension", result["message"])
+        self.assertEqual(hub.read_bytes(), original)
+        self.assertFalse(any(args[0].endswith("scp") for args, _ in self.runner.calls))
+
+    def test_hub_change_between_semantic_check_and_fingerprint_is_refused(self):
+        hub = self.app.config.bundle_path / "config/mavlink/config.conf"
+        real_hashes = self.manager._hashes
+        def changed_hashes(number):
+            hub.write_text(hub_config().replace("192.168.101.5", "192.168.120.5"))
+            return real_hashes(number)
+        with patch.object(self.manager, "_hashes", side_effect=changed_hashes):
+            result = self.preflight()
+        self.assertFalse(result["allowed"])
+        self.assertEqual(result["code"], "configuration_changed")
+        self.assertEqual(self.manager.preflights, {})
+        self.assertFalse(any(args[0].endswith("scp") for args, _ in self.runner.calls))
+
+    def test_hub_fifo_is_refused_without_waiting_for_a_writer(self):
+        hub = self.app.config.bundle_path / "config/mavlink/config.conf"
+        hub.unlink()
+        os.mkfifo(hub, 0o600)
+        code = '''from pathlib import Path
+import sys
+from types import SimpleNamespace
+from aquahub_agent.drone import DroneManager
+from aquahub_agent.security import ApiError
+manager = DroneManager.__new__(DroneManager)
+manager.app = SimpleNamespace(config=SimpleNamespace(bundle_path=Path(sys.argv[1])))
+try:
+    manager._read_hub()
+except ApiError as exc:
+    print(exc.code)
+'''
+        result = subprocess.run([sys.executable, "-c", code, str(self.app.config.bundle_path)],
+                                capture_output=True, text=True, timeout=3)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "unsafe_path")
 
     def test_hub_and_drone_network_changes_refused(self):
         hub = self.app.config.bundle_path / "config/mavlink/config.conf"
@@ -559,6 +644,45 @@ class DroneManagerTests(unittest.TestCase):
         self.assertTrue(inventory["configured"] and inventory["identity_verified"])
         with self.assertRaises(ApiError):
             self.configure(result)
+
+    def test_lower_target_success_verifies_original_hub_not_private_generated_subset(self):
+        number = 3
+        hub = self.app.config.bundle_path / "config/mavlink/config.conf"
+        original, original_inode = hub.read_bytes(), hub.stat().st_ino
+        self.runner.remote_kwargs["mavlink"] = drone_config(number)
+        result = self.manager.preflight({"number": number}, self.context)
+        self.assertTrue(result["allowed"], result)
+        plan = self.manager.preflights[result["preflight_id"]]
+        self.assertNotEqual(plan["generated_hub_sha"], plan["expected_hub_sha"])
+        states = deque((False, True))
+        self.manager._reachable = lambda number: states.popleft() if states else True
+        def deploy(plan):
+            self.runner.rebooted = True
+            return {"automatic_completed": 7, "manual_skipped": 5, "failed": 0}
+        with patch.object(self.manager, "_deploy", side_effect=deploy), patch.object(module.time, "sleep"):
+            output = self.manager.configure({"number": number, "preflight_id": result["preflight_id"],
+                                             "confirmed_identity": result["identity"]}, self.context)
+        self.assertTrue(output["result"]["verified"])
+        self.assertEqual(output["result"]["number"], number)
+        self.assertEqual(hub.read_bytes(), original)
+        self.assertEqual(hub.stat().st_ino, original_inode)
+        self.assertEqual([entry["number"] for entry in self.manager.list()["drones"] if entry["configured"]], [number])
+
+    def test_supplier_private_hub_mismatch_is_refused_without_touching_active_hub(self):
+        result = self.preflight()
+        plan = self.manager.preflights[result["preflight_id"]]
+        hub = self.app.config.bundle_path / "config/mavlink/config.conf"
+        original = hub.read_bytes()
+        def deploy(plan):
+            private_hub = plan["runtime"] / "config/mavlink/config.conf"
+            self.assertFalse(private_hub.is_symlink())
+            self.assertEqual(stat.S_IMODE(private_hub.stat().st_mode), 0o600)
+            private_hub.write_text(hub_config(1))
+            return {"automatic_completed": 7, "manual_skipped": 5, "failed": 0}
+        with patch.object(self.manager, "_deploy_pty", side_effect=deploy), self.assertRaises(ApiError) as caught:
+            self.manager._deploy(plan)
+        self.assertEqual(caught.exception.code, "postcheck_failed")
+        self.assertEqual(hub.read_bytes(), original)
 
     def test_corrupt_backup_refused_before_deployment(self):
         result = self.preflight()

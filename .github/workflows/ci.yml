@@ -1,0 +1,116 @@
+name: Checks
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debian-13-amd64:
+    name: Debian 13 amd64 / sources and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      # Official Debian 13 linux/amd64 manifest; refresh deliberately.
+      image: debian:13@sha256:15a71cc87173e191d5046f9c4288db4e8954b67f92e48d9587087826b0afe562
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      AQUAHUB_TEST_DOCKER: "0"
+      AQUAHUB_TEST_GTK: "0"
+      AQUAHUB_SUPPLIER_BUNDLE: ""
+      PYTHONDONTWRITEBYTECODE: "1"
+      CI: "true"
+    steps:
+      - name: Prepare isolated build tools
+        run: |
+          set -euo pipefail
+          test "$(dpkg --print-architecture)" = amd64
+          apt-get -o Acquire::Retries=3 update
+          apt-get -o Acquire::Retries=3 install --yes --no-install-recommends \
+            build-essential ca-certificates desktop-file-utils dpkg-dev git \
+            libgtk-4-dev nodejs npm passwd pkg-config python3 util-linux
+          useradd --create-home --uid 10001 --shell /bin/bash aquahub-ci
+          python3 --version
+          node --version
+          npm --version
+
+      - name: Read sources
+        # actions/checkout v4.2.2; pinned to the upstream commit.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Give the build user its workspace
+        run: chown -R aquahub-ci:aquahub-ci "$GITHUB_WORKSPACE"
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: /usr/sbin/runuser -u aquahub-ci -- npm ci
+
+      - name: Check TypeScript
+        working-directory: frontend
+        run: /usr/sbin/runuser -u aquahub-ci -- npm run check
+
+      - name: Test frontend rules
+        working-directory: frontend
+        run: /usr/sbin/runuser -u aquahub-ci -- npm test
+
+      - name: Build the interface
+        working-directory: frontend
+        run: /usr/sbin/runuser -u aquahub-ci -- npm run build
+
+      - name: Test Python and fixture packages
+        run: |
+          /usr/sbin/runuser -u aquahub-ci -- env PYTHONPATH=agent:desktop \
+            python3 -m unittest discover -s tests -v
+
+      - name: Build and inspect the application package without installing it
+        run: |
+          /usr/sbin/runuser -u aquahub-ci -- bash <<'BASH'
+          set -euo pipefail
+          candidate="$(mktemp -d)"
+          trap 'rm -rf "$candidate"' EXIT
+          version="$(node -p "require('./frontend/package.json').version")"
+          python3 installer/build_package.py --application-only \
+            --version "$version" --output "$candidate/aquahub.deb"
+          dpkg-deb --extract "$candidate/aquahub.deb" "$candidate/root"
+          dpkg-deb --control "$candidate/aquahub.deb" "$candidate/control"
+          export AQUAHUB_CI_CANDIDATE="$candidate"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          candidate = Path(os.environ['AQUAHUB_CI_CANDIDATE'])
+          package = candidate / 'aquahub.deb'
+          root = candidate / 'root'
+          expected = json.loads(Path('frontend/package.json').read_text())['version']
+          for field, value in (('Version', expected), ('Architecture', 'amd64'),
+                               ('X-AquaHub-Update', 'application-only')):
+              actual = subprocess.check_output(['dpkg-deb', '-f', str(package), field], text=True).strip()
+              if actual != value:
+                  raise SystemExit(f'Unexpected package field: {field}')
+          if (root / 'usr/share/aquahub/offline').exists():
+              raise SystemExit('An application update must not contain an offline supplier kit')
+          for filename in ('index.html', 'app.js', 'styles.css'):
+              if (root / 'usr/share/aquahub/frontend' / filename).read_bytes() != (Path('frontend/dist') / filename).read_bytes():
+                  raise SystemExit(f'Packaged frontend differs from the tested build: {filename}')
+          for desktop in (root / 'usr/share/applications').glob('*.desktop'):
+              subprocess.run(['desktop-file-validate', str(desktop)], check=True)
+          for name in ('preinst', 'postinst', 'prerm', 'postrm'):
+              subprocess.run(['sh', '-n', str(candidate / 'control' / name)], check=True)
+          print('Application package: metadata, tested frontend and desktop entries verified; not installed.')
+          PY
+          BASH
