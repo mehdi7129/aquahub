@@ -61,6 +61,9 @@ de domaine JavaScript. Les vrais scripts fournisseur sont exercés avec des
 transports interceptés ; aucune configuration physique n’est déduite de ces
 tests. Les résultats d’identité native 0.2.3 restent consignés séparément.
 Ces résultats ne qualifient pas une flotte ou un kit client générique.
+Une recette matérielle séparée configure Aqua_Drone_5 avec redémarrage et
+retour vérifiés, sans changement des IP/routes ni des fichiers du hub.
+Les cinq contrôles matériels manuels restent distincts de cette validation.
 
 ## Prochains chantiers
 
@@ -71,6 +74,10 @@ Ces résultats ne qualifient pas une flotte ou un kit client générique.
   et la récupération après incident restent à compléter. Voir le
   [plan consolidé](docs/PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt).
   Aucune modification des scripts fournisseur ou des IP n’est autorisée par ce plan.
+- **Reprise et rétention** : les scénarios, protections et critères de test
+  sont définis dans les plans de [reprise après interruption](docs/PLAN_REPRISE_APRES_INTERRUPTION.txt)
+  et de [conservation des fichiers](docs/PLAN_RETENTION_ET_QUOTAS.txt).
+  Leur implémentation reste un lot distinct ; aucun nettoyage n’est activé.
 - **Bundle fournisseur v1.0.1** : préparer le flux Git + registre, préserver
   les configurations client et qualifier le correctif WireGuard. Voir le
   [plan distinct](docs/PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt).

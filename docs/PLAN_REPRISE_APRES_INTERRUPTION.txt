@@ -1,0 +1,329 @@
+AquaHub — plan de reprise après interruption
+22 octobre 2026 — conception du lot B ; référence de code : 0.2.5
+Statut : proposition technique à relire avant implémentation et qualification.
+
+1. Objet et limites
+
+Ce document précise le lot B de PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt.
+Il décrit un développement futur. Les sources et la qualification de 0.2.5
+restent inchangées ; aucun parcours de récupération nouveau n’est livré par
+ce document. Il ne constitue pas un résultat de recette matérielle.
+
+Objectif : après disparition de l’agent ou du PC, retrouver l’opération,
+présenter ce qui est établi et ce qui reste inconnu, puis guider une
+vérification consultative ou une restauration explicitement confirmée.
+
+Invariants pour toute réalisation :
+- Aucun changement des octets du code, des scripts ou du Compose fournisseur.
+  L’orchestration et les gardes appartiennent uniquement à AquaHub.
+- Aucune réécriture d’IP, route, DNS, profil, métrique ou configuration réseau
+  pour retrouver un ancien constat ou obtenir un contrôle favorable.
+- Aucun redémarrage, transfert SSH, chargement d’image, installation ou rejeu
+  automatique d’une mutation au démarrage de l’agent ou à l’ouverture de la GUI.
+- Une tâche interrompue reste historiquement interrompue. Une vérification
+  ultérieure de l’état courant ne transforme pas son résultat en succès.
+- Les preuves réelles, archives, identités, accès et configurations restent
+  privées. Les réponses de la GUI ne contiennent ni secrets ni chemins libres.
+
+La panne RJ45 reste un diagnostic distinct. Aucun test de coupure du PC,
+de service ou de drone n’est déclenché pour rédiger ou relire ce plan.
+
+2. Comportement existant vérifié dans les sources
+
+Store utilise SQLite WAL et synchronous=FULL. Application.__init__ appelle
+interrupt_jobs après acquisition du verrou d’agent. Les tâches queued/running
+deviennent interrupted avec l’erreur agent_restarted et leur dernier progrès
+persistant. Elles ne sont pas exécutées à nouveau ; un événement global
+jobs_interrupted est enregistré. Références : store.py:33, :148, :156 et
+core.py:53, dans agent/aquahub_agent/.
+
+status.get expose vingt tâches récentes et active_job. Au chargement, la GUI
+n’adopte que la tâche active. Le bandeau courant n’affiche pas durablement
+les interruptions et ne les retrouve pas après fermeture. Les gardes ordinaires
+n’assimilent pas interrupted à une maintenance active. Références : core.py:253,
+:341, :349 ; frontend/src/app.ts:120, :278, :561.
+
+Configuration drone : le dossier du précontrôle contient les configurations
+prévues, une archive des trois fichiers distants, state-before.json, le hub
+initial et une trace fournisseur. Le plan complet reste en mémoire. L’identité,
+les réseaux et les empreintes sauvegardés ne suffisent pas à reconstituer
+tous les attendus : boot_id initial, MQTT attendu et services requis doivent
+notamment être persistés. inventory.json conserve un ancien configured=true
+si une nouvelle configuration s’interrompt ; la GUI peut alors afficher une
+réussite antérieure sans rendre visible l’incertitude actuelle. Références :
+drone.py:237, :254, :714, :745, :760, :823 ; frontend/src/app.ts:232.
+
+Mise à jour du bundle : un snapshot d’images/configurations/réseau précède
+la bascule. Une exception capturée déclenche une tentative de restauration.
+Une coupure électrique ou un arrêt forcé ne garantit pas ce passage. Le
+pointeur last-rollback.json n’est écrit qu’après succès ; rollback exige un
+snapshot completed=true et les images finales attendues. Un snapshot partiel
+ne possède donc pas encore de parcours de récupération pris en charge.
+Références : updates.py:626, :713, :727, :733, :743.
+
+Mise à jour d’AquaHub : le helper indépendant et son état scheduled/installing
+ont leur propre récupération. Après délai, unité absente et verrou disponible,
+AppUpdates contrôle l’état dpkg, la version installée et celle de l’agent,
+sans réauthentifier le fichier .deb ni relancer l’installation.
+Un contrôle incertain conserve le blocage. Préserver cette distinction ; ne
+pas traiter cette installation comme une tâche ordinaire disparue avec l’agent.
+Références : app_updates.py:111, :162, :360 ; installer/application_upgrade.py:144.
+
+Les JSON temporaires sont fsync avant renommage, mais leur répertoire n’est
+pas synchronisé après celui-ci. Les archives drone ne sont pas explicitement
+fsync avant l’envoi. Atomicité et durabilité après perte d’alimentation sont
+deux propriétés distinctes. Référence : updates.py:84 et drone.py:751.
+
+3. Catalogue durable et données privées
+
+Proposition : ajouter au Store un catalogue de récupération séparé du statut
+des jobs. Il doit être interrogeable sans dépendre de jobs(limit=20), avec
+pagination et bornes explicites. Une migration conserve toutes les données
+existantes ; ni suppression de base ni réinitialisation de l’inventaire.
+
+Champs minimaux du catalogue : schema, recovery_id, job_id unique, kind,
+target, UID opérateur, dates, génération d’agent, phase, exposition à une
+mutation, état de revue, référence relative et empreinte du manifeste privé,
+dernier contrôle et code de résultat. L’accusé de lecture est un champ séparé.
+La réponse destinée à l’interface est un sous-ensemble validé du catalogue
+privé. Elle n’expose ni UID interne, ni identité détaillée, configuration ou
+accès ; ces données ne vont pas non plus dans le texte des événements. Aucun
+chemin fourni par le client ne permet de sélectionner une sauvegarde.
+
+Chaque opération possède un répertoire privé au propriétaire attendu, mode
+0700, avec fichiers mode 0600. Le manifeste est versionné, borné, à clés validées,
+lié à son opération et protégé contre liens, fichiers spéciaux et traversées.
+Des fichiers absents, inconnus ou corrompus donnent un état inconnu explicite,
+pas une récupération optimiste. Aucun nettoyage ne supprime une opération
+nécessitant une revue, ni sa dernière preuve ou sauvegarde utilisable.
+
+Le manifeste immuable des attendus contient, selon le type d’opération :
+- Commun : cible exacte, identité du bundle, contrat reconnu et empreintes,
+  version de l’agent, UID, dates, référence du job, empreintes des sauvegardes.
+- Drone : numéro/adresse existants, machine_id et empreinte SSH approuvés,
+  boot_id initial, empreinte WireGuard, valeur MQTT prévue, réseaux hub/drone,
+  empreinte du hub actif attendu, fichier MAVLink prévu et son empreinte,
+  services requis et contrat des trois destinations distantes. Les secrets
+  de transport ne sont pas copiés dans le manifeste : référencer un profil
+  privé et revérifier sa validité avant une lecture distante.
+- Bundle : projet/dossier/Compose reconnus, configurations et réseau initiaux,
+  références et identités exactes des images avant/après, archives et digests,
+  schéma de données et preuves de sauvegarde validées avant mutation.
+- Service : service fermé du catalogue, conteneur/instance attendus, état et
+  identité observés avant commande ; ne pas déduire une relance historique
+  de la seule présence actuelle d’un conteneur running.
+
+Les étapes atteintes et la disponibilité évolutive des sauvegardes appartiennent
+au journal du catalogue. Ne pas les confondre avec les attendus immuables ni
+avec le champ completed des anciens snapshots, qui signifie fin d’application.
+
+4. Ordre des écritures et frontière de mutation
+
+Créer d’abord le job et son entrée de catalogue, sans effet externe. Préparer
+et valider les sauvegardes exigées par le contrat de l’opération avant les
+commandes qui modifient ses configurations ou images. Une simple relance de
+service n’implique pas une sauvegarde universelle de volumes ni une promesse
+de restauration de données. Synchroniser les fichiers et les répertoires
+nouvellement créés, puis écrire le manifeste temporaire, fsync, renommer et
+fsync son répertoire. Une erreur disque ou de synchronisation arrête la
+préparation avant mutation.
+
+Le catalogue SQLite est la référence des intentions : transaction durable
+avant chaque frontière externe, puis observation durable du résultat de cette
+étape. Les gardes des transports AquaHub enregistrent ces frontières sans
+modifier le script fournisseur. Une intention peut être durable alors que
+l’appel n’a finalement pas eu lieu : ce cas reste inconnu et ne vaut pas
+confirmation d’effet. Une écriture de fichier privée seule n’est pas une
+mutation de l’installation exploitée.
+
+Un défaut entre fichier et transaction ne doit jamais donner une preuve
+inexistante : manifeste absent, empreinte incohérente ou version de schéma
+inconnue bloque la conclusion et préserve les fichiers. Tester explicitement
+ces fenêtres. fsync ne constitue pas une garantie contre un matériel qui
+n’honore pas ses propres engagements de persistance.
+
+5. Machine d’états et classification après interruption
+
+Conserver deux axes distincts :
+
+Phase d’exécution : preparing -> snapshot_ready -> mutation_intent ->
+mutation_observed -> postchecking -> completed. Plusieurs étapes mutantes
+peuvent chacune repasser par intention puis observation ; leur journal garde
+la première frontière et la dernière étape acquittée.
+
+Revue : not_required avant incident, puis required -> checking ->
+verified_current | verified_before | divergent | unavailable. Un contrôle
+interrompu revient à required ou unavailable, sans exécuter d’effet externe.
+L’acquittement visuel ne change pas cette machine ; une résolution manuelle
+déclarée est enregistrée comme resolved_manual avec auteur et motif, sans
+fabriquer un résultat technique
+vérifié. Une opération normale complétée reste not_required. L’interruption
+du job et le passage du catalogue à required se font dans une même transaction.
+Un job failed dont une intention ou un effet mutant est enregistré exige
+aussi une revue, sauf preuve complète d’un état cohérent déjà vérifié. Le
+refus avant mutation est distingué d’un échec laissant un état partiel.
+
+verified_current signifie que tous les attendus de l’état visé ont été relus
+et confirmés ; verified_before signifie que l’état initial a été retrouvé
+et vérifié, sans prétendre que l’opération a réussi. Ces deux états et une
+résolution manuelle explicite peuvent lever la garde de reprise. Les nouveaux
+précontrôles restent obligatoires avant toute nouvelle mutation : un ancien
+rapport de récupération n’est pas une permission permanente d’intervenir.
+
+Au redémarrage, classer l’exposition :
+- Avant mutation : journal valide démontrant qu’aucune frontière externe
+  n’a été autorisée. Les préparations peuvent être abandonnées explicitement.
+- Après mutation observée : au moins une étape a eu un effet acquitté ;
+  la fin et la cohérence globale restent à contrôler.
+- Inconnue : intention sans preuve finale, ancien job sans journal, manifeste
+  manquant/corrompu ou exécution encore susceptible de produire des effets.
+
+Un processus local disparu n’établit pas l’absence d’effet distant. Vérifier
+les processus/unités propres à l’opération avec leur génération et identité,
+sans tuer des processus arbitraires. Une commande SSH déjà acceptée ou un
+redémarrage distant lancé peuvent continuer. Tant qu’une exécution résiduelle
+est possible, ne pas ouvrir une seconde intervention concurrente.
+
+Les jobs hérités de versions antérieures sont classés legacy_unknown, jamais
+rejoués. La migration doit qualifier leur présentation et le blocage éventuel :
+ne pas bloquer silencieusement tout un poste à cause d’un ancien incident
+déjà suivi d’une intervention vérifiée. Toute résolution par une preuve plus
+récente doit être liée à la même identité, cible et invariants ; sinon garder
+une revue manuelle explicite. Ne pas modifier l’historique du job initial.
+
+6. Gardes et contrats de consultation
+
+Les vérifications de récupération réservent le créneau d’opération et le
+verrou de maintenance existants ; elles ne passent pas à travers une mise
+à jour de paquet ou une autre vérification. Une seconde vérification simultanée
+est refusée. Les gardes doivent être testées après dispatch et à l’acquisition
+effective du créneau, y compris sur une requête déjà en attente.
+
+Proposition de méthodes fermées à préciser avec leurs DTO avant implémentation :
+  recovery.list       Consultation paginée des incidents et contrôles acquis.
+  recovery.check      Identifiant du catalogue ; vérification consultative.
+  recovery.acknowledge Accusé de lecture persistant, sans validation technique.
+  recovery.resolve_manual Identifiant, motif borné, confirmation explicite ;
+                      déclaration d’une intervention manuelle, audit obligatoire.
+
+Le droit de consultation reste lié à SO_PEERCRED et à l’UID opérateur ; la
+vérification courante d’un drone ne réintroduit pas de mot de passe PC.
+Associer une nouvelle empreinte ou changer les accès conserve ses autorisations
+propres. Une récupération ne contourne jamais l’identité SSH pour retrouver
+un appareil qui a été réinstallé ou remplacé.
+
+La résolution manuelle est une intervention administrative distincte : elle
+garde PolicyKit et n’est pas le bouton courant de configuration. Elle doit
+expliquer quels contrôles restent non prouvés et ne jamais inscrire verified
+sur simple déclaration. Son parcours et ses refus sont à relire séparément.
+Elle ne peut lever que la garde de reprise : jamais une tâche ou un helper
+encore actif, une maintenance ni les contrôles de cible et d’identité SSH.
+
+Après une interruption susceptible d’avoir modifié l’installation, bloquer
+les nouvelles configurations, bascules/rollbacks et relances incompatibles
+jusqu’au contrôle ou à une résolution manuelle tracée. Définir la portée
+par type/cible ; une mise à jour du bundle implique le hub entier. Les
+consultations, journaux, diagnostics et réglages nécessaires à une connexion
+SSH valide restent accessibles avec leurs droits habituels. Le téléchargement
+interrompu d’une archive ne doit pas être confondu avec une bascule effective.
+
+Ne pas livrer une garde bloquante sans chemin de sortie qualifié pour les
+incidents hérités, l’absence d’appareil et les preuves manquantes. Une simple
+case « compris » ne doit pas attester une restauration ni une configuration.
+
+7. Vérification consultative et restauration explicite
+
+recovery.check peut écrire son résultat et son audit dans AquaHub. Ses lectures
+externes restent fermées et bornées : état Docker, fichiers locaux attendus,
+commande SSH de lecture connue. Il ne lance ni SCP, reboot, compose up,
+image load/tag, installateur, renouvellement DHCP ou modification de fichier
+fournisseur. Chaque résultat distingue observation actuelle et preuve historique.
+
+Pour le drone : vérifier cible/identité avant toute lecture, les trois fichiers,
+réseaux, hub actif et services requis. Un boot_id différent prouve un nouveau
+démarrage identifiable, pas que l’agent a observé l’arrêt pendant son absence.
+Un appareil hors ligne, une clé changée ou des données manquantes donnent une
+vérification indisponible ; ne pas les transformer en panne démontrée ou en
+permission de réinstaller. L’ancien précontrôle RAM ne doit pas être réutilisé.
+
+Pour le bundle : comparer la réalité aux états avant/après attendus et montrer
+un état mixte si nécessaire. Un conteneur running et un tag latest ne prouvent
+ni l’identité attendue ni l’intégrité des données. Examiner les snapshots
+partiels en lecture seule ; leur présence ne les rend pas restaurables.
+
+La restauration fera l’objet d’un sous-lot séparé et d’une double revue.
+Elle exige une sélection fermée de sauvegarde, intégrité, identité, contrat,
+préconditions à jour, confirmation explicite de cible et opération sérialisée.
+Son autorisation est distincte de la simple consultation. Aucun terminal libre,
+argument SSH arbitraire ou chemin de fichier fourni par le renderer.
+
+Une restauration ne réécrit pas d’anciens paramètres réseau. Si les champs
+réseau nécessaires diffèrent de l’état administré actuel, refuser plutôt que
+rétablir d’anciennes IP. Le hub actif demeure intact dans le parcours drone
+de 0.2.5. Un échec de restauration reste visible, avec preuves conservées.
+
+Les images sauvegardées ne sont pas des sauvegardes de volumes. Le contrat
+image-refresh-v1 suppose données inchangées ; aucune migration, restauration
+universelle de volume ni rétablissement d’un firmware n’est couvert. Le retour
+à une ancienne version d’AquaHub reste distinct de celui des images du bundle.
+
+8. Présentation persistante
+
+Afficher un bandeau accessible sur tous les onglets après réouverture :
+opération/cible, date, dernière phase acquise, résultat non confirmé et accès
+au détail de vérification. La requête dédiée doit retrouver un incident même
+après plus de vingt nouvelles tâches. L’historique conserve les transitions
+de revue et les contrôles manquants, sans inclure de secret.
+
+Sur un Aqua_Drone ayant une ancienne configuration réussie puis une opération
+incertaine, afficher « Configuration à vérifier ». La date de la dernière
+réussite peut rester consultable, distincte de l’état présent. Un simple scan,
+une réponse SSH ou un ancien configured=true ne retire pas cet avertissement.
+Un contrôle actuel validé ne change pas la tâche interrompue en « Terminée ».
+
+Présenter séparément avant mutation, résultat partiel et exposition inconnue.
+Éviter « Aucune tâche de maintenance » seul si une revue reste nécessaire.
+Un accusé de lecture peut réduire le bandeau, sans effacer le statut incertain.
+Aucun bouton « Reprendre » ne rejoue des étapes ; libeller explicitement
+« Vérifier l’état actuel », puis seulement une restauration réellement qualifiée.
+
+9. Tests nécessaires et critères de livraison
+
+Tests sans matériel :
+- Migration d’une base existante et conservation des jobs/identités/progrès.
+- Arrêt forcé d’un agent synthétique avant sauvegarde, avant/après intention,
+  après premier transfert simulé, pendant attente de reboot et après contrôle
+  final mais avant enregistrement du succès. Redémarrer son agent isolé,
+  jamais le service du poste de travail pour ces tests.
+- Compter les commandes : aucun transfert, reboot, Docker mutant, installation
+  ou script fournisseur exécuté par la récupération automatique/consultative.
+- Fautes d’écriture, espace plein, fsync, renommage et crash entre catalogue
+  et manifeste : aucune mutation si les preuves préalables ne sont pas durables.
+- Manifestes anciens, manquants, corrompus, liens, FIFO, fichiers volumineux,
+  mauvaise identité/UID, clé SSH changée, appareil absent et boot_id inchangé.
+- Hub/images/réseau modifiés hors AquaHub : constat divergent, aucune réécriture.
+- Snapshot bundle complet ou partiel, état avant/après/mixte et archives
+  corrompues ; aucune déclaration de restauration sur présence d’un dossier.
+- Interruption d’une vérification et concurrence avec tâche, précontrôle,
+  garde dpkg et helper applicatif toujours actif ; verrous libérés correctement.
+- Ancien configured=true suivi d’une interruption, réouverture de GUI et
+  incident hors des vingt dernières tâches ; navigation/thèmes/clavier.
+- Accusé de lecture distinct de validation ; aucune donnée sensible dans DTO,
+  notifications, diagnostics destinés au public ou captures de démonstration.
+
+Ensuite seulement, recette VM isolée avec interruptions contrôlées, restauration
+des seuls objets contractuellement couverts et comparaison des invariants.
+Un arrêt forcé de processus ne qualifie pas à lui seul une perte d’alimentation
+du PC ; ce scénario demande une recette spécifique sur un banc autorisé.
+Les preuves de recette réelles restent privées et ne valent que pour la version
+effectivement éprouvée. Prévoir enfin un banc drone séparé, sans modifier ses IP.
+
+Ordre proposé : B1 catalogue/manifeste durable et tests de coupure ; B2 affichage
+persistant et contrôles consultatifs ; B3 récupération explicite des cas
+restaurables, avec ses tests de refus et d’échec. Prévoir une relecture du
+contrat d’exécution et une revue indépendante de sécurité/reprise avant chaque
+implémentation, puis leurs vérifications du résultat. Ne pas annoncer le lot
+B terminé avec le seul bandeau.
+
+Références : ARCHITECTURE.txt, SECURITE.txt, CONTRAT_BUNDLE.txt,
+REPRISE_DEVELOPPEMENT.txt section 16, API_ET_DONNEES.txt et TESTS.txt.

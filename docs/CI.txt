@@ -113,3 +113,24 @@ incident d'infrastructure. Le distinguer d'un échec de test ; ne pas masquer
 un échec par continue-on-error, un secret ajouté au workflow ou l'activation
 des recettes matérielles. Une évolution des dépendances et de l'image doit
 passer par la même revue de code que le reste du projet.
+
+6. Première exécution GitHub vérifiée
+
+Le 22 octobre 2026, l’exécution 39775466446 s’est terminée avec conclusion
+success sur le commit 0c57ebfd254b0b47ec76f0c47ca890882967bcf3 :
+https://github.com/mehdi7129/aquahub/actions/runs/39775466446
+
+L’état du run, les étapes et les journaux ont été contrôlés via l’API GitHub.
+Toutes les étapes ont réussi : préparation Debian 13 amd64, checkout,
+permissions du workspace, npm ci, vérification TypeScript, 28 tests
+JavaScript, compilation frontend, suite Python, paquets de fixture puis
+construction et inspection du paquet applicatif temporaire.
+
+La suite Python découvre 291 tests : 283 réussis et huit ignorés selon les
+préconditions facultatives décrites plus haut. Le paquet final est extrait,
+ses métadonnées, ses ressources frontend et ses entrées desktop sont vérifiées,
+ainsi que la syntaxe des scripts de maintenance. Il n’est pas installé.
+
+Ce résultat confirme une exécution réelle du workflow pour ce commit,
+distincte des recettes locales. Il n’annonce ni Release publique, ni kit
+complet redistribuable, ni qualification des parcours exclus de cette CI.

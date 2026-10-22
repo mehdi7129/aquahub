@@ -209,3 +209,40 @@ La version affichée dans une fenêtre déjà ouverte peut rester celle de
 l’interface chargée en mémoire : fermer puis rouvrir AquaHub après la réussite.
 Ne pas annoncer une restauration automatique de l’application : ce flux
 conserve les données mais ne dispose pas d’un paquet précédent automatique.
+
+8. Décisions de production restant à fixer
+
+Le développement de l’adaptateur Git + registre, des vérifications de
+signature sur clés de test, du processus de publication et des recettes
+d’installation peut avancer dans AquaHub. Il doit conserver les fichiers
+fournisseur intacts et les paramètres réseau existants. Les accès Git et
+registre déjà vérifiés suffisent pour préparer ce flux ; read_api n’est pas
+un prérequis supplémentaire. La recherche de Releases GitLab reste un autre
+parcours et ne doit pas être imposée à ce développement.
+
+Avant une publication signée de production, définir le détenteur de la clé
+d’éditeur, son lieu de protection, qui peut signer, puis les procédures de
+sauvegarde, rotation et révocation. La clé privée ne va ni dans le dépôt,
+ni dans les artefacts, ni dans le kit client. Une clé de recette n’est pas
+une identité de production ; le SHA-256 fourni par GitHub n’est pas une
+signature d’éditeur indépendante. Choisir ensuite la version qualifiée qui
+deviendra la première Release stable, avec son paquet, ses preuves et un
+moyen de réparation conservé. Publier des sources ou réussir la CI ne prend
+pas ces décisions à la place du responsable de publication.
+
+Avant de distribuer le kit complet, obtenir un bundle redistribuable sans
+clés du banc, ou une procédure officielle de préparation propre à chaque
+client. Préciser la fourniture des configurations et la création de clés
+uniques, avec les adresses définies extérieurement ; AquaHub ne devient pas
+un outil d’administration des IP. Valider avec le fournisseur les droits
+de redistribution des composants privés, les notices à remettre et les
+accès clients éventuels au Git et au registre : titulaire, portée, durée,
+rotation et révocation. Ne pas réutiliser implicitement les accès du banc
+pour tous les clients.
+
+Définir enfin le support de remise du kit volumineux : support physique,
+archive ou autre canal adapté, distinct des Releases légères de l’application.
+Le client doit disposer de l’ensemble nécessaire hors ligne et d’un parcours
+graphique testé sur Debian 13 GNOME vierge. Ces prérequis concernent la
+publication et la distribution de production ; ils n’empêchent pas de préparer
+les outils, fixtures et recettes en attendant les décisions manquantes.

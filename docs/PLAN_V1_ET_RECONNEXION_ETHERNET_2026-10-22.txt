@@ -198,6 +198,10 @@ qu’une extension nécessitant un changement réseau reste refusée.
 Les tests fournisseur sur transports interceptés couvrent 5, 3, 1, 4 et 2,
 avec conservation du contenu, de l’inode, de la date et du mode du hub témoin.
 Ce résultat ne remplace pas la recette physique des différents appareils.
+Une recette distincte a ensuite configuré le seul Aqua_Drone_5 disponible,
+avec reboot/retour stable vérifiés et invariants conservés. Elle ne qualifie
+ni plusieurs appareils physiques ni les cinq inspections matérielles manuelles.
+Voir TESTS.txt pour les contrôles et les limites.
 
 scripts/capture_network_reconnect.py prépare une capture bornée, privée et
 en lecture seule. La première collecte observe une connexion fonctionnelle ;
@@ -208,6 +212,10 @@ ne sont pas publiés ; voir DIAGNOSTIC_RECONNEXION_ETHERNET.txt.
 La CI générique est définie séparément. Ses préconditions et limites sont
 décrites dans CI.txt. La restauration, la rétention, les mises à jour du
 bundle et la livraison client restent des lots distincts non terminés.
+Les conceptions de reprise et de rétention sont détaillées respectivement
+dans PLAN_REPRISE_APRES_INTERRUPTION.txt et PLAN_RETENTION_ET_QUOTAS.txt.
+PUBLICATION.txt distingue aussi le travail autonome des décisions de
+signature et de distribution requises avant une livraison commerciale.
 
 Références officielles pour le diagnostic :
 https://systemd.io/NETWORK_ONLINE/

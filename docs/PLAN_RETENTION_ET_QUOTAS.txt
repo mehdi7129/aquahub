@@ -1,0 +1,169 @@
+AquaHub — rétention et quotas des fichiers de travail
+Proposition du 22 octobre 2026 — référence qualifiée : 0.2.5
+
+Prochain lot F, sans changement ni nettoyage actuel. Les valeurs proposées
+attendent une double revue technique avant un correctif distinct ; elles ne
+sont ni des exigences fournisseur ni des limites déjà implémentées.
+
+1. État existant
+
+drone.py garde les précontrôles en mémoire, avec une validité de 600 secondes.
+Leurs dossiers UUID privés persistent après refus, expiration ou arrêt.
+Une configuration ajoute sauvegarde distante, état initial, copie du hub,
+miroir et trace. Depuis 0.2.5, le hub actif n'est pas réécrit.
+
+core._diagnostics() écrit une copie agent puis renvoie aussi son contenu.
+desktop/app.py en écrit une deuxième copie dans diagnostics. Aucun de ces
+deux dossiers n'a de quota ou d'expiration. Les exports de journaux choisis
+par l'utilisateur dans un autre dossier sont distincts.
+
+updates.py supprime les imports refusés et certains dossiers UUID dépassant
+3600 secondes à l'inspection suivante. Il conserve snapshot et used connu
+en mémoire, mais utilise l'âge du dossier pour les préparations inconnues.
+Après redémarrage, l'absence de used en mémoire ne prouve pas l'absence d'usage.
+Les dossiers download-UUID échappent à ce balayage ; ils peuvent rester après
+coupure ou refus de submit_job, leur création précédant la soumission.
+
+app_updates.py conserve un seul package.deb, plafonné à 256 Mio, et quelques
+états fixes. Les téléchargements .part sont nettoyés dans finally ou au
+démarrage sans tâche active. installation.log est append-only, sans rotation.
+
+Les événements sont déjà limités à 365 jours/100000 entrées ; les extraits
+santé à 90 jours/1024 entrées/64 Mio. Les jobs SQLite, avec leurs clés
+d'idempotence, n'ont pas de rétention. Ces limites logiques ne constituent
+pas une borne physique globale du fichier SQLite ou de son WAL.
+
+2. Premier correctif proposé
+
+A — Précontrôles drone jetables
+
+Supprimer immédiatement les seuls dossiers de précontrôles refusés créés
+par la requête courante et reconnus comme inutilisés. Expirer les précontrôles
+inutilisés selon les 600 secondes existantes, au prochain usage et au
+démarrage sûr de l'agent. Retirer simultanément leurs références mémoire.
+Aucun nouveau thread périodique n'est nécessaire ; une application inactive
+peut conserver ses fichiers expirés jusqu'au prochain passage.
+
+Valeurs proposées : au plus 32 préparations inutilisées et 64 Mio cumulés.
+Purger les préparations expirées éligibles. Ne pas évincer un précontrôle
+valide : refuser la nouvelle préparation avec un message explicite. Quotas
+des seuls fichiers jetables reconnus, hors sauvegardes et dossiers inconnus.
+
+B — Copies automatiques de diagnostics
+
+Valeurs proposées, séparément côté agent et desktop : 30 jours, 20 fichiers
+et 32 Mio cumulés ; ancienneté puis fichiers les plus anciens pour le quota.
+Conserver l'export courant ; borner chaque nouveau diagnostic à 2 Mio avant
+écriture, avec une erreur explicite si ce plafond est dépassé.
+Vérifier aussi la taille de la réponse IPC réellement sérialisée, avec son
+contenu échappé et son enveloppe : son plafond actuel de 2 Mio est distinct
+de celui du fichier. Effectuer ce contrôle avant de publier la copie, avec
+la sérialisation et la marge nécessaires au protocole ; la taille brute du
+diagnostic ne suffit pas. Refuser explicitement une réponse trop volumineuse.
+Ne supprimer que les copies internes identifiées comme générées par AquaHub.
+Sans preuve d'origine, conserver, même si le nom correspond.
+Les fichiers enregistrés ailleurs par l'utilisateur restent hors périmètre.
+
+C — Rendre conservative la purge des mises à jour
+
+Retirer l'inférence « ancien UUID inconnu = supprimable ». Sans marqueur
+fiable, ne purger que les inspections inutilisées connues du processus et
+expirées ; préserver tout dossier inconnu après redémarrage. La généralisation
+aux archives, téléchargements et quotas bundle appartient au lot suivant.
+
+3. Contrat durable unused → keep
+
+Créer dans chaque nouvelle préparation un marqueur privé versionné : genre,
+identifiant, date de création et état unused. Pour un précontrôle réussi,
+faire correspondre sa date d'expiration à celle du plan réellement retourné.
+Le marqueur ne contient aucune clé, adresse ou configuration.
+
+Dans le worker de configuration, sous les verrous existants, remplacer
+irréversiblement unused par keep avant sauvegarde, déploiement ou action
+susceptible de produire un état récupérable. Écriture atomique, fsync fichier,
+remplacement puis fsync du dossier doivent réussir avant de poursuivre.
+L'échec de persistance bloque le travail ; aucun retour automatique à unused.
+La création initiale du dossier doit aussi synchroniser son parent.
+Avant toute purge, croiser le marqueur avec les références persistantes des
+jobs et du catalogue de récupération. Une préparation référencée par une
+opération utilisée, interrompue ou d’exposition inconnue reste conservée,
+y compris si unused subsiste après un échec d’écriture de keep. Seule une
+preuve durable et cohérente d’absence de frontière externe peut autoriser
+son classement jetable ; l’absence de plan en mémoire ne suffit jamais.
+
+Seul unused, expiré et sans artefact de récupération autorise la suppression.
+Les fichiers ordinaires du précontrôle (hub.conf, drone.conf, générateur et
+known_hosts épinglé) font partie des préparations jetables ; leur présence
+seule ne prouve pas une configuration commencée. Les artefacts de sauvegarde,
+d’exécution ou de récupération listés ci-dessous imposent de conserver.
+keep, marqueur absent/illisible/incohérent, date future ou ancienne version
+inconnue signifient conserver. Tout snapshot, sauvegarde, état initial,
+runtime, guard ou trace impose également conserver, même avec un marqueur
+qui prétend unused. Les anciens dossiers ne sont jamais marqués inutilisés
+rétroactivement d'après leur date ou leur contenu apparent.
+
+Diagnostics : preuve associant nom aléatoire, identité et empreinte du fichier,
+écrite après création complète. Catalogue absent/incohérent ou contenu modifié :
+conserver. Vérifier l'espace disponible avant toute nouvelle écriture.
+
+4. Ancrage et concurrence
+
+Valider les racines privées et leur propriétaire sans chmod correctif sur
+un objet inattendu. Agent : propriétaire du processus ; copies exportées :
+propriétaire agent ou UID opérateur configuré seulement. Desktop : UID courant.
+Dossiers 0700, fichiers 0600 ; liens, fichiers spéciaux et liens physiques
+inattendus sont conservés et signalés, jamais suivis.
+
+Ouvrir les dossiers par descripteurs O_DIRECTORY|O_NOFOLLOW, puis les enfants
+relatifs ; contrôler fstat, type, propriétaire et permissions. Lire les
+marqueurs avec O_NOFOLLOW|O_NONBLOCK et une borne proposée de 4 Kio. Vérifier
+l'identité du fichier avant unlink. Pour le staging, liste fermée des seuls
+fichiers et sous-dossiers attendus ; aucun rmtree générique d'une racine.
+
+Précontrôles : operation_guard, maintenance et verrou DroneManager, ordre
+unique ; aucun nettoyage pendant une tâche ou un précontrôle concurrent.
+Le démarrage attend l'initialisation complète des gestionnaires et vérifie
+la maintenance externe. Diagnostics : verrou de dossier distinct couvrant
+création/catalogage/purge, avec protection des exports en cours, y compris
+entre deux processus desktop. Leur export doit rester possible pendant une
+opération longue ; ne pas lui imposer le verrou global des mutations.
+
+Valeurs proposées par passage : 1024 entrées examinées et 128 suppressions.
+Limite atteinte, erreur ou objet inconnu : conserver et signaler un bilan
+borné sans chemin personnel. Ne pas annoncer que le quota est respecté si
+le parcours est incomplet. Une erreur de nettoyage ne masque pas l'échec
+initial d'un précontrôle et ne provoque aucun accès administrateur interactif.
+
+5. Zones exclues et suites
+
+Jamais de purge automatique dans le bundle, ses scripts/configurations,
+WireGuard/SSH/inventaire, kit hors ligne, volumes ou images Docker. Préserver
+tous les snapshots, sauvegardes drone, tâches utilisées/interrompues et
+last-rollback.json. Aucun effacement de jobs SQLite : leurs clés empêchent
+le rejeu d'une ancienne demande. Aucun VACUUM automatique dans ce lot.
+
+Conserver package.deb, états et journal d'installation AquaHub : rotation
+séparée sous garde de maintenance. Les captures Ethernet privées sont exclues.
+Le total disque reste non borné : ces quotas ne remplacent pas une politique
+de sauvegarde/récupération.
+Archives bundle, orphelins de téléchargement et rotation des logs sont un F2.
+
+6. Critères de recette du futur correctif
+
+Vérifier les refus sans résidu quand leur origine et leur inutilisation sont
+prouvées ; sinon conserver plutôt que purger. Tester expiration et quota sans
+perdre un plan valide ;
+transition keep durable avant toute action ; crash/reprise à chaque frontière ;
+conservation des anciens dossiers, sauvegardes et snapshots partiels ; refus
+liens/FIFO/hardlinks/propriétaire/modes inattendus ; fichiers extérieurs intacts.
+
+Exercer concurrence configuration/précontrôle/nettoyage, maintenance externe,
+plusieurs exports/processus, export pendant une tâche, quota incomplet,
+catalogue absent et erreurs disque/permissions. Les fichiers utilisateur
+étrangers et l'export courant doivent rester intacts. Vérifier l'expiration
+du chemin conservé dans un ancien résultat API sans rejouer l'opération.
+
+Enfin : suite complète, paquet extrait, upgrade/réinstallation et invariants
+bundle/réseau/kit/SQLite. Les clés d'idempotence et l'absence de mot de passe
+administrateur pour les drones doivent rester inchangées. Ne pas déclarer
+la restauration, le kit client ou la panne RJ45 qualifiés par cette recette.

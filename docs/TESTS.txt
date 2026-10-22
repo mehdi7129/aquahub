@@ -56,12 +56,29 @@ conteneurs conservent identités/images/états/démarrages/montages. Le relevé
 réseau IPv4/IPv6 et l’inventaire taille/date/mode des 363 fichiers du kit
 restent identiques. Le précontrôle réel Aqua_Drone_5 est autorisé avec tous
 ses contrôles réussis, depuis le compte opérateur, sans élévation interactive.
-Aucune configuration ni relance matérielle ne suit ce précontrôle.
+
+Une recette matérielle distincte a ensuite configuré le seul Aqua_Drone_5,
+dont l’identité était déjà associée, via le vrai RPC depuis le compte opérateur.
+La tâche réussit en 167,6 secondes et finit à 100 % : sept étapes automatiques
+réussies, cinq contrôles manuels laissés à effectuer, aucune étape en échec.
+La coupure puis le retour avec nouveau boot_id et deux observations stables
+sont confirmés. Les contrôles finaux vérifient identité, configuration MAVLink,
+services embarqués, WireGuard, MQTT, IP/routes du drone et du hub.
+
+La comparaison indépendante avant/après retrouve les quinze fichiers du
+bundle/configurations identiques en empreinte et mode, le réseau IPv4/IPv6
+inchangé et le même inventaire des 363 fichiers du kit. Les neuf conteneurs
+gardent identités, images, états et montages ; seules les dates de démarrage
+de net_setup, mavlink_router et gcs_reactor changent, conformément à la
+procédure fournisseur. Aucun script fournisseur n’est modifié. Aucun autre
+drone n’est configuré, aucun câble RJ45 n’est débranché pour cette recette.
+Les cinq inspections matérielles ne sont pas déclarées validées par ce test.
 
 Limites : aucune première installation client vierge, configuration physique
 multi-drone, coupure/reconnexion RJ45 ni nouvelle recette visuelle GNOME.
-Le workflow public est ajouté ; son exécution GitHub doit être vérifiée dans
-Actions pour le commit concerné, séparément des résultats locaux ci-dessus.
+Le workflow public est ajouté ; sa première exécution réussie est consignée
+dans CI.txt, séparément des résultats locaux et matériels ci-dessus. Pour
+toute autre révision, vérifier le statut Actions du commit concerné.
 Les rapports, journaux, captures et configurations réels restent privés.
 
 0 bis. Correctif 0.2.4 — configuration sans mot de passe administrateur du PC

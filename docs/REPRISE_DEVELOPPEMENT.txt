@@ -332,8 +332,21 @@ autorisation et maintenance de 0.2.4 restent en place.
 La qualification globale des sources passe 291 tests Python sans omission,
 avec opt-ins Docker consultatif, GTK/Xvfb et fournisseur intercepté ; les
 28 tests JavaScript, la vérification TypeScript et le build passent également.
-Voir TESTS.txt pour les commandes et les limites exactes. Aucune configuration
-physique de drone n’a été exécutée pour cette qualification 0.2.5. Le diagnostic
+Voir TESTS.txt pour les commandes et les limites exactes. Une recette distincte
+a ensuite configuré le seul Aqua_Drone_5 disponible en 167,6 secondes, avec
+redémarrage et retour stable vérifiés, sans mot de passe administrateur du PC.
+Bundle, IP/routes, kit et invariants des conteneurs restent conservés ; seules
+les trois relances prévues par la procédure fournisseur sont observées.
+Les cinq inspections matérielles et la flotte physique restent à qualifier.
+La première exécution GitHub de la CI est verte et référencée dans CI.txt.
+Le diagnostic
 de reconnexion RJ45 reste distinct : aucune correction réseau n’est livrée ici,
 la capture d’une coupure/reconnexion physique attend l’opérateur. Voir
 PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt.
+
+Les prochains lots sont définis dans PLAN_REPRISE_APRES_INTERRUPTION.txt et
+PLAN_RETENTION_ET_QUOTAS.txt. Le premier traite notamment les interruptions
+hors des vingt dernières tâches, l’ancien badge configured=true et les
+manifestes durables ; le second préserve les sauvegardes et dossiers inconnus.
+Ce sont des conceptions, sans nouveau mécanisme de récupération ni purge
+activé par 0.2.5. Les décisions de production sont listées dans PUBLICATION.txt.

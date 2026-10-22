@@ -117,12 +117,18 @@ Aucune coupure ni relance de réseau n’est provoquée par cette mise à jour d
 Configuration de flotte : le blocage des cibles 1..4 dans un hub 1..5 est
 traité par l’orchestration 0.2.5, sans réécrire le hub actif. Les essais des
 vrais scripts sur transports interceptés couvrent 5, 3, 1, 4 et 2. La recette
-physique reste à compléter ; l’extension à 6 exigeant un changement réseau
+physique de plusieurs appareils reste à compléter ; le seul Aqua_Drone_5
+disponible a réussi sa configuration avec redémarrage et invariants vérifiés.
+Les inspections matérielles manuelles restent distinctes. L’extension à 6
+exigeant un changement réseau
 reste volontairement refusée. Aucun script fournisseur n’est modifié.
 
 La reprise guidée après interruption et la rétention des fichiers de travail
 restent à réaliser. La CI est définie dans .github/workflows/ci.yml ; vérifier
 son résultat réel sur GitHub et conserver les essais matériels séparés.
+Les scénarios de ces deux futurs correctifs sont précisés dans
+PLAN_REPRISE_APRES_INTERRUPTION.txt et PLAN_RETENTION_ET_QUOTAS.txt ; aucun
+nouveau mécanisme de restauration ou de purge n’est activé par ces documents.
 
 Contrat fournisseur et mises à jour du bundle
 
