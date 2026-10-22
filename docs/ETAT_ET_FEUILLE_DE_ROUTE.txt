@@ -92,7 +92,29 @@ dans toutes les vues du shell. La revue visuelle complète d’Alt-Tab et des
 échelles du bureau reste à compléter ; voir TESTS.txt et le plan réalisé
 PLAN_IDENTITE_BUREAU_2026-10-21.txt pour la portée exacte de la recette.
 
-Priorité 1 : terminer le contrat fournisseur
+Priorités immédiates — reconnexion Ethernet et configuration de flotte
+
+Le bilan V1 du 22 octobre est consolidé dans
+PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt. Il conserve tous les fichiers
+fournisseur intacts et les paramètres réseau existants. Les lots détaillés
+ci-dessous restent à réaliser ; leur présence dans ce plan ne les qualifie pas.
+
+Premier diagnostic : Internet ne revient pas après débranchement/rebranchement
+du RJ45 selon le signalement utilisateur, jusqu’au reboot du PC. La cause n’est
+pas établie. Capturer carrier, NetworkManager, DHCP, routes IPv4/IPv6, DNS et
+événements du bundle avant de définir le correctif. Vérifier séparément le
+retour Internet et celui des Aqua_Drones, sans reboot et sans réécriture réseau.
+Aucune coupure ni relance de réseau n’est provoquée par cette mise à jour du plan.
+
+Configuration de flotte : la garde anti-réduction protège le hub, mais une
+reproduction hub 1..5 puis cible 3 est bloquée. Les cibles 1..4 et l’extension
+à 6 doivent disposer d’un parcours supporté conservant strictement l’existant.
+Ne pas contourner la protection ni modifier les scripts fournisseur.
+
+Ajouter aussi la reprise guidée après interruption, la rétention des fichiers
+de travail et les tests automatiques du dépôt aux travaux avant livraison.
+
+Contrat fournisseur et mises à jour du bundle
 
 Qualifier la procédure fournisseur confirmée de mise à jour d’un Hub déjà installé,
 conservant .env, configurations client/VPN et adresses. Définir la procédure
@@ -111,7 +133,7 @@ WireGuard complet restent à qualifier ; voir le plan complémentaire
 PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt. Aucun script fournisseur n’est
 modifié par le correctif d’interface 0.2.2.
 
-Priorité 2 : créer une livraison publique propre
+Livraison client et distribution
 
 La séparation du paquet applicatif et du kit hors ligne est implémentée.
 Qualifier et publier les artefacts issus de cette séparation. Préparer
@@ -125,7 +147,7 @@ présence de ressources Docker tierces et cohabitation Docker Desktop. Garder
 le moteur natif explicite. Le code contient des refus et simulations ; la
 recette d’un artefact livré doit aussi observer les effets réels.
 
-Priorité 3 : durcir et qualifier le canal applicatif
+Canal de mise à jour de l’application
 
 Le bouton est implémenté dans la 0.2.0. Le contrat accepte les versions
 stables X.Y.Z, les métadonnées GitHub et le petit paquet applicatif marqué,
@@ -140,7 +162,7 @@ ensuite les scénarios de panne, définir une restauration applicative et
 qualifier un parcours de mise à niveau hors ligne. Ne pas annoncer ces
 chantiers comme couverts par le rollback d’images du bundle.
 
-Priorité 4 : qualification de flotte et exploitation
+Qualification de flotte et exploitation
 
 Avec plusieurs appareils physiques : doublons, identité changée, cible absente,
 configuration sélective, absence d’écriture hors cible et conservation de la

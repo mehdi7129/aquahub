@@ -1,0 +1,192 @@
+AquaHub — plan de consolidation V1 et reconnexion Ethernet
+22 octobre 2026 — référence de code : préproduction 0.2.4
+
+1. Périmètre confirmé
+
+Ce plan reprend le bilan de la V1 et ajoute l’incident de reconnexion Ethernet
+signalé par l’utilisateur. La reconnexion devient le premier lot de diagnostic.
+Le document décrit des travaux à réaliser ; il ne livre aucun correctif réseau
+et ne signifie pas que les lots ci-dessous sont déjà développés ou qualifiés.
+
+Règles à conserver pour tous les lots :
+- Aucun changement du code, des scripts ou du Compose fournis par le fournisseur.
+  AquaHub conserve ses adaptations dans son propre dépôt et son orchestrateur.
+- Aucune modification des IP, profils réseau, DNS, métriques ou routes pour
+  contourner un défaut. Les configurations existantes restent la référence.
+- Si la cause exige un correctif fournisseur, transmettre le diagnostic et
+  intégrer ensuite une version officielle intacte, après qualification.
+- Une configuration de drone reste ciblée, confirmée et sérialisée ; son
+  lancement ne demande pas le mot de passe administrateur du PC à l’opérateur.
+- Journaux bruts, configurations, captures réseau, accès et sauvegardes réels
+  restent privés. Le dépôt ne reçoit que des résultats expurgés et fixtures.
+
+2. Lot prioritaire — récupération après coupure Ethernet
+
+Symptôme rapporté : après débranchement puis rebranchement du câble RJ45 du PC,
+Internet ne revient pas ; un redémarrage du PC permet de retrouver l’accès.
+Le retour de l’accès aux Aqua_Drones pendant cet incident reste à préciser.
+
+Statut : incident rapporté, cause non identifiée. Ne pas conclure que la GUI,
+NetworkManager, le câble, WireGuard ou un autre composant est responsable.
+Une connexion fonctionnelle après reboot ne suffit pas à expliquer la panne.
+
+La lecture initiale retrouve NetworkManager actif et une connectivité déclarée
+complète. Cela décrit cet instant, pas la disponibilité continue d’Internet.
+Les journaux disponibles ne suffisent pas à corréler l’incident rapporté.
+Aucun débranchement, redémarrage, renouvellement DHCP ou changement réseau
+n’a été provoqué pour la rédaction de ce plan.
+
+2.1 Diagnostic avant toute correction
+
+Préparer une collecte privée bornée et horodatée, puis comparer cinq états :
+connexion fonctionnelle, câble absent, câble rebranché, panne persistante,
+retour du service. Le relevé après reboot sert de comparaison si un reboot
+a été nécessaire ; ce n’est pas le mécanisme de reprise attendu.
+
+Observer séparément :
+- Lien physique et pilote : carrier, état de la carte, erreurs et événements
+  noyau. Une interface administrativement UP ne prouve pas la présence du câble.
+- NetworkManager : profil effectivement actif, autoconnect, activation,
+  adresses existantes et état du bail DHCP si ce profil utilise DHCP.
+- Routage : routes et règles IPv4/IPv6, passerelle choisie et métriques.
+  Plusieurs routes par défaut ne suffisent pas à prouver un conflit.
+- DNS : résolveur réellement utilisé, état de resolv.conf et résolution de
+  noms. Ne pas imposer un serveur DNS public pour masquer le problème.
+- Connectivité : accès au réseau local et aux Aqua_Drones, accès Internet
+  par IP, résolution DNS puis HTTPS. Employer plusieurs observations bornées ;
+  un ping refusé ou un seul indicateur de connectivité ne suffit pas.
+- Services du bundle : états, horodatages et logs de net_setup, GCS Reactor
+  et WireGuard, corrélés aux événements NetworkManager. Observer aussi quel
+  composant sélectionne l’interface physique et à quel moment.
+
+Le service aqua-hub.service attend le réseau au démarrage ; cette dépendance
+ne constitue pas une surveillance des rebranchements. À l’inverse, net_setup
+possède déjà une boucle de redétection/réapplication : ne pas présumer qu’il
+ne réagit jamais au câble. Le détecteur installé tient compte de routes,
+d’adresses et de l’état administratif ; son comportement face au carrier
+doit être observé pendant la panne. Ces constats ne désignent pas une cause.
+
+Comparer les scénarios avec AquaHub ouvert et fermé. Les services du bundle
+et l’agent peuvent continuer lorsque la fenêtre est fermée : fermer la GUI
+ne constitue donc pas, seul, un essai sans bundle.
+
+Commandes de lecture pour le développeur, pas un parcours demandé au client :
+  nmcli general status
+  nmcli device status
+  nmcli device show
+  ip -j -d link show
+  ip -j -d address show
+  ip -j route show table all
+  ip -j -6 route show table all
+  ip -j rule show
+  ip -j -6 rule show
+  journalctl -b -u NetworkManager.service --since '10 minutes ago' --no-pager -n 3000
+  journalctl -b -k --since '10 minutes ago' --no-pager -n 3000
+
+Adapter la période aux horodatages de l’incident, sans retirer les bornes.
+Compléter par la lecture du carrier de la carte concernée, de resolv.conf
+et des journaux Docker. Garder ces données hors dépôt. Les règles IPv6 sont
+relevées explicitement pour la lisibilité de la comparaison ; cela n’affirme
+pas une absence d’IPv6 dans la collecte actuelle de routes table all.
+
+2.2 Décision selon la cause démontrée
+
+- Poste/NetworkManager/pilote : définir la prise en charge appropriée avec
+  le profil et les paramètres existants ; faire valider toute intervention
+  nécessaire hors du périmètre de lecture de ce diagnostic.
+- Interaction avec le bundle : fournir au développeur responsable une
+  reproduction et une chronologie expurgées. Ne pas patcher ses scripts.
+- Observation ou orchestration AquaHub : corriger uniquement notre code,
+  avec un test démontrant le défaut et le maintien des invariants réseau.
+- Cause indéterminée : conserver ce statut et demander les éléments manquants.
+  Ne pas ajouter un redémarrage général automatique ou une réparation aveugle.
+
+Une reprise logicielle éventuelle doit être définie et testée après diagnostic,
+avec les seules fonctionnalités existantes et une cible précise. Aucun reset
+global de NetworkManager, DHCP, pare-feu ou routes n’est décidé par ce plan.
+
+2.3 Critères d’acceptation
+
+Sur le réseau amont disponible et avec les mêmes paramètres administrés :
+- Après une coupure brève puis prolongée, le lien et les accès concernés
+  reviennent sans reboot du PC et sans relance générale des services.
+- Vérifier séparément Internet, DNS, Aqua_Drones et outils locaux du hub.
+- Répéter plusieurs cycles ; relever les délais avant de fixer une exigence
+  chiffrée. Aucun délai de reprise garanti n’est annoncé avant la mesure.
+- Comparer avant/après profils, configurations, adresses, routes, règles,
+  métriques et DNS ; ne pas réécrire un paramètre pour obtenir un test vert.
+- Les événements transitoires normaux doivent être distingués d’une divergence
+  persistante ; aucune correction automatique ne masque une différence.
+- Une perte Internet ne déclenche ni mise à jour, ni reconfiguration, ni
+  redémarrage d’un drone. L’historique garde la panne et le rétablissement.
+
+La reproduction avec coupure réelle sera organisée sur un banc autorisé et
+à un moment convenu, avec collecte préparée pour ne pas perdre les preuves.
+Le diagnostic pourra nécessiter l’aide physique de l’opérateur pour le câble.
+
+3. Lots suivants du bilan V1
+
+A — Configuration ciblée et flotte
+Le numéro du drone ne doit pas réduire la flotte déjà présente sur le hub.
+La reproduction synthétique hub 1..5 puis cible 3 montre le refus protecteur
+fleet_reduction ; les cibles 1..4 sont concernées et l’ajout de 6 rencontre
+la comparaison globale des champs réseau. Dissocier cible et flotte dans un
+parcours fournisseur supporté. Si ce parcours n’existe pas, définir avec le
+fournisseur l’entrée nécessaire. Ne pas modifier ses scripts ni sélectionner
+tous les appareils pour contourner la protection. Tester plusieurs ordres,
+l’absence d’écriture hors cible et la conservation du hub.
+
+B — Reprise après interruption
+Définir la vérification de l’état réel et la récupération après arrêt brutal
+de l’agent ou du PC. Distinguer les images, configurations, volumes Docker,
+données AquaHub et sauvegardes drone. Qualifier les snapshots partiels et
+le parcours graphique de restauration, sans promettre de rollback universel.
+
+C — Mise à jour du bundle et WireGuard
+Implémenter le flux tags Git + registre et un catalogue de profils connus,
+avec téléchargement préparé, fichiers fournisseur intacts, données client
+préservées et images identifiées exactement. Qualifier sauvegarde/bascule/
+restauration. Activer WireGuard séparément après essais nominaux et d’échec.
+Référence détaillée : PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt.
+
+D — Publication de l’application AquaHub
+Qualifier une première Release installable et la mise à jour réelle par le
+bouton GitHub, distinct du bundle. Définir signature d’éditeur, conservation
+d’un paquet de réparation et retour à une version précédente qualifiée.
+La publication du code ne constitue pas cette Release.
+
+E — Kit client complet hors ligne
+Définir le socle générique, les éléments propres au client et leurs accès,
+les notices des composants, puis qualifier l’artefact remis au client sur
+Debian 13 GNOME vierge, sans Internet et avec un parcours entièrement graphique.
+Le kit privé de recette existant n’est pas une livraison client générique.
+
+F — Exploitation et développement répétable
+Ajouter les tests automatiques du dépôt et une construction traçable.
+Définir quotas/rétention des préparations, diagnostics et sauvegardes en
+conservant les éléments récupérables. Qualifier les permissions et changements
+concurrents des fichiers utilisés par l’agent, sans réintroduire le mot de
+passe administrateur pour la configuration de drone.
+
+G — Qualification matérielle et finale
+Exercer le parcours complet sur l’appareil disponible puis sur plusieurs
+appareils lorsqu’ils le seront. Couvrir identité incorrecte, cible absente,
+coupures contrôlées, espace disque, redémarrage, réparation et coexistence de
+ressources Docker tierces. Les tests synthétiques ne remplacent pas ces essais.
+
+4. Ordre de travail et livrables
+
+Commencer par diagnostiquer et reproduire la reconnexion Ethernet. Définir
+le correctif avec le responsable identifié avant d’intégrer une action de
+reprise. Les travaux de flotte puis de récupération restent prioritaires ;
+la publication applicative et la CI peuvent avancer indépendamment du nouveau
+bundle. Le kit client final dépend du contenu fournisseur à distribuer.
+
+Pour chaque lot : scénario reproductible, changements AquaHub limités au
+périmètre, vérification des invariants, résultats et limites documentés,
+puis paquet/version qualifiés lorsque le code a changé. Aucun nouveau paquet,
+changement de version ou correctif de fonctionnement n’est créé par ce document.
+
+Références officielles pour le diagnostic :
+https://systemd.io/NETWORK_ONLINE/
+https://networkmanager.dev/docs/api/latest/NetworkManager-dispatcher.html

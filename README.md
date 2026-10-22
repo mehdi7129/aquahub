@@ -63,6 +63,11 @@ Ces résultats ne qualifient pas une flotte ou un kit client générique.
 
 ## Prochains chantiers
 
+- **Consolidation V1 et reconnexion Ethernet** : diagnostiquer la perte
+  d’Internet après rebranchement du RJ45, puis qualifier une reprise sans
+  reboot ; préparer aussi la configuration ciblée de flotte et la récupération
+  après incident. Voir le [plan consolidé](docs/PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt).
+  Aucune modification des scripts fournisseur ou des IP n’est autorisée par ce plan.
 - **Bundle fournisseur v1.0.1** : préparer le flux Git + registre, préserver
   les configurations client et qualifier le correctif WireGuard. Voir le
   [plan distinct](docs/PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt).
