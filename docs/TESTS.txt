@@ -7,10 +7,10 @@ Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURIT
 
 0. Version 0.2.6 — tunnel WireGuard et intention persistante
 
-Vérification du 26 octobre 2026 : 328/328 tests Python réussis avec les
+Vérification du 26 octobre 2026 : 328/329 tests Python réussis avec les
 préconditions Docker, GTK/WebKit et fournisseur explicitement activées.
 Les lectures Docker restent consultatives ; les transports fournisseur
-des tests de configuration sont interceptés. Les 25 tests WireGuard couvrent
+des tests de configuration sont interceptés. Les 26 tests WireGuard couvrent
 les profils, interfaces absentes/incomplètes/actives, refus d’appartenance,
 réseau extérieur, erreurs sans fuite de clé et véritable helper shell sur
 transports simulés. TypeScript, build et 38 tests JavaScript passent.
@@ -31,8 +31,8 @@ captures synthétiques clair/sombre ont été inspectées ; les contrôles reste
 accessibles, sans débordement ni superposition. Aucun équipement réel n’est
 contacté par cette recette.
 
-Candidat applicatif : 162452 octets,
-SHA-256 aac08b1505d8b28d94c4ea73428e1fdfd86370213cd712563bc517bf4eecf717.
+Candidat applicatif : 162528 octets,
+SHA-256 958f8f40889b91c6bd129281eb706513246be4e1948b7ee698d796e47fa10eaa.
 Vingt-six comparaisons runtime/frontend sont identiques aux sources/build
 testés ; la garde préinst Python correspond aussi à sa source et le helper C
 livré contient son mode de précontrôle. Le paquet extrait réussit le parcours

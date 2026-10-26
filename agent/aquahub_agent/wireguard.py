@@ -338,6 +338,10 @@ class WireGuardManager:
                 or value.get("pid_mode") not in {"", "private"} or value.get("running") is not True
                 or value.get("state") != "running" or type(value.get("pid")) is not int or value["pid"] <= 1):
             raise _error("wireguard_unmanaged")
+        # Docker's "host" mode may refer to another initial namespace. Network
+        # snapshots and the commands must concern the same kernel interfaces.
+        if os.readlink(f"/proc/{value['pid']}/ns/net") != os.readlink("/proc/self/ns/net"):
+            raise _error("wireguard_unmanaged")
         mounts = value.get("mounts")
         if not isinstance(mounts, list) or len(mounts) != 2:
             raise _error("wireguard_unmanaged")

@@ -63,7 +63,7 @@ La santé fonctionnelle reste distincte de l’état.
 Les [notes de version](CHANGELOG.md) décrivent le code livré. Les
 [résultats de validation](docs/TESTS.txt) séparent tests génériques, parcours
 graphiques, recettes de paquet et essais matériels. Les contrôles locaux des
-sources 0.2.6 passent **328 tests Python sans omission**, avec les préconditions
+sources 0.2.6 passent **329 tests Python sans omission**, avec les préconditions
 explicites du banc, la vérification TypeScript et **38 tests JavaScript**.
 La suite comprend des lectures Docker réelles et des exécutions de scripts
 fournisseur sur transports simulés. La recette WebKit WireGuard passe

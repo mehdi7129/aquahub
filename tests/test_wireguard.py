@@ -184,7 +184,8 @@ class ReactivationTests(unittest.TestCase):
         self.context = RequestContext(os.getuid(), os.getpid(), process_start_time(os.getpid()))
         self.profile = wg.parse_profile(RAW)
         self.fingerprints = {wg.PROFILE: (wg._hash(RAW), (0o644, os.getuid(), os.getgid()))}
-        self.patches = [patch.object(self.manager, "_attest", return_value=(self.profile, PUBLIC)),
+        self.patches = [patch("aquahub_agent.wireguard.os.readlink", return_value="net:[fixture]"),
+                        patch.object(self.manager, "_attest", return_value=(self.profile, PUBLIC)),
                         patch.object(self.manager, "_host_snapshot", side_effect=lambda: snapshot(self.docker.shape)),
                         patch.object(self.manager, "_wg_state", side_effect=lambda _c: kernel_state()),
                         patch.object(self.manager, "_fingerprints", side_effect=lambda: copy.deepcopy(self.fingerprints))]
@@ -218,6 +219,18 @@ class ReactivationTests(unittest.TestCase):
                 status = self.call("wireguard.status")
                 self.assertEqual(status["state"], "inactive")
                 self.assertTrue(status["can_reactivate"])
+
+    def test_host_mode_in_another_network_namespace_never_allows_activation(self):
+        def namespace(path):
+            return "net:[observer]" if path == "/proc/self/ns/net" else "net:[foreign]"
+        with patch("aquahub_agent.wireguard.os.readlink", side_effect=namespace):
+            status = self.call("wireguard.status")
+            result = self.finish(self.call("wireguard.reactivate", {"confirmed": True}))
+        self.assertEqual(status["state"], "unsupported")
+        self.assertFalse(status["can_reactivate"])
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["code"], "wireguard_unmanaged")
+        self.assertEqual(self.helpers(), [])
 
     def test_current_partial_tunnel_can_be_reactivated_without_container_restart_or_handshake(self):
         dto = self.call("wireguard.status")

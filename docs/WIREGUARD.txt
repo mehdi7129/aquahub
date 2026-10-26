@@ -48,6 +48,8 @@ son appartenance au profil est prouvée. Une interface étrangère est conservé
 Le module agent/aquahub_agent/wireguard.py reconnaît une instance unique du
 service WireGuard dans le projet local attendu, l’image qualifiée, son PID,
 son dossier de travail et ses montages. Le conteneur doit déjà fonctionner.
+Son namespace réseau doit être celui de l’agent : le seul mode Docker host
+ne suffit pas à prouver que les interfaces observées sont celles commandées.
 Le suivi fournisseur /run/activeconfs doit désigner le profil unique attendu.
 Un conteneur arrêté ou un ancien démarrage échoué sans suivi reste refusé.
 

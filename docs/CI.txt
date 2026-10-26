@@ -63,7 +63,7 @@ tests -v exécute la suite publique. Les variables suivantes sont forcées :
   AQUAHUB_TEST_GTK=0
   AQUAHUB_SUPPLIER_BUNDLE=     (chaîne vide)
 
-La référence 0.2.6 découvre 328 tests : 320 passent et huit restent ignorés
+La référence 0.2.6 découvre 329 tests : 321 passent et huit restent ignorés
 dans la recette générique sans opt-in. Le module drone comprend 41 tests.
 Les huit cas facultatifs sont trois lectures Docker réelles, deux recettes
 du script fournisseur local et trois recettes GTK/WebKit explicites. Les

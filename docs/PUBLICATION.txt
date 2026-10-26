@@ -143,8 +143,8 @@ Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
 
-Candidat applicatif 0.2.6 construit localement : 162452 octets, SHA-256 :
-  aac08b1505d8b28d94c4ea73428e1fdfd86370213cd712563bc517bf4eecf717
+Candidat applicatif 0.2.6 construit localement : 162528 octets, SHA-256 :
+  958f8f40889b91c6bd129281eb706513246be4e1948b7ee698d796e47fa10eaa
 Le parcours de réactivation WireGuard, ses gardes et les preuves effectivement
 acquises sont décrits dans WIREGUARD.txt et TESTS.txt. Une réussite des sources
 ou de la CI n’annonce pas la disponibilité du pair, du drone ou d’un kit client.
