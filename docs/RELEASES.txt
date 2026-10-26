@@ -1,0 +1,53 @@
+AquaHub — publication des préversions applicatives
+
+Le workflow .github/workflows/release.yml publie uniquement les mises à jour
+de l’application pour Debian 13 amd64. Il ne produit ni kit initial, ni
+configuration client, ni image fournisseur. Les règles de production et de
+signature indépendante restent dans PUBLICATION.txt.
+
+Chaque version possède un dossier release/vMAJEURE.MINEURE.CORRECTIF/ avec
+manifest.json, notes.md et INSTALLATION.txt. Le manifeste fixe la version,
+la taille, le SHA-256, l’identité Git du paquet exact déjà qualifié, le commit
+de qualification et sa CI verte. Le paquet n’est pas reconstruit lors de la
+publication ; une nouvelle construction n’a pas implicitement la même preuve.
+Le binaire exact est transféré comme objet Git adressé par son empreinte,
+sans être ajouté à l’arbre de sources. La Release en fournit la copie durable.
+
+La première publication est déclenchée par l’ajout du manifeste 0.2.7 sur
+main. Les suivantes peuvent être lancées dans Actions, workflow Publish
+qualified pre-release, Run workflow, version demandée. Le publisher refuse
+un autre dépôt ou une branche différente. Le workflow n’est pas lancé sur PR.
+
+Avant toute publication, les sources d’exécution entre le commit qualifié
+et le commit de publication doivent être identiques. Le script exige la CI
+du commit qualifié et la CI Checks du commit courant, puis contrôle le paquet
+Debian, les membres de son archive et les formes connues de données privées.
+Le contrôle automatisé ne remplace pas la revue humaine des artefacts.
+
+Les fichiers joints sont le .deb application-only, INSTALLATION.txt,
+provenance.json et SHA256SUMS. Le checksum couvre les trois autres fichiers.
+La Release reste draft pendant les transferts. Le serveur doit confirmer
+sha256, taille et state=uploaded de chacun avant sa publication.
+
+Une relance conserve les assets déjà identiques et complète un brouillon
+compatible. Un asset différent, un tag étranger, des notes changées ou une
+Release publique incomplète provoquent un refus sans écrasement. Examiner
+alors le brouillon et les journaux Actions ; ne pas supprimer une livraison
+publique pour faire passer un nouvel artefact sous le même numéro.
+
+Cette première livraison est marquée Pre-release. Le canal intégré actuel
+ignore les préversions et propose uniquement les Releases normales ; le
+téléchargement manuel depuis la page publique reste possible. La maturité
+de production, la première Release normale et l’identité de signature restent
+des décisions distinctes. Le SHA-256 GitHub n’est pas une signature d’éditeur.
+
+Tests ciblés, depuis la racine :
+  PYTHONPATH=agent:desktop:tests python3 -m unittest test_release_publication -v
+
+Ne pas installer de paquet ni toucher au réseau pour tester ce module : les
+tests utilisent une API en mémoire, sans token ni requête vers GitHub.
+
+Références des API et permissions utilisées :
+https://docs.github.com/en/rest/releases/releases
+https://docs.github.com/en/rest/releases/assets
+https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication

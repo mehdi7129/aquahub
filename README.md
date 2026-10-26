@@ -8,13 +8,14 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.7.** Les sources et les tests sont disponibles ;
-aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
-ses images et ses configurations privées doivent être obtenus séparément.
+**État : préproduction 0.2.7.** Les sources et les tests sont publics. Les
+livraisons installables sont indiquées dans les [Releases](https://github.com/mehdi7129/aquahub/releases).
+Le paquet de mise à jour AquaHub seul nécessite une installation existante.
+Le bundle fournisseur, ses images et ses configurations client sont séparés.
 
 ![Interface AquaHub en mode démonstration, avec données fictives](docs/assets/aquahub-demo.png)
 
-Capture de l’interface 0.2.2 avec données fictives uniquement.
+Capture de l’interface 0.2.7 avec données fictives uniquement.
 [Voir le mode sombre](docs/assets/aquahub-demo-dark.png).
 
 ## Fonctionnalités
@@ -28,7 +29,7 @@ Capture de l’interface 0.2.2 avec données fictives uniquement.
 | Aqua_Drones | Configuration ciblée dans l’ordre choisi, sans mot de passe administrateur du PC et sans réécriture du hub actif | Compte autorisé, identité confirmée et cible déjà couverte par le hub ; un appareil à la fois, accès SSH distincts |
 | Progression | Numéro du drone, étapes validées et remplissage conservé pendant l’attente | Les cinq contrôles manuels restent séparés |
 | Outils complémentaires | Accès à GCS, Fleet Controller et Portainer | Le compte Portainer est distinct des opérations courantes AquaHub |
-| Mise à jour AquaHub | Recherche de Releases, téléchargement vérifié et installation confirmée | Un commit ou un ZIP de sources ne suffit pas ; aucun installateur public qualifié publié à ce stade |
+| Mise à jour AquaHub | Recherche de Releases normales, téléchargement vérifié et installation confirmée | Les préversions publiques s’installent manuellement ; un ZIP de sources n’est pas un installateur |
 | Mise à jour du bundle | Inspection et application des livraisons `image-refresh-v1` reconnues | Le futur flux Git + registre du fournisseur n’est pas encore implémenté |
 | Installation | Constructeur de paquet applicatif et assistant de kit complet hors ligne | Kit fournisseur/client externe, privé s’il contient des configurations ou secrets |
 | Identité dans le bureau | Nom AquaHub, identifiant natif et icône alignés sur le lanceur existant | Fermer l’ancienne fenêtre avant de rouvrir après mise à niveau ; portée des contrôles GNOME dans les tests |
@@ -66,6 +67,8 @@ Les [notes de version](CHANGELOG.md) décrivent le code livré. Les
 graphiques, recettes de paquet et essais matériels. Les contrôles locaux des
 sources 0.2.7 passent **335 tests Python sans omission**, avec les préconditions
 explicites du banc, la vérification TypeScript et **38 tests JavaScript**.
+La publication ajoute **8 tests isolés** de brouillon, reprise et refus ;
+ils ne modifient aucun service et ne contactent pas GitHub.
 La suite comprend des lectures Docker réelles et des exécutions de scripts
 fournisseur sur transports simulés. La recette WebKit WireGuard de 0.2.6 passe
 **15 scénarios à 100 % et 15 à 200 %**, avec données synthétiques et les deux
@@ -169,6 +172,7 @@ des chemins d’état distincts. Les invariants sont détaillés dans
 | Comprendre les corrections d’affichage 0.2.2 | [Plan des corrections visuelles](docs/PLAN_CORRECTIONS_VISUELLES_2026-10-21.txt) |
 | Corriger le nom et l’icône dans GNOME | [Plan d’identité bureau](docs/PLAN_IDENTITE_BUREAU_2026-10-21.txt) |
 | Construire un paquet et préparer une publication | [Construction et publication](docs/PUBLICATION.txt) |
+| Publier une préversion applicative qualifiée | [Releases](docs/RELEASES.txt) |
 | Résoudre un problème sur le poste de dev | [Dépannage](docs/DEPANNAGE.txt) |
 | Choisir le prochain chantier | [État et feuille de route](docs/ETAT_ET_FEUILLE_DE_ROUTE.txt) |
 | Utiliser les fonctions de la GUI | [Guide utilisateur](docs/GUIDE_UTILISATEUR.txt) |

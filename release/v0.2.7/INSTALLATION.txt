@@ -1,0 +1,30 @@
+AquaHub 0.2.7 — mise à jour graphique d’une installation existante
+Debian 13 amd64 avec GNOME
+
+1. Télécharger aquahub-application_0.2.7_amd64.deb depuis cette Release.
+2. Ouvrir le fichier avec le gestionnaire de paquets graphique Debian.
+3. Valider l’installation et l’autorisation système demandée.
+4. Fermer puis rouvrir AquaHub depuis son icône habituelle.
+
+Aucune ligne de commande n’est nécessaire. Si aucun gestionnaire de paquets
+graphique n’est installé sur le poste, utiliser l’environnement prévu avec
+le kit initial ; le paquet .deb ne fournit pas de gestionnaire de paquets.
+
+Ce paquet nécessite une installation AquaHub déjà terminée. Il met à jour
+l’application uniquement. Docker, Portainer, bundle fournisseur, images,
+configurations, adresses IP et données ne sont pas remplacés. Le kit complet
+hors ligne pour équiper un nouveau poste est une livraison séparée.
+
+Pour WireGuard : Supervision > WireGuard > Réactiver le tunnel lorsque le
+tunnel reconnu est absent ou incomplet. Une confirmation reste obligatoire,
+sans mot de passe PC pour le compte opérateur autorisé. Le conteneur historique
+doit déjà être en cours ; son démarrage générique reste protégé.
+
+Empreinte SHA-256 du paquet (162512 octets) :
+defba0618c8bf94318b957d78d51bd3bae63f139245642d72b226254a6539748
+SHA256SUMS et provenance.json accompagnent le paquet. Ils documentent son
+intégrité et sa source ; ce ne sont pas une signature indépendante d’éditeur.
+
+Cette préversion n’est pas proposée par le canal de mises à jour normales
+de l’application. Elle se télécharge et s’installe manuellement depuis la
+page Release. Les archives « Source code » sont destinées au développement.

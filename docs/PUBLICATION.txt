@@ -140,6 +140,9 @@ les favoris et le fonctionnement du bundle pendant ces essais.
 6. GitHub Releases
 
 Dépôt de publication prévu : https://github.com/mehdi7129/aquahub
+Le parcours de préversion publique est implémenté dans RELEASES.txt et
+.github/workflows/release.yml : paquet exact qualifié, brouillon, vérification
+des assets puis publication, sans reconstruction ni écrasement d’artefact.
 Ne pas pousser le dépôt privé du banc ou son historique dans ce dépôt public.
 Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes

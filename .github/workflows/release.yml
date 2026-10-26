@@ -1,0 +1,39 @@
+name: Publish qualified pre-release
+
+"on":
+  push:
+    branches: [main]
+    paths: [release/v0.2.7/manifest.json]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Qualified pre-release version
+        required: true
+        default: 0.2.7
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aquahub-release-${{ github.event.inputs.version || '0.2.7' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'mehdi7129/aquahub' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Read reviewed publication sources
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify CI, exact qualified package and draft assets, then publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ github.event.inputs.version || '0.2.7' }}
+        run: python3 release/publish.py

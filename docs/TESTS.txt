@@ -5,7 +5,23 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-0. Version 0.2.7 — réactivation WireGuard sans mot de passe PC
+0. Publication publique et captures 0.2.7
+
+Deux nouvelles captures WebKit natif à 1440 × 1000 montrent les thèmes clair
+et sombre de 0.2.7. Le mode démonstration est affiché, les huit services et le
+numéro de version sont contrôlés dans le DOM. Aucun agent réel, Docker ou drone
+n’est contacté. Les images ont été inspectées avant copie dans docs/assets.
+
+Le paquet exact 0.2.7 ci-dessous passe aussi la validation de publication :
+35 fichiers, aucun chemin personnel, token ou clé privée reconnu, champs
+Debian application-only, taille et empreinte conformes. Les huit nouveaux
+tests du publisher passent sans réseau : création en brouillon, validation
+des assets avant publication, reprise d’un brouillon et idempotence, refus
+de digest, tag, fichier ou métadonnées incompatibles. La CI générique découvre
+désormais 343 tests, dont huit opt-ins ; la qualification de l’application
+elle-même reste la recette 335/335 ci-dessous, sans lui attribuer ces nouveaux cas.
+
+Version 0.2.7 — réactivation WireGuard sans mot de passe PC
 
 Vérification du 26 octobre 2026 : 335/335 tests Python réussis en 20,058 s,
 avec Docker consultatif, GTK/WebKit sous Xvfb et fournisseur sur transports

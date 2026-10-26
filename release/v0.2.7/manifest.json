@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "version": "0.2.7",
+  "bytes": 162512,
+  "sha256": "defba0618c8bf94318b957d78d51bd3bae63f139245642d72b226254a6539748",
+  "git_blob": "0766c70f22bd7ac61bda6d93ee2b8dc09dd01f8e",
+  "qualification_commit": "85ee89618d75d551b5d33238efe59ad703b9a4d4",
+  "qualification_run": 40318958444,
+  "prerelease": true
+}
