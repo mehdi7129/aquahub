@@ -146,3 +146,13 @@ depuis l’onglet Actions ; ne pas lui attribuer le résultat d’un commit anci
 La suite 0.2.6 après ce dernier correctif comprend 331 tests. La référence
 0.2.7 ajoute quatre tests d’autorisation WireGuard. Les preuves locales et
 système des paquets correspondants sont dans TESTS.txt.
+
+Le correctif final 0.2.6 (7db683648c33e22503592dcbf28cd1b041a1f875) et le
+code 0.2.7 (85ee89618d75d551b5d33238efe59ad703b9a4d4) ont ensuite obtenu
+success, respectivement dans les runs 40315896214 et 40318958444 :
+https://github.com/mehdi7129/aquahub/actions/runs/40315896214
+https://github.com/mehdi7129/aquahub/actions/runs/40318958444
+Les journaux 0.2.7 confirment 335 tests Python découverts, 327 réussis et
+huit préconditions facultatives ignorées ; les 38 tests JavaScript et toutes
+les étapes de construction/inspection du paquet passent. Ces exécutions
+ne publient pas d’installateur et ne remplacent pas les recettes système.

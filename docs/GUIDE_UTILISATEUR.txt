@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.6
+Préproduction 0.2.7
 
 1. Disponibilité et installation
 

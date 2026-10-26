@@ -45,8 +45,8 @@ Pour une mise à jour publique de l’application seule :
 
   python3 installer/build_package.py \
     --application-only \
-    --output dist/aquahub-application_0.2.6_amd64.deb \
-    --version 0.2.6
+    --output dist/aquahub-application_0.2.7_amd64.deb \
+    --version 0.2.7
 
 Ce mode n’accepte ni --payload ni --private-kit. Le paquet garde le nom Debian
 aquahub-setup afin de mettre à niveau l’installation 0.1.2 existante, sans
@@ -80,8 +80,8 @@ Exemple avec un payload externe déjà vérifié, depuis la racine du dépôt :
 
   python3 installer/build_package.py \
     --payload /chemin/hors-depot/payload \
-    --output dist/aquahub-setup_0.2.6_amd64.deb \
-    --version 0.2.6
+    --output dist/aquahub-setup_0.2.7_amd64.deb \
+    --version 0.2.7
 
 Cette commande refuse un payload déclaré privé ou contenant les formes de
 clés privées reconnues. L’option --private-kit permet uniquement une recette
