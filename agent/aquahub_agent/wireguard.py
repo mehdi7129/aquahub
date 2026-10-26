@@ -126,7 +126,7 @@ printf 'AQUAHUB_WIREGUARD_REACTIVATED\n'
 OUTER = ("umask 077\nexec /usr/bin/timeout -s TERM -k 5 20 /usr/bin/flock -x -n "
          "/run/aquahub-wireguard.lock /bin/bash --noprofile --norc -c " + shlex.quote(ACTIVATE))
 LOCK_PROBE = ("umask 077\nexec /usr/bin/timeout -s TERM -k 2 5 /usr/bin/flock -x -n "
-              "/run/aquahub-wireguard.lock /bin/true && printf AQUAHUB_LOCK_FREE")
+              "/run/aquahub-wireguard.lock /bin/echo AQUAHUB_LOCK_FREE")
 
 
 def _error(code="wireguard_unavailable"):

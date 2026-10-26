@@ -115,8 +115,10 @@ IPv4 et IPv6. Un redémarrage de conteneur doit changer son heure de lancement,
 sans changer son identité ni son image. Tester les relances autorisées une à
 une et conserver les rapports détaillés dans un dossier privé hors du dépôt.
 Une recette ne remplace pas la validation d’un comportement fournisseur
-encore inconnu : WireGuard demeure protégé tant que son chemin d’échec et
-la procédure de reprise ne sont pas validés.
+encore inconnu : le démarrage générique de WireGuard demeure protégé tant que
+son chemin d’échec et sa procédure de reprise ne sont pas validés. La remise
+en service du profil local 0.2.6 est un parcours distinct à qualifier suivant
+WIREGUARD.txt ; elle ne valide pas l’ancien entrypoint du conteneur.
 
 Recette de l’identité bureau 0.2.3 : extraire les deux modes de construction,
 valider les deux fichiers desktop et résoudre l’icône fournie dans un thème
@@ -143,8 +145,8 @@ Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
 
-Candidat applicatif 0.2.6 construit localement : 162528 octets, SHA-256 :
-  958f8f40889b91c6bd129281eb706513246be4e1948b7ee698d796e47fa10eaa
+Candidat applicatif 0.2.6 construit localement : 162526 octets, SHA-256 :
+  ebb0a6f5572fa27ea645ce9916abb4d4b8a02426711727bf24e448e3730d3a8a
 Le parcours de réactivation WireGuard, ses gardes et les preuves effectivement
 acquises sont décrits dans WIREGUARD.txt et TESTS.txt. Une réussite des sources
 ou de la CI n’annonce pas la disponibilité du pair, du drone ou d’un kit client.

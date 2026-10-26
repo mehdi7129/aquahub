@@ -63,6 +63,11 @@ puis réactivation de sa carte réseau. Sur un autre réseau sans Aqua_Drone,
 l’interface WireGuard existait sans adresse alors que son conteneur tournait.
 Ce constat justifie le contrôle du tunnel, mais ne démontre pas la cause de
 l’incident RJ45 initial ni la stabilité de plusieurs cycles de reconnexion.
+Le paquet applicatif corrigé a ensuite été installé sur le poste : la tâche
+de réactivation réussit et trois lectures confirment le tunnel local actif.
+Les fichiers fournisseur, les neuf conteneurs et le réseau hors wg0 restent
+identiques. Aucun Aqua_Drone n’était connecté ; la liaison distante reste
+à vérifier lorsqu’un appareil sera disponible. Le détail est dans TESTS.txt.
 
 Validations initiales
 

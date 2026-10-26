@@ -1,6 +1,7 @@
 """WireGuard recovery fixtures: no host Docker, interface or supplier mutation."""
 import base64
 import copy
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -369,6 +370,29 @@ class ReactivationTests(unittest.TestCase):
 
 
 class HelperTests(unittest.TestCase):
+    def test_real_lock_probe_emits_marker_while_holding_a_free_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wireguard.lock"
+            script = wg.LOCK_PROBE.replace("/run/aquahub-wireguard.lock", shlex.quote(str(path)))
+            result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2,
+                                    env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            self.assertEqual(result.stdout, b"AQUAHUB_LOCK_FREE\n")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_real_lock_probe_is_nonblocking_and_emits_no_marker_when_busy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wireguard.lock"
+            script = wg.LOCK_PROBE.replace("/run/aquahub-wireguard.lock", shlex.quote(str(path)))
+            with path.open("a+b") as lock:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", script],
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2,
+                                        env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn(b"AQUAHUB_LOCK_FREE", result.stdout)
+
     def test_closed_helper_owns_expiry_timeout_lock_and_no_legacy_entrypoint(self):
         self.assertIn("/usr/bin/timeout -s TERM -k 5 20", wg.OUTER)
         self.assertIn("/usr/bin/flock -x -n", wg.OUTER)

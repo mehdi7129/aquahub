@@ -7,10 +7,10 @@ Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURIT
 
 0. Version 0.2.6 — tunnel WireGuard et intention persistante
 
-Vérification du 26 octobre 2026 : 328/329 tests Python réussis avec les
+Vérification du 26 octobre 2026 : 331/331 tests Python réussis avec les
 préconditions Docker, GTK/WebKit et fournisseur explicitement activées.
 Les lectures Docker restent consultatives ; les transports fournisseur
-des tests de configuration sont interceptés. Les 26 tests WireGuard couvrent
+des tests de configuration sont interceptés. Les 28 tests WireGuard couvrent
 les profils, interfaces absentes/incomplètes/actives, refus d’appartenance,
 réseau extérieur, erreurs sans fuite de clé et véritable helper shell sur
 transports simulés. TypeScript, build et 38 tests JavaScript passent.
@@ -23,6 +23,14 @@ Bash. Un test de contrat sérialise les vrais DTO Python pour les valider
 dans le renderer. Les deux identités config/manifest de l’image qualifiée
 sont liées cryptographiquement par les descripteurs d’une archive linux/amd64.
 
+La première recette réelle de verrou a révélé un marqueur de fin non émis
+après exec : la réparation pouvait réussir alors que sa tâche restait non
+confirmée. Le marqueur est désormais exécuté dans flock. Deux tests lancent
+réellement cette constante shell : verrou libre avec marqueur et mode 0600,
+verrou tenu par fcntl avec refus immédiat sans marqueur. Le test antérieur
+de transport simulé ne couvrait pas ce défaut ; les candidats concernés ont
+été retirés du banc et ne sont pas des installateurs publics qualifiés.
+
 Le nouveau parcours WebKit isolé passe 15/15 à 100 % et 15/15 à 200 %.
 Il couvre confirmation/annulation, double clic, tunnel incomplet avec conteneur
 en cours, cible pendant navigation, vérification consultative, réponse perdue
@@ -31,15 +39,68 @@ captures synthétiques clair/sombre ont été inspectées ; les contrôles reste
 accessibles, sans débordement ni superposition. Aucun équipement réel n’est
 contacté par cette recette.
 
-Candidat applicatif : 162528 octets,
-SHA-256 958f8f40889b91c6bd129281eb706513246be4e1948b7ee698d796e47fa10eaa.
+Candidat applicatif : 162526 octets,
+SHA-256 ebb0a6f5572fa27ea645ce9916abb4d4b8a02426711727bf24e448e3730d3a8a.
 Vingt-six comparaisons runtime/frontend sont identiques aux sources/build
 testés ; la garde préinst Python correspond aussi à sa source et le helper C
 livré contient son mode de précontrôle. Le paquet extrait réussit le parcours
 GTK/WebKit de démonstration 19/19. Il ne contient aucun payload fournisseur.
 
-Les résultats des recettes système et de réactivation restent séparés de
-ces preuves de sources. Ce relevé ne démontre ni une liaison distante, ni
+En VM Debian 13, la mise à niveau 0.2.5 → 0.2.6 puis la réinstallation
+préservent fichiers du bundle, unité fournisseur, configurations, réseau
+IPv4/IPv6, images, identités et montages, ainsi que les 362 empreintes du kit.
+GCS, Fleet et Portainer répondent 200 ; dpkg --verify est propre et les deux
+lanceurs desktop sont valides. Le critère historique « neuf conteneurs en
+cours » n’est pas retenu comme réussite : RTCM poursuit son retry autonome
+hors ligne connu, les huit autres services restant stables. Les six contrôles
+du vrai helper C refusent une réparation avec intention WireGuard persistante
+avant APT, sans commande APT ni changement des identités/démarrages mesurés.
+
+La recette de tunnel utilise ensuite la VM jetable comme banc séparé, avec
+profil et clés synthétiques, sans drone ni service client. Les premières
+tentatives de namespace isolé ont rejoint un namespace inattendu : elles ont
+été abandonnées et ont motivé la garde explicite du produit. La topologie
+finale vérifie le namespace commun de l’agent et du conteneur avant le scénario.
+L’arrêt des services d’origine dans cette VM pour monter ce banc est une
+action de recette distincte, pas une propriété de conservation du paquet.
+Le paquet final réussit la réparation d’une interface appartenant au profil
+mais privée d’adresse/routes (14 contrôles), la création du tunnel absent
+(13), et la consultation sans mutation d’un tunnel actif (11). Une clé
+étrangère et une adresse supplémentaire sont refusées, avec réseau conservé
+et respectivement onze et dix contrôles de préservation réussis.
+Un conteneur legacy arrêté reste refusé sans démarrage ni changement réseau
+(12 contrôles). Un Endpoint DNS synthétique injoignable provoque réellement
+le timeout : échec contrôlé en 20,843 secondes, création puis suppression
+de wg0 observées, dix contrôles de préservation réussis hors tunnel, règles,
+DNS hôte, profil, fournisseur et conteneur. L’intention persistante est
+clôturée naturellement après échéance et preuve de verrou libre ; une nouvelle
+tentative réussit après restauration du seul profil de recette. Le blocage
+intermédiaire de 45 secondes n’a pas été observé directement dans cette VM :
+il reste couvert par les tests unitaires et le précontrôle C distinct, sans
+être présenté comme une recette système de cette fenêtre temporelle.
+Un essai avec résolveur du conteneur en lecture seule n’a pas produit d’erreur ;
+il n’est donc pas compté comme injection de panne réussie.
+
+Sur le poste existant, la mise à niveau depuis 0.2.5 puis la réinstallation
+du paquet corrigé conservent fichiers du bundle, conteneurs, réseau, DNS,
+règles et kit ; dpkg --verify est propre. Le correctif ne lance ni déploiement
+du bundle ni configuration d’un drone. Une recette développeur privilégiée
+a ensuite exercé le handler installé et ses vrais verrous/tâches sur le seul
+tunnel WireGuard, sans règle PolicyKit globale ni modification du service
+fournisseur. La tâche réussit et trois lectures sur huit secondes confirment
+le tunnel actif, avec un pair configuré et aucun échange récent.
+
+Une comparaison indépendante avant/après retrouve les quinze fichiers suivis
+du bundle identiques en empreinte, mode, inode et date ; les neuf conteneurs
+gardent identité, image, état, montages et heure de démarrage. Les adresses
+et routes hors wg0, les règles IPv4/IPv6, le résolveur hôte et l’inventaire
+des 363 fichiers du kit restent identiques. Seuls les éléments de wg0 prévus
+par le profil sont restaurés. GCS, Fleet et Portainer répondent HTTP 200 ;
+TCP Internet, résolution DNS et HTTPS restent disponibles après l’action.
+Le compte opérateur ordinaire retrouve le statut actif depuis le vrai agent.
+
+Les recettes système ci-dessus restent distinctes des tests de sources.
+Ce relevé ne démontre ni une liaison distante, ni
 un Aqua_Drone connecté, ni une réparation générale de la reconnexion RJ45.
 Les limites de profil, démarrage legacy et image sont dans WIREGUARD.txt.
 Les données réelles du banc et ses rapports détaillés restent privés.

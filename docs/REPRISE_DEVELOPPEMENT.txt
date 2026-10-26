@@ -350,3 +350,42 @@ hors des vingt dernières tâches, l’ancien badge configured=true et les
 manifestes durables ; le second préserve les sauvegardes et dossiers inconnus.
 Ce sont des conceptions, sans nouveau mécanisme de récupération ni purge
 activé par 0.2.5. Les décisions de production sont listées dans PUBLICATION.txt.
+
+17. Tunnel WireGuard distinct du conteneur — 0.2.6
+
+Lire WIREGUARD.txt avant de modifier ce parcours. WireGuardManager est
+enregistré par __main__ ; status.get utilise son cache non bloquant. Les
+méthodes wireguard.status et wireguard.reactivate restent distinctes des
+actions Docker génériques, qui conservent leurs refus sur le service legacy.
+L’interface distingue conteneur en cours, tunnel local actif/incomplet/absent
+et échanges récents. Aucun de ces états ne prouve la présence d’un drone.
+
+L’observation exige l’image qualifiée, le profil unique monté et le même
+namespace réseau que l’agent. Une interface incomplète ne peut être réparée
+que si clés publiques, pairs, adresses et routes prouvent son appartenance.
+Une interface étrangère ou une adresse supplémentaire est conservée/refusée.
+Le profil fournisseur n’est jamais écrit : seuls ses éléments attendus sont
+rétablis avec les outils existants, depuis une copie privée bornée et vérifiée.
+
+Le helper shell ferme et vérifie son transport avant toute mutation, puis
+contrôle expiration, empreintes, identité, état et verrou interne. Ne pas
+remplacer son délai interne par le seul timeout du client Docker : un exec
+pourrait survivre à son client. LOCK_PROBE émet son marqueur depuis la commande
+tenue par flock ; un exec suivi d’un printf n’exécuterait jamais ce printf.
+Deux tests exécutent réellement la sonde avec verrou libre et verrou occupé.
+
+wireguard_pending est une intention persistante unique, créée avant exec.
+Les mutations et mises à niveau restent bloquées tant que la fin n’est pas
+prouvée. Une date dépassée seule ne suffit pas ; le contrôle du verrou et
+de la génération de conteneur précède l’effacement conditionnel SQLite.
+La garde d’installation C effectue aussi le précontrôle avant APT, puis
+finish.py le répète. Ne pas supprimer ces contrôles comme simples doublons.
+
+Les sources passent 331 tests Python avec les préconditions documentées,
+38 tests JavaScript et deux parcours WebKit WireGuard de quinze scénarios
+aux zooms 100 et 200 %. Le paquet applicatif exact, sa mise à niveau, ses
+recettes VM et la réactivation réelle du poste sont décrits dans TESTS.txt.
+Sur le poste sans drone, le tunnel incomplet est devenu actif sans modifier
+les fichiers fournisseur, les neuf conteneurs ni le réseau extérieur à wg0.
+La liaison distante et la cause initiale de la panne RJ45 restent distinctes.
+Les sources publiques ne contiennent aucun profil, clé ou rapport réel du banc.
