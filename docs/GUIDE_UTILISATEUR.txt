@@ -3,9 +3,13 @@ Préproduction 0.2.7
 
 1. Disponibilité et installation
 
-Le dépôt public contient les sources. Aucun installateur public qualifié
-n’est encore publié. Un ZIP de sources GitHub ne s’installe pas comme une
-application. Le kit complet doit être préparé avec un bundle fournisseur
+Le dépôt public contient les sources et une préversion applicative 0.2.7 :
+https://github.com/mehdi7129/aquahub/releases/tag/v0.2.7
+Télécharger le .deb pour mettre à jour une installation AquaHub existante,
+puis l’ouvrir avec le gestionnaire de paquets graphique Debian. Lire les
+instructions jointes, valider l’installation, fermer et rouvrir AquaHub.
+Un ZIP de sources GitHub ne s’installe pas comme une application.
+Le kit complet pour un nouveau poste doit être préparé avec un bundle fournisseur
 et des configurations adaptés au poste ; voir PUBLICATION.txt.
 
 Avec un kit qualifié pour Debian 13 amd64 / GNOME, le parcours prévu est
@@ -233,9 +237,10 @@ AquaHub pour charger la nouvelle interface. En échec, lire le message et
 le diagnostic ; il n’existe pas encore de retour automatique à l’ancienne
 version de l’application.
 
-Aucune Release publique n’est encore annoncée avec ces sources. Le paquet
-applicatif est une mise à niveau pour un poste déjà initialisé, pas un kit
-de première installation. Le kit complet hors ligne reste un autre artefact.
+La préversion publique 0.2.7 se télécharge manuellement depuis sa page Release.
+Le canal automatique ignore volontairement les préversions. Le paquet est
+une mise à niveau pour un poste déjà initialisé, pas un kit de première
+installation. Le kit complet hors ligne reste un autre artefact.
 
 8. Mettre le bundle fournisseur à jour
 

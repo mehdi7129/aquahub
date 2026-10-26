@@ -13,6 +13,9 @@ installateur public ou une Release GitHub qualifiée est déjà disponible.
 - Le moteur de réactivation 0.2.6 reste identique ; seul son besoin d’autorisation
   interactive change. Les tests d’autorisation et preuves de paquet sont
   consignés séparément dans docs/TESTS.txt.
+- Première préversion publique du paquet applicatif exact qualifié, avec
+  instructions, provenance et empreintes ; captures README actualisées en
+  clair/sombre 0.2.7. Publication distincte en brouillon vérifié, sans kit privé.
 
 ## 0.2.6 — réactivation ciblée de WireGuard, préproduction
 

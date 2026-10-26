@@ -139,7 +139,7 @@ les favoris et le fonctionnement du bundle pendant ces essais.
 
 6. GitHub Releases
 
-Dépôt de publication prévu : https://github.com/mehdi7129/aquahub
+Dépôt de publication : https://github.com/mehdi7129/aquahub
 Le parcours de préversion publique est implémenté dans RELEASES.txt et
 .github/workflows/release.yml : paquet exact qualifié, brouillon, vérification
 des assets puis publication, sans reconstruction ni écrasement d’artefact.
@@ -148,12 +148,20 @@ Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
 
-Candidat applicatif 0.2.7 construit localement : 162512 octets, SHA-256 :
+Préversion publique 0.2.7 publiée :
+https://github.com/mehdi7129/aquahub/releases/tag/v0.2.7
+Release 424328121, tag v0.2.7, commit de publication
+47c658832b7eb9a22df1c706570491fb29d21cab. Les quatre assets sont publics :
+paquet application-only, INSTALLATION.txt, provenance.json et SHA256SUMS.
+Les téléchargements anonymes ont confirmé les octets et toutes les empreintes.
+Le paquet exact qualifié conserve 162512 octets, SHA-256 :
   defba0618c8bf94318b957d78d51bd3bae63f139245642d72b226254a6539748
 La délégation de la réactivation au compte opérateur, ses refus et les preuves
 de paquet sont décrits dans WIREGUARD.txt et TESTS.txt. Elle ne modifie aucune
-règle PolicyKit/sudoers globale ni le moteur de réactivation 0.2.6. Aucune
-Release publique ou qualification d’un kit complet n’est annoncée par ce code.
+règle PolicyKit/sudoers globale ni le moteur de réactivation 0.2.6. Cette Release
+est marquée Pre-release, sans signature indépendante d’éditeur. Le canal
+automatique actuel l’ignore ; son téléchargement manuel est disponible.
+Elle ne qualifie ni ne distribue un kit complet client.
 
 Historique du candidat applicatif 0.2.6 : 162526 octets, SHA-256 :
   ebb0a6f5572fa27ea645ce9916abb4d4b8a02426711727bf24e448e3730d3a8a

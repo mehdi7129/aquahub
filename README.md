@@ -18,6 +18,20 @@ Le bundle fournisseur, ses images et ses configurations client sont séparés.
 Capture de l’interface 0.2.7 avec données fictives uniquement.
 [Voir le mode sombre](docs/assets/aquahub-demo-dark.png).
 
+## Télécharger la préversion
+
+[Télécharger AquaHub 0.2.7 pour Debian 13 amd64 (.deb)](https://github.com/mehdi7129/aquahub/releases/download/v0.2.7/aquahub-application_0.2.7_amd64.deb).
+
+Ce paquet met à jour une installation AquaHub existante. Ouvrir le fichier
+avec le gestionnaire de paquets graphique, valider l’installation, puis fermer
+et rouvrir AquaHub. Il ne contient ni le bundle fournisseur ni le kit initial.
+Les [notes, instructions et empreintes](https://github.com/mehdi7129/aquahub/releases/tag/v0.2.7)
+accompagnent les quatre fichiers de la Release. Les archives « Source code »
+sont destinées au développement.
+
+La livraison est marquée **Pre-release** : téléchargement manuel. Le bouton
+de mise à jour actuel propose uniquement les Releases normales compatibles.
+
 ## Fonctionnalités
 
 | Fonction | État dans 0.2.7 | Limite à connaître |
@@ -195,8 +209,8 @@ L’onglet **Mises à jour** distingue deux canaux :
 
 Le canal applicatif vérifie le SHA-256 fourni dans les métadonnées GitHub
 reçues par HTTPS et les champs du paquet Debian. Il ne possède pas encore
-une signature d’éditeur indépendante de GitHub. Aucune Release publique ni
-installation complète publique qualifiée n’est annoncée par ces sources.
+une signature d’éditeur indépendante de GitHub. La préversion publique 0.2.7
+contient l’application seule ; aucun kit initial public qualifié n’est annoncé.
 Voir les [notes de version](CHANGELOG.md) et la
 [procédure de publication](docs/PUBLICATION.txt).
 

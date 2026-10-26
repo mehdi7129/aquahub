@@ -63,6 +63,13 @@ réactivation sans mot de passe administrateur du PC. La méthode reste une
 mutation sérialisée, confirmée et protégée par les gardes existantes. Le moteur
 de réactivation est conservé ; aucune règle système globale n’est élargie.
 
+La préversion applicative 0.2.7 est publiée sur GitHub avec le .deb exact
+qualifié, ses instructions, sa provenance et ses empreintes. Elle s’installe
+manuellement sur un poste déjà initialisé et reste ignorée par le canal des
+Releases normales. Les nouvelles captures publiques clair/sombre sont en
+démonstration 0.2.7. Le kit initial complet et la signature de production
+restent distincts ; voir RELEASES.txt et PUBLICATION.txt.
+
 Le 26 octobre, l’opérateur a signalé un retour Internet après désactivation
 puis réactivation de sa carte réseau. Sur un autre réseau sans Aqua_Drone,
 l’interface WireGuard existait sans adresse alors que son conteneur tournait.

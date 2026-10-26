@@ -156,9 +156,11 @@ Le canal app_updates est implémenté séparément pour les Releases publiques
 fixes de mehdi7129/aquahub ; il ne clone ni ne lance un dépôt Git. Voir
 API_ET_DONNEES.txt pour ses paramètres et son suivi d’installation séparé
 des tâches génériques. Un poste doit déjà être initialisé pour utiliser
-le paquet application-only. Aucune Release publique n’est encore annoncée.
+le paquet application-only. La préversion publique 0.2.7 se télécharge
+manuellement ; le canal normal ignore les préversions. Voir RELEASES.txt.
 
-WireGuard reste protégé. Les relances de net_setup et gcs_reactor sont
+Les actions Docker génériques WireGuard restent protégées ; le parcours
+dédié est décrit en sections 17 et 18. Les relances de net_setup et gcs_reactor sont
 autorisées avec comparaison consultative des adresses/routes ; leurs autres
 actions restent protégées. La présence d’un
 conteneur running et les deux seules sondes du bundle ne valident pas la
@@ -404,3 +406,27 @@ administratives. Le moteur de réactivation et ses limites 0.2.6 ne changent pas
 Tester le vrai registre avec AuthPolicy(privileged=True), pkcheck interdit,
 transports synthétiques et refus UID/confirmation/maintenance/concurrence.
 Les résultats de sources, de paquet et du poste sont séparés dans TESTS.txt.
+
+19. Captures et première préversion publique 0.2.7
+
+docs/assets contient deux captures WebKit 0.2.7 clair/sombre en démonstration,
+avec huit services fictifs et aucune donnée du poste. Le paquet public est
+celui déjà qualifié, 162512 octets, SHA-256 defba0618c8bf94318b957d78d51bd3bae63f139245642d72b226254a6539748.
+Le commit de qualification est 85ee89618d75d551b5d33238efe59ad703b9a4d4 ;
+le tag v0.2.7 vise 47c658832b7eb9a22df1c706570491fb29d21cab, avec runtime
+inchangé, captures et automation de publication. Aucun binaire n’a été ajouté
+à l’arbre de sources. La Release en fournit la copie de téléchargement durable.
+
+release/publish.py et le workflow séparé vérifient les deux CI, les sources,
+l’objet qualifié et le paquet, puis publient un brouillon seulement lorsque
+tous les assets correspondent. Huit tests en mémoire couvrent ce publisher.
+La CI découvre maintenant 343 tests, dont les huit opt-ins historiques ;
+la qualification locale de l’application 335/335 reste une preuve distincte.
+Lire RELEASES.txt avant une nouvelle livraison ; conserver un manifeste,
+des notes et des instructions spécifiques à sa version. Ne pas modifier les
+assets publics sous un même tag pour remplacer un build différent.
+
+La Release est une préversion applicative, installable manuellement sur un
+poste déjà initialisé. Le canal de mises à jour normales l’ignore. Un kit
+initial générique, la signature d’éditeur et une première Release normale
+restent des décisions séparées, sans configurations client publiées.

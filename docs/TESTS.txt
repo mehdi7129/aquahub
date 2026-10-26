@@ -21,6 +21,15 @@ de digest, tag, fichier ou métadonnées incompatibles. La CI générique décou
 désormais 343 tests, dont huit opt-ins ; la qualification de l’application
 elle-même reste la recette 335/335 ci-dessous, sans lui attribuer ces nouveaux cas.
 
+Les runs GitHub 40336451928 (Checks) et 40336451904 (publication) réussissent
+sur 47c658832b7eb9a22df1c706570491fb29d21cab. Le second a attendu le premier
+avant de publier la Release 424328121, tag v0.2.7, prerelease=true, draft=false.
+Les quatre fichiers ont ensuite été téléchargés anonymement depuis les URLs
+publiques. Le .deb reste exactement celui de 162512 octets / defba0618… ;
+SHA256SUMS couvre les trois autres fichiers et toutes les empreintes passent.
+provenance.json relie le commit qualifié 85ee896… au commit de publication.
+Aucun paquet n’a été réinstallé ni service du poste relancé pour cette recette.
+
 Version 0.2.7 — réactivation WireGuard sans mot de passe PC
 
 Vérification du 26 octobre 2026 : 335/335 tests Python réussis en 20,058 s,

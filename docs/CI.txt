@@ -172,3 +172,11 @@ Release en brouillon. Tous les assets doivent avoir le SHA-256 et la taille
 attendus avant publication. Les tags et assets existants ne sont jamais
 écrasés. Huit nouveaux tests en mémoire couvrent ces transitions et refus.
 Voir PUBLICATION.txt et release/v0.2.7/ pour les données de la préversion.
+
+Première publication vérifiée le 26 octobre 2026 sur
+47c658832b7eb9a22df1c706570491fb29d21cab :
+Checks 40336451928 et publication 40336451904, conclusions success.
+https://github.com/mehdi7129/aquahub/actions/runs/40336451928
+https://github.com/mehdi7129/aquahub/actions/runs/40336451904
+La Release v0.2.7 est publique en préversion, avec quatre assets dont les
+empreintes ont été confirmées à nouveau par téléchargements anonymes.
