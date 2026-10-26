@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.6","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.7","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -24,13 +24,14 @@ et passent par une origine exacte et un nonce.
 L’UID, le PID et l’heure de démarrage du processus viennent de SO_PEERCRED
 et de /proc, pas du JSON. Ne pas ajouter de champ permettant au renderer
 d’affirmer son rôle ou son identité. Les interventions administratives passent
-par PolicyKit. Depuis 0.2.4, drones.preflight et drones.configure en sont
-explicitement exemptées pour l’UID opérateur autorisé. Tout processus de ce
+par PolicyKit. drones.preflight et drones.configure en sont exemptées depuis
+0.2.4, ainsi que wireguard.reactivate depuis 0.2.7, pour l’UID opérateur autorisé.
+Tout processus de ce
 compte pouvant joindre la socket privée bénéficie de cette délégation ; elle
 ne dépend pas d’un clic dans la GUI. Ces méthodes restent authentifiées et
 incompatibles avec une maintenance en cours. La revérification supplémentaire
 du PID et de son instant de démarrage dans AuthPolicy reste appliquée aux
-méthodes administratives, pas à ces deux exceptions.
+méthodes administratives, pas à ces exceptions.
 
 Les tâches exposent notamment created_at, started_at et finished_at.
 status.collected_at date le début de collecte. L’interface 0.2.2 utilise
@@ -68,7 +69,8 @@ WireGuard. La réactivation du tunnel utilise le contrat dédié suivant.
 WireGuard, depuis 0.2.6 :
   wireguard.status      Aucun paramètre ; lecture renouvelée du tunnel local,
                         compte opérateur authentifié, sans demande administrateur.
-  wireguard.reactivate  confirmed=true ; autorisation habituelle des services,
+  wireguard.reactivate  confirmed=true ; compte opérateur autorisé, sans mot
+                        de passe PC depuis 0.2.7 ; mutation avec gardes actives,
                         renvoie une tâche sérialisée kind=wireguard.reactivate,
                         target=wireguard. Les autres paramètres sont refusés.
 

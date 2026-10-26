@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.6.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.7.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -19,11 +19,11 @@ Capture de l’interface 0.2.2 avec données fictives uniquement.
 
 ## Fonctionnalités
 
-| Fonction | État dans 0.2.6 | Limite à connaître |
+| Fonction | État dans 0.2.7 | Limite à connaître |
 | --- | --- | --- |
 | Supervision | Huit services reconnus, contours colorés et détail par service | État du conteneur et santé distincts ; données anciennes neutralisées |
 | Relances | Tâche ciblée visible, résultat et observation après intervention | Un service à la fois ; WireGuard utilise son action dédiée |
-| WireGuard | Vérification du tunnel et réactivation du profil existant lorsqu’il est absent ou incomplet | Conteneur déjà en cours et profil reconnu ; démarrage générique toujours protégé, liaison distante distincte |
+| WireGuard | Vérification du tunnel et réactivation du profil existant sans mot de passe PC pour l’opérateur autorisé | Conteneur déjà en cours et profil reconnu ; démarrage générique toujours protégé, liaison distante distincte |
 | Journaux et historique | Logs techniques, événements, extraits de panne et exports | Collecte et conservation bornées ; aucun historique exhaustif garanti |
 | Aqua_Drones | Configuration ciblée dans l’ordre choisi, sans mot de passe administrateur du PC et sans réécriture du hub actif | Compte autorisé, identité confirmée et cible déjà couverte par le hub ; un appareil à la fois, accès SSH distincts |
 | Progression | Numéro du drone, étapes validées et remplissage conservé pendant l’attente | Les cinq contrôles manuels restent séparés |
@@ -59,14 +59,15 @@ La santé fonctionnelle reste distincte de l’état.
 | 0.2.4 | Configuration d’un Aqua_Drone sans demande de mot de passe administrateur du PC, avec contrôles de cible et de maintenance conservés |
 | 0.2.5 | Hub actif conservé pendant la configuration ciblée, scripts fournisseur intacts ; capture privée de reconnexion et CI générique |
 | 0.2.6 | État du tunnel WireGuard distinct du conteneur, vérification consultative et réactivation ciblée du profil existant, sans redémarrage générique |
+| 0.2.7 | Réactivation WireGuard sans mot de passe PC pour le compte opérateur, avec confirmation et gardes conservées |
 
 Les [notes de version](CHANGELOG.md) décrivent le code livré. Les
 [résultats de validation](docs/TESTS.txt) séparent tests génériques, parcours
 graphiques, recettes de paquet et essais matériels. Les contrôles locaux des
-sources 0.2.6 passent **331 tests Python sans omission**, avec les préconditions
+sources 0.2.7 passent **335 tests Python sans omission**, avec les préconditions
 explicites du banc, la vérification TypeScript et **38 tests JavaScript**.
 La suite comprend des lectures Docker réelles et des exécutions de scripts
-fournisseur sur transports simulés. La recette WebKit WireGuard passe
+fournisseur sur transports simulés. La recette WebKit WireGuard de 0.2.6 passe
 **15 scénarios à 100 % et 15 à 200 %**, avec données synthétiques et les deux
 thèmes. Ces résultats ne qualifient pas une installation client complète,
 une flotte ou une liaison distante ; les recettes de paquet sont consignées

@@ -716,5 +716,5 @@ def register(app):
     manager = WireGuardManager(app)
     app.wireguard = manager
     app.register_handler("wireguard.status", manager.status, False)
-    app.register_handler("wireguard.reactivate", manager.reactivate, True)
+    app.register_handler("wireguard.reactivate", manager.reactivate, True, requires_admin=False)
     return manager

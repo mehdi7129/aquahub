@@ -389,3 +389,18 @@ Sur le poste sans drone, le tunnel incomplet est devenu actif sans modifier
 les fichiers fournisseur, les neuf conteneurs ni le réseau extérieur à wg0.
 La liaison distante et la cause initiale de la panne RJ45 restent distinctes.
 Les sources publiques ne contiennent aucun profil, clé ou rapport réel du banc.
+
+18. Délégation WireGuard au compte opérateur — 0.2.7
+
+wireguard.register conserve mutation=True et définit requires_admin=False
+uniquement pour wireguard.reactivate. Ne pas passer mutation=False : la
+sérialisation, les exclusions de maintenance et wireguard_pending restent
+nécessaires. L’agent root vérifie toujours l’UID fourni par SO_PEERCRED ;
+le compte opérateur peut appeler la méthode via la socket privée, y compris
+depuis un autre processus que la GUI. Les autres comptes sont refusés.
+Cette délégation ne demande aucune règle PolicyKit globale ni exception
+sudoers ; service.restart et les autres interventions protégées restent
+administratives. Le moteur de réactivation et ses limites 0.2.6 ne changent pas.
+Tester le vrai registre avec AuthPolicy(privileged=True), pkcheck interdit,
+transports synthétiques et refus UID/confirmation/maintenance/concurrence.
+Les résultats de sources, de paquet et du poste sont séparés dans TESTS.txt.

@@ -1,5 +1,5 @@
 AquaHub — frontières de confiance et invariants
-Référence : préproduction 0.2.6.
+Référence : préproduction 0.2.7.
 
 Ce document décrit les garde-fous implémentés, leur portée et les règles de
 contribution. Il ne constitue pas une certification ni une garantie contre
@@ -38,6 +38,8 @@ que la commande SSH de lecture fixe et prépare ses fichiers dans un espace
 local privé. configure passe par submit_job et ses gardes de maintenance.
 enroll, ssh_settings et les autres interventions administratives conservent
 PolicyKit. Aucune règle globale PolicyKit ni exception sudoers n’est ajoutée.
+Depuis 0.2.7, wireguard.reactivate reçoit une délégation analogue, limitée au
+profil reconnu et au compte opérateur. Voir la section 9 pour son contrat.
 
 Le pont WebKit n’accepte que le fichier index.html exact de l’application,
 avec un nonce aléatoire propre à la fenêtre. Navigation distante, nouvelles
@@ -283,6 +285,15 @@ contenant une vulnérabilité exploitable et des accès réels ; utiliser le can
 privé décrit dans les consignes de contribution lorsqu’il est disponible.
 
 9. Réactivation WireGuard 0.2.6
+
+Depuis 0.2.7, wireguard.reactivate garde mutation=True et reçoit explicitement
+requires_admin=False. Le compte opérateur identifié par SO_PEERCRED peut
+lancer la réactivation sans demande PolicyKit. Les processus de ce compte
+peuvent également invoquer cette méthode sur la socket privée ; la confirmation
+GUI n’est pas une frontière d’autorisation. Les autres comptes restent refusés.
+Confirmation, profil fixe, verrous, exclusions de maintenance et intention
+persistante conservent leur portée. Les autres interventions administratives
+restent protégées ; aucune règle PolicyKit ou sudoers globale n’est élargie.
 
 Le parcours dédié atteste l’instance, le profil fixe monté, les outils, la
 séparation du résolveur conteneur/hôte et l’appartenance de wg0. Il refuse

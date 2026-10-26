@@ -226,8 +226,10 @@ distincte de la conservation des IP/routes hors tunnel, des autres VPN,
 des règles et du résolveur hôte. Les fichiers fournisseur restent inchangés.
 Le contrôle local ne requiert pas de handshake et ne promet pas l’accès à un
 pair ou à un drone. wireguard.status est consultatif sans autorisation admin ;
-wireguard.reactivate conserve l’autorisation habituelle des services et les
-gardes de maintenance. Voir docs/WIREGUARD.txt pour le contrat et ses limites.
+wireguard.reactivate est délégué depuis 0.2.7 au compte opérateur autorisé
+sans demande PolicyKit, avec mutation=True et requires_admin=False. Confirmation
+et gardes de maintenance restent actives. Aucune règle système globale n’est
+élargie. Voir docs/WIREGUARD.txt pour le contrat et ses limites.
 
 drone.py contient le contrat actuel de numérotation et de cible du fournisseur.
 Le scan cherche les six cibles prévues, pas tout le réseau. Les profils du

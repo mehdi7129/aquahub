@@ -77,17 +77,17 @@ passe administrateur. Ce contrôle ne coupe pas le tunnel et reste possible
 sans Aqua_Drone connecté, y compris sur un autre réseau.
 
 Réactiver le tunnel est proposé pour un tunnel absent ou incomplet lorsque
-le profil et l’instance sont reconnus. Lire la confirmation, autoriser
-l’intervention sur le service dans la boîte système si elle est demandée,
-puis attendre le résultat de la tâche. Les paramètres enregistrés ne changent
+le profil et l’instance sont reconnus. Lire et valider la confirmation,
+puis attendre le résultat de la tâche. Depuis 0.2.7, le compte opérateur
+autorisé n’a plus de mot de passe PC à saisir pour cette réactivation.
+Les paramètres enregistrés ne changent
 pas : seuls les éléments du tunnel déjà prévus par ce profil sont remis en
 service. Aucun réglage d’adresse n’est demandé.
 
 L’action dédiée ne redémarre pas le conteneur historique. Son démarrage
 générique reste protégé ; un conteneur arrêté ou un profil non reconnu peut
 nécessiter une intervention distincte. Le motif s’affiche dans le détail.
-La réactivation garde l’autorisation habituelle des interventions sur les
-services ; elle ne change pas l’exception sans mot de passe PC des drones.
+Les autres interventions administratives gardent leur protection habituelle.
 
 Les échanges distants sont séparés de l’état du tunnel. L’absence d’échange
 récent n’est pas, à elle seule, une panne. Un échange WireGuard ne prouve pas

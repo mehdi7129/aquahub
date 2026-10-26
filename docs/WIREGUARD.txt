@@ -1,5 +1,5 @@
 AquaHub — observation et réactivation du tunnel WireGuard
-Préproduction 0.2.6 — contrat et limites du parcours dédié
+Préproduction 0.2.7 — contrat et limites du parcours dédié
 
 1. Parcours utilisateur
 
@@ -118,9 +118,14 @@ nécessaire pour consulter cet état depuis le compte opérateur autorisé.
 
 wireguard.reactivate({confirmed:true}) : création d’une tâche sérialisée,
 kind=wireguard.reactivate, target=wireguard. Les autres paramètres et une
-confirmation absente sont refusés. L’autorisation administrative habituelle
-des interventions sur les services est conservée. L’exception sans mot de
-passe PC des précontrôles/configurations Aqua_Drones reste distincte.
+confirmation absente sont refusés. Depuis 0.2.7, le compte opérateur autorisé
+peut lancer cette seule intervention sans demande de mot de passe PC.
+L’identité est vérifiée par l’agent à partir des credentials de la socket ;
+la confirmation, la sérialisation et les gardes de maintenance restent actives.
+Les autres interventions administratives conservent leurs autorisations.
+Aucune règle PolicyKit globale ou sudoers n’est modifiée. Les processus du
+compte opérateur peuvent invoquer cette méthode depuis la socket privée :
+l’autorisation ne dépend pas exclusivement du bouton de l’interface.
 
 Le DTO expose state (active/absent/inactive/unknown/unsupported), checked_at,
 can_reactivate, les nombres de pairs/échanges récents et des messages bornés.

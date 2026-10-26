@@ -13,7 +13,7 @@ import threading
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "agent"))
 from aquahub_agent import wireguard as wg
@@ -277,6 +277,82 @@ class ReactivationTests(unittest.TestCase):
                 self.call("wireguard.reactivate", params)
         with self.assertRaises(ApiError):
             self.app.dispatch("wireguard.status", {}, RequestContext(os.getuid() + 1000, os.getpid()))
+        self.assertFalse(self.docker.commands)
+
+    def test_registered_operator_reactivation_succeeds_without_admin_or_pkcheck(self):
+        # Exercise the real privileged policy and registry, not a permissive
+        # authorize mock: this catches accidentally keeping requires_admin=True.
+        self.app.policy = AuthPolicy(os.getuid(), privileged=True)
+        self.assertEqual(self.app._handlers["wireguard.reactivate"][1:], (True, False))
+        with patch("aquahub_agent.security.subprocess.run", side_effect=AssertionError("No administrative prompt is allowed")) as pkcheck:
+            result = self.finish(self.call("wireguard.reactivate", {"confirmed": True}))
+            pkcheck.assert_not_called()
+        self.assertEqual(result["status"], "succeeded")
+        self.assertTrue(result["result"]["tunnel_active"])
+        self.assertEqual(len(self.helpers()), 1)
+        self.assertIsNone(self.app.store.setting_get(wg.PENDING_KEY))
+
+    def test_registered_reactivation_requires_confirmation_and_operator_without_prompt(self):
+        self.app.policy = AuthPolicy(os.getuid(), privileged=True)
+        with patch("aquahub_agent.security.subprocess.run", side_effect=AssertionError("No administrative prompt is allowed")) as pkcheck:
+            with self.assertRaises(ApiError) as caught:
+                self.app.dispatch("wireguard.reactivate", {"confirmed": True}, RequestContext(os.getuid() + 1, os.getpid()))
+            self.assertEqual(caught.exception.code, "unauthorized")
+            for params in ({}, {"confirmed": False}, {"confirmed": True, "path": "/fixture/foreign.conf"}):
+                with self.subTest(params=params), self.assertRaises(ApiError) as caught:
+                    self.call("wireguard.reactivate", params)
+                self.assertEqual(caught.exception.code, "confirmation_required")
+            pkcheck.assert_not_called()
+        self.assertEqual(self.app.store.jobs(), [])
+        self.assertFalse(self.docker.commands)
+
+    def test_registered_reactivation_keeps_maintenance_busy_and_pending_fences_without_prompt(self):
+        self.app.policy = AuthPolicy(os.getuid(), privileged=True)
+        with patch("aquahub_agent.security.subprocess.run", side_effect=AssertionError("No administrative prompt is allowed")) as pkcheck:
+            for pending in (Mock(return_value=True), Mock(side_effect=[False, True])):
+                self.app.app_updates = SimpleNamespace(installation_pending=pending)
+                with self.assertRaises(ApiError) as caught:
+                    self.call("wireguard.reactivate", {"confirmed": True})
+                self.assertEqual(caught.exception.code, "maintenance")
+            self.app.app_updates.installation_pending = Mock(return_value=False)
+            with self.app._maintenance_path.open("r+") as descriptor:
+                fcntl.flock(descriptor.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with self.assertRaises(ApiError) as caught:
+                    self.call("wireguard.reactivate", {"confirmed": True})
+                self.assertEqual(caught.exception.code, "maintenance")
+            with self.app.operation_guard():
+                with self.assertRaises(ApiError) as caught:
+                    self.call("wireguard.reactivate", {"confirmed": True})
+                self.assertEqual(caught.exception.code, "busy")
+            marker = {"schema": 1, "intent_id": "1" * 32,
+                      **{key: self.docker.container[key] for key in ("id", "image_id", "pid", "started_at")},
+                      "until": time.time() + 45}
+            self.app.store.setting_set(wg.PENDING_KEY, marker)
+            with self.assertRaises(ApiError) as caught:
+                self.call("wireguard.reactivate", {"confirmed": True})
+            self.assertEqual(caught.exception.code, "maintenance")
+            self.assertEqual(self.app.store.setting_get(wg.PENDING_KEY), marker)
+            self.app.store.setting_set(wg.PENDING_KEY, None)
+            # A request admitted by dispatch must be fenced again when its
+            # serialized worker slot is acquired.
+            with patch.object(self.manager, "is_pending", side_effect=[False, True]):
+                with self.assertRaises(ApiError) as caught:
+                    self.call("wireguard.reactivate", {"confirmed": True})
+                self.assertEqual(caught.exception.code, "maintenance")
+            pkcheck.assert_not_called()
+        self.assertEqual(self.app.store.jobs(), [])
+        self.assertFalse(self.docker.commands)
+        self.assertFalse(self.app._mutation_lock.locked())
+
+    def test_service_restarts_still_require_administrative_authorization(self):
+        self.app.policy = AuthPolicy(os.getuid(), privileged=True)
+        with patch("aquahub_agent.security.subprocess.run", return_value=subprocess.CompletedProcess([], 1)) as pkcheck:
+            with self.assertRaises(ApiError) as caught:
+                self.call("service.restart", {"service": "gcs"})
+            self.assertEqual(caught.exception.code, "unauthorized")
+            pkcheck.assert_called_once()
+            self.assertEqual(pkcheck.call_args.args[0][0], "/usr/bin/pkcheck")
+        self.assertEqual(self.app.store.jobs(), [])
         self.assertFalse(self.docker.commands)
 
     def test_known_malformed_or_stopped_container_cannot_be_started(self):

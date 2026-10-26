@@ -26,7 +26,7 @@ import tarfile
 import tempfile
 import time
 
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 PROJECT = "aqua-hub-bundle"
 SERVICES = {"mosquitto", "dmx_fleet_controller", "gcs", "gcs_reactor", "net_setup", "mavlink_router", "rtcm_mavlink", "wireguard"}
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "HOME": "/root", "DOCKER_CONFIG": "/etc/aquahub/docker-client"}

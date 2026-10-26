@@ -145,7 +145,14 @@ Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
 
-Candidat applicatif 0.2.6 construit localement : 162526 octets, SHA-256 :
+Candidat applicatif 0.2.7 construit localement : 162512 octets, SHA-256 :
+  defba0618c8bf94318b957d78d51bd3bae63f139245642d72b226254a6539748
+La délégation de la réactivation au compte opérateur, ses refus et les preuves
+de paquet sont décrits dans WIREGUARD.txt et TESTS.txt. Elle ne modifie aucune
+règle PolicyKit/sudoers globale ni le moteur de réactivation 0.2.6. Aucune
+Release publique ou qualification d’un kit complet n’est annoncée par ce code.
+
+Historique du candidat applicatif 0.2.6 : 162526 octets, SHA-256 :
   ebb0a6f5572fa27ea645ce9916abb4d4b8a02426711727bf24e448e3730d3a8a
 Le parcours de réactivation WireGuard, ses gardes et les preuves effectivement
 acquises sont décrits dans WIREGUARD.txt et TESTS.txt. Une réussite des sources

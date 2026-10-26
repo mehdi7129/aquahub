@@ -5,7 +5,49 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-0. Version 0.2.6 — tunnel WireGuard et intention persistante
+0. Version 0.2.7 — réactivation WireGuard sans mot de passe PC
+
+Vérification du 26 octobre 2026 : 335/335 tests Python réussis en 20,058 s,
+avec Docker consultatif, GTK/WebKit sous Xvfb et fournisseur sur transports
+interceptés explicitement activés. TypeScript, build et 38 tests JavaScript
+passent. Aucun script fournisseur ni paramètre réseau n’est modifié.
+
+Les quatre nouveaux cas exercent le vrai registre, Application et
+AuthPolicy(privileged=True), avec un opérateur normal et pkcheck interdit.
+Une réactivation synthétique complète réussit sans appel PolicyKit ; les
+refus UID/confirmation, mise à jour en cours aux deux frontières, verrou de
+maintenance, concurrence et intention persistante restent actifs. Un appel
+service.restart exige toujours pkcheck et reste refusé en cas de refus.
+Le module WireGuard passe 32/32. Le moteur de réactivation reste identique ;
+la modification fonctionnelle porte sur requires_admin=False avec mutation=True.
+
+Paquet applicatif : 162512 octets,
+SHA-256 defba0618c8bf94318b957d78d51bd3bae63f139245642d72b226254a6539748.
+Vingt-six comparaisons runtime/frontend sont identiques aux sources/build
+testés. La garde préinst correspond à sa source, les deux lanceurs desktop
+sont valides et les scripts de maintenance passent sh -n. Le paquet ne
+contient aucun payload fournisseur. Aucune règle PolicyKit/sudoers globale
+n’est ajoutée. Les recettes graphiques et la matrice VM détaillées 0.2.6
+ci-dessous restent leurs preuves historiques ; elles ne sont pas présentées
+comme de nouveaux essais visuels ou réseau 0.2.7.
+
+Sur le poste existant, la mise à niveau 0.2.6 → 0.2.7 réussit ; l’agent
+renvoie 0.2.7 et dpkg --verify reste propre. Le client desktop appelle ensuite
+le vrai wireguard.reactivate depuis le compte opérateur ordinaire, sans
+sudo ni substitution de politique : succès en 0,849 s, already_active=true,
+puis tunnel toujours actif. Cette vérification sans coupure exerce le chemin
+d’un tunnel déjà conforme ; elle ne simule pas une nouvelle perte d’interface.
+
+Avant/après installation et appel, les quinze fichiers suivis du bundle
+conservent empreintes, modes, inode et dates. Les neuf conteneurs gardent
+identités, images, états, montages et heures de démarrage ; le réseau IPv4/IPv6
+normalisé, les règles, le DNS et l’inventaire des 363 fichiers du kit restent
+identiques. Les fichiers d’action PolicyKit livrés sont identiques à 0.2.6.
+Aucun drone n’est configuré ni liaison distante revendiquée. Les rapports
+détaillés restent privés. L’opérateur a validé la réactivation réelle 0.2.6
+avant ce correctif d’autorisation ; le moteur n’a pas été modifié en 0.2.7.
+
+Historique 0.2.6 — tunnel WireGuard et intention persistante
 
 Vérification du 26 octobre 2026 : 331/331 tests Python réussis avec les
 préconditions Docker, GTK/WebKit et fournisseur explicitement activées.

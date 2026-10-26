@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.6 — état du code et qualification à poursuivre
+Préproduction 0.2.7 — état du code et qualification à poursuivre
 
 Développé
 
@@ -57,6 +57,11 @@ perdu son adresse/sa route, puis réactive ce profil après confirmation. Les
 configurations fournisseur et les paramètres réseau administrés sont conservés.
 Les états inconnus, interfaces étrangères et profils hors contrat restent
 refusés. Voir WIREGUARD.txt et TESTS.txt pour le périmètre et les preuves.
+
+La version 0.2.7 permet au compte opérateur autorisé de lancer cette seule
+réactivation sans mot de passe administrateur du PC. La méthode reste une
+mutation sérialisée, confirmée et protégée par les gardes existantes. Le moteur
+de réactivation est conservé ; aucune règle système globale n’est élargie.
 
 Le 26 octobre, l’opérateur a signalé un retour Internet après désactivation
 puis réactivation de sa carte réseau. Sur un autre réseau sans Aqua_Drone,

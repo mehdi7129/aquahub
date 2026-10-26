@@ -80,8 +80,8 @@ class Application:
         if method in self._handlers:
             raise ValueError(f"Handler already registered: {method}")
         # Maintenance exclusion and interactive authorization are independent:
-        # operator-authorized drone checks/configuration keep their operation
-        # fences without requiring an administrative password for each launch.
+        # Operator-authorized drone checks/configuration and WireGuard recovery
+        # keep their operation fences without an administrative password.
         self._handlers[method] = (handler, mutation, mutation if requires_admin is None else requires_admin)
 
     def _register_builtin(self):

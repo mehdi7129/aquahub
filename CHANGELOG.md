@@ -3,6 +3,17 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.7 — réactivation WireGuard sans mot de passe PC, préproduction
+
+- Le compte opérateur autorisé peut réactiver le tunnel sans demande PolicyKit.
+  La confirmation, les contrôles du profil, la sérialisation et les exclusions
+  de maintenance restent actifs. Les autres comptes sont refusés.
+- Les autres actions administratives gardent leur protection. Aucun changement
+  des règles PolicyKit/sudoers, scripts fournisseur ou paramètres IP.
+- Le moteur de réactivation 0.2.6 reste identique ; seul son besoin d’autorisation
+  interactive change. Les tests d’autorisation et preuves de paquet sont
+  consignés séparément dans docs/TESTS.txt.
+
 ## 0.2.6 — réactivation ciblée de WireGuard, préproduction
 
 - Supervision séparée du conteneur, du tunnel local et des échanges récents.
