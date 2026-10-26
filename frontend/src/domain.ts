@@ -1,4 +1,4 @@
-import type { Drone, HubStatus, Job, Preflight, Service, Inspection, JobProgress } from './types';
+import type { Drone, HubStatus, Job, Preflight, Service, Inspection, JobProgress, WireGuardStatus } from './types';
 
 export function escape(value: unknown): string { return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!)); }
 export function plainLog(text: string): string { return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').slice(-200000); }
@@ -20,7 +20,7 @@ interface ServicePresentationOptions { requesting?: string; job?: Job | null; jo
 interface ServicePresentation { tone: ReturnType<typeof serviceTone>; label: string; shortLabel?: string; description: string; operation?: 'requesting' | 'active' | 'refreshing' | 'uncertain'; }
 
 function restartFor(service: Service, job: Job | null | undefined): job is Job {
-  return Boolean(job && job.kind === 'service.restart' && job.target === service.id);
+  return Boolean(job && job.target === service.id && (job.kind === 'service.restart' || (service.id === 'wireguard' && job.kind === 'wireguard.reactivate')));
 }
 function timestamp(value: string | undefined): number { return typeof value === 'string' && value.trim() ? Date.parse(value) : NaN; }
 
@@ -44,16 +44,17 @@ export function servicePresentation(service: Service, status: HubStatus | null, 
   const fresh = observationFresh(status, connected, now);
   const job = latestRestart(service, status, options.job);
   const requested = options.requesting === service.id;
-  const uncertain = (): ServicePresentation => ({ tone: 'unknown', label: 'État à vérifier', description: 'Le résultat de la relance et l’état actuel de ce service restent à vérifier.', operation: 'uncertain' });
+  const wireguard = service.id === 'wireguard' && (requested || job?.kind === 'wireguard.reactivate');
+  const uncertain = (): ServicePresentation => ({ tone: 'unknown', label: 'État à vérifier', description: wireguard ? 'Le résultat de la réactivation et l’état du tunnel restent à vérifier.' : 'Le résultat de la relance et l’état actuel de ce service restent à vérifier.', operation: 'uncertain' });
   const unconfirmed = options.unconfirmed;
   const recovered = job && unconfirmed && timestamp(job.created_at) >= unconfirmed.requestedAt;
   if (unconfirmed && !recovered && (!fresh || !Number.isFinite(unconfirmed.failedAt) || timestamp(status?.collected_at) <= unconfirmed.failedAt)) return uncertain();
   if ((job || requested) && !fresh) return uncertain();
-  if (requested) return { tone: 'transition', label: 'Relance demandée', shortLabel: 'Relance', description: 'Demande de redémarrage envoyée ; attente de sa prise en compte par l’agent.', operation: 'requesting' };
+  if (requested) return { tone: 'transition', label: wireguard ? 'Réactivation demandée' : 'Relance demandée', shortLabel: wireguard ? 'Réactivation' : 'Relance', description: wireguard ? 'Demande de réactivation du tunnel envoyée ; attente de sa prise en compte par l’agent.' : 'Demande de redémarrage envoyée ; attente de sa prise en compte par l’agent.', operation: 'requesting' };
   if (job) {
     if (isActive(job)) {
       if (options.jobError && options.job?.id === job.id) return uncertain();
-      return { tone: 'transition', label: ['queued', 'pending'].includes(job.status) ? 'Relance en attente' : 'Redémarrage en cours', shortLabel: 'Relance', description: 'La tâche de redémarrage de ce service est suivie par AquaHub.', operation: 'active' };
+      return { tone: 'transition', label: wireguard ? (['queued', 'pending'].includes(job.status) ? 'Réactivation en attente' : 'Réactivation en cours') : (['queued', 'pending'].includes(job.status) ? 'Relance en attente' : 'Redémarrage en cours'), shortLabel: wireguard ? 'Réactivation' : 'Relance', description: wireguard ? 'La réactivation du tunnel WireGuard est suivie par AquaHub.' : 'La tâche de redémarrage de ce service est suivie par AquaHub.', operation: 'active' };
     }
     const finished = timestamp(job.finished_at);
     const collected = timestamp(status?.collected_at);
@@ -62,10 +63,65 @@ export function servicePresentation(service: Service, status: HubStatus | null, 
     // completion can safely replace the maintenance indicator with Docker state.
     if (collected <= finished) {
       if (now - finished > 30000) return uncertain();
-      return { tone: 'unknown', label: 'Actualisation', description: 'Relance terminée ; attente d’une observation du service postérieure à la tâche.', operation: 'refreshing' };
+      return { tone: 'unknown', label: 'Actualisation', description: wireguard ? 'Réactivation terminée ; attente d’une observation du tunnel postérieure à la tâche.' : 'Relance terminée ; attente d’une observation du service postérieure à la tâche.', operation: 'refreshing' };
     }
   }
   return { tone: serviceTone(service, fresh), label: serviceState(service.state), description: fresh ? '' : 'Dernier état observé ; état actuel non confirmé' };
+}
+
+export function validateWireGuardStatus(value: unknown): WireGuardStatus | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const data = value as Record<string, unknown>;
+  if (typeof data.state !== 'string' || !['active', 'absent', 'inactive', 'unknown', 'unsupported'].includes(data.state) || typeof data.can_reactivate !== 'boolean' ||
+      typeof data.checked_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(data.checked_at) || !Number.isFinite(Date.parse(data.checked_at))) return null;
+  const parts = data.checked_at.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)!;
+  const calendar = new Date(0); calendar.setUTCFullYear(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+  if (calendar.getUTCFullYear() !== Number(parts[1]) || calendar.getUTCMonth() !== Number(parts[2]) - 1 || calendar.getUTCDate() !== Number(parts[3]) || Number(parts[4]) > 23 || Number(parts[5]) > 59 || Number(parts[6]) > 59) return null;
+  for (const key of ['peer_count', 'recent_peer_count']) if (data[key] !== undefined && (typeof data[key] !== 'number' || !Number.isSafeInteger(data[key]) || data[key] < 0 || data[key] > 4096)) return null;
+  if (data.recent_peer_count !== undefined && (data.peer_count === undefined || Number(data.recent_peer_count) > Number(data.peer_count))) return null;
+  for (const key of ['reason', 'message']) if (data[key] !== undefined && (typeof data[key] !== 'string' || data[key].length > 2000)) return null;
+  return { state: data.state as WireGuardStatus['state'], checked_at: data.checked_at, can_reactivate: data.can_reactivate,
+    ...(data.peer_count === undefined ? {} : { peer_count: Number(data.peer_count) }),
+    ...(data.recent_peer_count === undefined ? {} : { recent_peer_count: Number(data.recent_peer_count) }),
+    ...(typeof data.reason === 'string' ? { reason: data.reason } : {}), ...(typeof data.message === 'string' ? { message: data.message } : {}) };
+}
+
+export function wireGuardFresh(value: unknown, now = Date.now()): boolean {
+  const wireguard = validateWireGuardStatus(value);
+  if (!wireguard) return false;
+  const checked = Date.parse(wireguard.checked_at);
+  return now - checked >= -5000 && now - checked <= 30000;
+}
+
+export interface WireGuardPresentation { label: string; tone: 'running' | 'transition' | 'unknown'; state: WireGuardStatus['state']; message: string; peers: string; operation?: ServicePresentation['operation']; }
+
+export function wireGuardPresentation(service: Service, status: HubStatus | null, connected: boolean, options: ServicePresentationOptions = {}): WireGuardPresentation {
+  const now = options.now ?? Date.now();
+  const wireguard = validateWireGuardStatus(service.wireguard);
+  const unknown = (message: string, operation?: ServicePresentation['operation']): WireGuardPresentation => ({ label: 'Tunnel non vérifié', tone: 'unknown', state: 'unknown', message, peers: '', ...(operation ? { operation } : {}) });
+  if (service.id !== 'wireguard') return unknown('Ce composant n’est pas WireGuard.');
+  const operation = servicePresentation(service, status, connected, options);
+  if (operation.operation) return { ...unknown(operation.description, operation.operation), ...(operation.operation === 'active' || operation.operation === 'requesting' ? { label: operation.label, tone: 'transition' as const } : {}) };
+  if (!observationFresh(status, connected, now) || !wireGuardFresh(wireguard, now)) return unknown('L’état actuel du tunnel n’est pas confirmé. Vérifiez WireGuard pour obtenir une nouvelle observation.');
+  const job = latestRestart(service, status, options.job);
+  const checked = timestamp(wireguard!.checked_at);
+  const unconfirmed = options.unconfirmed;
+  const recovered = job && unconfirmed && timestamp(job.created_at) >= unconfirmed.requestedAt;
+  if (unconfirmed && !recovered && (!Number.isFinite(unconfirmed.failedAt) || checked <= unconfirmed.failedAt)) return unknown('La demande n’a pas pu être suivie. Une nouvelle observation du tunnel est nécessaire avant tout nouvel essai.', 'uncertain');
+  if (job?.kind === 'wireguard.reactivate' && !isActive(job)) {
+    const finished = timestamp(job.finished_at);
+    if (!Number.isFinite(finished) || finished > now + 5000 || checked <= finished) return unknown('La tâche est terminée ; son résultat attend une observation du tunnel postérieure à sa fin.', Number.isFinite(finished) && now - finished <= 30000 ? 'refreshing' : 'uncertain');
+  }
+  const value = wireguard!;
+  const peers = value.state === 'active' && value.recent_peer_count !== undefined ? value.recent_peer_count > 0 ? `${value.recent_peer_count} échange${value.recent_peer_count > 1 ? 's' : ''} récent${value.recent_peer_count > 1 ? 's' : ''} observé${value.recent_peer_count > 1 ? 's' : ''}.` : 'Aucun échange récent observé.' : '';
+  return { state: value.state, label: ({ active: 'Tunnel actif', absent: 'Tunnel absent', inactive: 'Tunnel incomplet', unknown: 'Tunnel non vérifié', unsupported: 'Tunnel non pris en charge' })[value.state], tone: value.state === 'active' ? 'running' : ['absent', 'inactive'].includes(value.state) ? 'transition' : 'unknown', message: value.reason || value.message || (value.state === 'active' ? 'Le tunnel est actif. Cela ne confirme pas la présence d’un Aqua_Drone.' : value.state === 'inactive' ? 'L’interface WireGuard existe, mais le tunnel doit être réactivé.' : value.state === 'absent' ? 'Le tunnel WireGuard n’est pas actif sur ce poste.' : 'L’état du tunnel ne permet pas sa réactivation automatique.'), peers };
+}
+
+export function wireGuardReactivateAllowed(status: HubStatus | null, service: Service | undefined, connected: boolean, busy: boolean, options: ServicePresentationOptions = {}): boolean {
+  if (!service || service.id !== 'wireguard' || service.state !== 'running' || busy || isActive(status?.active_job)) return false;
+  const value = validateWireGuardStatus(service.wireguard);
+  const presentation = wireGuardPresentation(service, status, connected, options);
+  return Boolean(value?.can_reactivate === true && ['absent', 'inactive'].includes(presentation.state) && !presentation.operation);
 }
 export function healthState(health: string | null): string { if (!health || ['none', 'not_defined', 'undefined'].includes(health)) return 'Non défini'; return ({ healthy: 'Validé', unhealthy: 'En échec', starting: 'Vérification' } as Record<string, string>)[health] ?? 'Inconnu'; }
 export function counts(services: Service[]) { return { total: services.length, running: services.filter(s => s.state === 'running').length, healthy: services.filter(s => s.health === 'healthy').length, unhealthy: services.filter(s => s.health === 'unhealthy').length, undefined: services.filter(s => healthState(s.health) === 'Non défini').length }; }
@@ -82,7 +138,7 @@ export function jobState(job: Job): string { return ({ queued: 'En attente', pen
 export function jobSucceeded(job: Job): boolean { return ['succeeded', 'completed'].includes(job.status); }
 export function preflightAllowed(preflight: Preflight | null, drone: Drone | undefined): boolean { return Boolean(drone?.supported && drone.reachable === true && preflight && (preflight.id || preflight.preflight_id) && preflight.allowed === true && preflight.number !== undefined && preflight.number === drone.number && preflight.address === drone.address && (preflight.checks ?? []).every(check => check.ok !== false)); }
 export function inspectionAllowed(inspection: Inspection | null): boolean { return Boolean(inspection && (inspection.id || inspection.inspection_id) && inspection.allowed === true && inspection.can_apply === true && (inspection.checks ?? []).every(check => check.ok !== false)); }
-export function restartAllowed(status: HubStatus | null, service: Service | undefined, busy: boolean): boolean { return Boolean(status?.docker_available && !status.stale && service && service.state !== 'missing' && service.actions?.restart !== false && !busy && !isActive(status.active_job)); }
+export function restartAllowed(status: HubStatus | null, service: Service | undefined, busy: boolean): boolean { return Boolean(status?.docker_available && !status.stale && service && service.id !== 'wireguard' && service.state !== 'missing' && service.actions?.restart !== false && !busy && !isActive(status.active_job)); }
 export function rpcResultError(result: unknown): string | null {
   if (!result || typeof result !== 'object' || !('error' in result) || !result.error || 'status' in result || 'services' in result) return null;
   const error = result.error;
@@ -115,7 +171,7 @@ export function jobLabel(job: Job): string {
   const target = String(job.target ?? '');
   const droneNumber = target.match(/^(?:Aqua_Drone_)?([1-9][0-9]*)$/i)?.[1];
   if (droneKind && droneNumber) return `Configuration de Aqua_Drone_${droneNumber}`;
-  return job.label ?? ({ restart: 'Redémarrage du service', service_restart: 'Redémarrage du service', 'service.restart': 'Redémarrage du service', 'portainer.restart': 'Relance de Portainer', 'portainer.initialize': 'Initialisation Portainer', 'app.download': 'Téléchargement d’AquaHub', 'app.install': 'Mise à jour de l’application AquaHub', 'app_updates.download': 'Téléchargement d’AquaHub', 'app_updates.install': 'Mise à jour de l’application AquaHub', download: 'Téléchargement de la livraison', update: 'Installation de la livraison', rollback: 'Restauration de la livraison', drone_configure: 'Configuration Aqua_Drone', configure_drone: 'Configuration Aqua_Drone', configure: 'Configuration Aqua_Drone' } as Record<string, string>)[job.kind ?? ''] ?? 'Tâche de maintenance';
+  return job.label ?? ({ restart: 'Redémarrage du service', service_restart: 'Redémarrage du service', 'service.restart': 'Redémarrage du service', 'wireguard.reactivate': 'Réactivation du tunnel WireGuard', 'portainer.restart': 'Relance de Portainer', 'portainer.initialize': 'Initialisation Portainer', 'app.download': 'Téléchargement d’AquaHub', 'app.install': 'Mise à jour de l’application AquaHub', 'app_updates.download': 'Téléchargement d’AquaHub', 'app_updates.install': 'Mise à jour de l’application AquaHub', download: 'Téléchargement de la livraison', update: 'Installation de la livraison', rollback: 'Restauration de la livraison', drone_configure: 'Configuration Aqua_Drone', configure_drone: 'Configuration Aqua_Drone', configure: 'Configuration Aqua_Drone' } as Record<string, string>)[job.kind ?? ''] ?? 'Tâche de maintenance';
 }
 export function jobProgress(job: Job): JobProgress {
   const progress = job.progress;

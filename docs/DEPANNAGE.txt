@@ -243,3 +243,21 @@ Donner la version, la commande ou le parcours utilisé, la cible simulée ou
 réelle, le code d’erreur et une reproduction expurgée. Ne pas déposer la base
 SQLite, une archive client, un fichier SSH ou les logs bruts d’un fournisseur
 dans une issue publique.
+
+WireGuard : conteneur en cours, tunnel absent ou incomplet
+
+Le processus Docker peut tourner alors que wg0 a perdu son adresse ou une
+route. Dans Supervision → WireGuard, lire l’état du tunnel séparé du contour
+Docker. Vérifier WireGuard renouvelle les contrôles sans couper la liaison.
+Si le profil reconnu est réactivable, Réactiver le tunnel remet en service
+ses paramètres déjà installés après confirmation. Aucun drone n’est requis.
+
+Aucun échange récent observé reste neutre : sans trafic, un handshake peut
+rester nul. Ce n’est pas une mesure de présence d’un Aqua_Drone. Un tunnel
+local actif ne garantit pas que le pair est accessible sur le réseau actuel.
+
+Si l’état est non vérifié ou non pris en charge, consulter le motif et les
+journaux. Le bouton ne supprime pas une interface étrangère, ne change pas
+les IP administrées et ne redémarre pas l’ancien conteneur. Le profil, ses
+montages ou une opération encore en cours peuvent exiger une intervention
+qualifiée. Voir WIREGUARD.txt pour les limites ; les preuves réelles restent privées.

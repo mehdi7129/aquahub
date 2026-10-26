@@ -63,3 +63,14 @@ class UpgradeGuardTests(unittest.TestCase):
         self.app.store.create_job('legacy','drone',{})
         with self.assertRaisesRegex(RuntimeError,'pas terminée'):
             upgrade.guard(self.state,lambda:self.fail('must not stop'))
+
+    def test_wireguard_intent_blocks_upgrade_even_after_its_deadline(self):
+        for value in ({'schema': 1, 'until': 1}, {}, False):
+            with self.subTest(value=value):
+                self.app.store.setting_set('wireguard_pending', value)
+                with self.assertRaisesRegex(RuntimeError, 'WireGuard'):
+                    upgrade.guard(self.state, lambda:self.fail('must not stop'))
+        self.app.store.setting_set('wireguard_pending', None)
+        stopped=[]
+        upgrade.guard(self.state, lambda:stopped.append(True))
+        self.assertEqual(stopped, [True])

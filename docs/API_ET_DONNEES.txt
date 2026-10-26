@@ -11,7 +11,7 @@ Exemple de lecture :
   {"id":"example-1","method":"app.version","params":{}}
 
 Réponse de succès :
-  {"id":"example-1","result":{"version":"0.2.5","stage":"preproduction","protocol":1}}
+  {"id":"example-1","result":{"version":"0.2.6","stage":"preproduction","protocol":1}}
 
 Réponse d’erreur :
   {"id":"example-1","error":{"code":"unknown_method","message":"..."}}
@@ -61,6 +61,52 @@ Maintenance générale, autorisation requise :
   service.start/stop/restart  service limité à la liste connue.
   settings.save             github_url et/ou theme.
   portainer.restart         confirmed=true, instance locale gérée uniquement.
+
+Les méthodes génériques service.start/stop/restart restent refusées pour
+WireGuard. La réactivation du tunnel utilise le contrat dédié suivant.
+
+WireGuard, depuis 0.2.6 :
+  wireguard.status      Aucun paramètre ; lecture renouvelée du tunnel local,
+                        compte opérateur authentifié, sans demande administrateur.
+  wireguard.reactivate  confirmed=true ; autorisation habituelle des services,
+                        renvoie une tâche sérialisée kind=wireguard.reactivate,
+                        target=wireguard. Les autres paramètres sont refusés.
+
+wireguard.status renvoie directement un DTO, également joint au service
+wireguard de status.get sous Service.wireguard. Champs :
+  state              active, absent, inactive, unknown ou unsupported.
+  checked_at         Date ISO de l’observation propre au tunnel.
+  can_reactivate     Booléen d’éligibilité, pas une autorisation du demandeur.
+  peer_count         Nombre de pairs du profil reconnu, lorsqu’il est connu.
+  recent_peer_count  Nombre de pairs avec échange récent observé, s’il est connu.
+  reason, message    Textes bornés ; reason est facultatif et omis s’il est absent.
+
+active confirme le profil chargé et les éléments locaux attendus. absent
+signifie que l’interface wg0 n’existe pas. inactive désigne une interface
+appartenant au profil reconnu mais incomplète ou non activée, affichée
+« Tunnel incomplet ». unknown et unsupported n’autorisent pas l’activation.
+Aucun échange récent n’est requis pour active. Aucun de ces champs ne
+constitue un indicateur de présence d’un Aqua_Drone ou une garantie distante.
+Le DTO ne contient ni clé, ni endpoint, ni adresse privée du profil.
+
+Le renderer valide les types, nombres et dates avant usage. Les observations
+Docker et WireGuard doivent être récentes pour proposer la réactivation :
+au plus 30 secondes, avec au plus cinq secondes de tolérance pour une date
+future. Une réponse invalide ou absente ne rend jamais le bouton éligible.
+Après la fin d’une tâche, collected_at et checked_at doivent tous deux être
+postérieurs à finished_at pour confirmer le nouvel état. Une lecture dédiée
+plus récente n’est pas remplacée par une ancienne réponse de status.get.
+
+Le statut inclus dans status.get est collecté séparément, sans bloquer la
+supervision Docker. Une sonde WireGuard indisponible donne un état de tunnel
+non vérifié ; elle ne rend pas les autres services indisponibles.
+
+La mutation ne redémarre pas le conteneur. Elle réactive uniquement un profil
+et une instance déjà reconnus, ou constate qu’ils sont déjà actifs. Elle ne
+prend aucun chemin, IP, commande ou profil du client. Les paramètres existants
+restent inchangés ; la restauration des seuls éléments prévus du tunnel est
+distinguée des invariants réseau hors tunnel. Voir WIREGUARD.txt pour les
+gardes, le contrat de profil et les cas refusés.
 
 Aqua_Drones :
   drones.list/scan    Pas de paramètre ; profils, présence observée et
@@ -197,6 +243,14 @@ Les étapes et le journal d’une tâche expliquent son progrès. La fermeture
 de la fenêtre n’annule pas le travail de l’agent. Un redémarrage d’agent
 marque les tâches inachevées interrupted ; il ne les rejoue pas automatiquement.
 
+La tâche wireguard.reactivate se suit aussi par jobs.get, sans nouvelle
+demande d’activation après déconnexion. Une intention interne wireguard_pending
+est persistée avant son appel externe ; elle ne devient pas sûre par simple
+expiration. Tant que la fin n’est pas prouvée, les gardes bloquent les mutations,
+précontrôles et installations incompatibles. Ce marqueur interne ne fait pas
+partie des paramètres client et ne constitue pas une reprise générale de tous
+les types de tâches interrompues. Voir WIREGUARD.txt et le plan de reprise.
+
 idempotency_key est une clé facultative de la requête, de 1 à 128 caractères,
 transmise au contexte et aux tâches. Elle permet de reconnaître une même
 demande. Elle ne remplace ni les précontrôles, ni PolicyKit, ni le verrou de
@@ -247,6 +301,9 @@ dans une issue publique pour illustrer un problème.
 Le canal applicatif conserve son état privé dans app-updates : ready.json,
 pending.json, status.json et package.deb. Le helper application_upgrade.py
 utilise ces chemins fixes et écrit un journal installation.log privé.
+WireGuard conserve son intention interne wireguard_pending dans les réglages
+privés SQLite ; les états détaillés, les identités et le profil ne doivent
+pas être exportés comme données publiques de diagnostic.
 
 Il n’existe pas encore de framework général de migrations de schéma ou de
 négociation de versions de protocole. Pour faire évoluer les données ou les

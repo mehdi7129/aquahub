@@ -139,6 +139,15 @@ def no_active_jobs(state):
         with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True, timeout=5)) as connection:
             if connection.execute("SELECT count(*) FROM jobs WHERE status IN ('running','queued')").fetchone()[0]:
                 raise UpgradeError('Une opération AquaHub n’est pas terminée. Attendez avant de mettre à jour l’application.')
+            if connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'").fetchone():
+                row = connection.execute("SELECT value FROM settings WHERE key='wireguard_pending'").fetchone()
+                if row:
+                    try:
+                        pending = json.loads(row[0])
+                    except (ValueError, TypeError):
+                        raise UpgradeError('L’état de réactivation WireGuard doit être vérifié avant la mise à jour.') from None
+                    if pending is not None:
+                        raise UpgradeError('La fin de la réactivation WireGuard doit être confirmée avant la mise à jour.')
 
 
 def install(*, state=STATE, stage=STAGE, runtime_version=RUNTIME_VERSION, setup_marker=SETUP_MARKER, run=command):

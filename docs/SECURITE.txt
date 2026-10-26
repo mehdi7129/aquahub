@@ -1,5 +1,5 @@
 AquaHub — frontières de confiance et invariants
-Référence : préproduction 0.2.5.
+Référence : préproduction 0.2.6.
 
 Ce document décrit les garde-fous implémentés, leur portée et les règles de
 contribution. Il ne constitue pas une certification ni une garantie contre
@@ -85,7 +85,8 @@ Les actions directes start/stop des trois composants réseau sont bloquées.
 restart est autorisé pour net_setup et gcs_reactor sur le conteneur existant,
 avec comparaison consultative des adresses et routes IPv4/IPv6 avant/après.
 Une différence donne un échec explicite, sans restauration automatique du
-réseau. WireGuard reste bloqué dans l’attente d’un parcours d’échec validé.
+réseau. Les actions génériques du conteneur WireGuard restent bloquées ;
+sa réactivation utilise depuis 0.2.6 le parcours séparé de WIREGUARD.txt.
 Ces règles restent appliquées si l’interface est contournée. Le moteur image-refresh-v1
 refuse les changements d’images de ces composants ainsi que les changements
 de Compose et des configurations protégées.
@@ -280,3 +281,27 @@ exceptions réseau nécessite des tests négatifs : vérifier les refus autant
 que le cas nominal. Voir docs/TESTS.txt. Ne pas fournir une issue publique
 contenant une vulnérabilité exploitable et des accès réels ; utiliser le canal
 privé décrit dans les consignes de contribution lorsqu’il est disponible.
+
+9. Réactivation WireGuard 0.2.6
+
+Le parcours dédié atteste l’instance, le profil fixe monté, les outils, la
+séparation du résolveur conteneur/hôte et l’appartenance de wg0. Il refuse
+hooks, routes par défaut, options inconnues et paramètres étrangers. Le
+profil source n’est pas écrit ; une copie privée vérifiée par empreinte
+précède toute action. Son transport sur stdin évite les clés dans argv et
+les événements Docker. Les valeurs sont analysées avec des séparateurs
+compatibles avec l’outil Bash existant : LF/CRLF et syntaxe ASCII hors commentaires.
+
+Une intention unique est enregistrée avant l’exécution, avec limite interne
+et externe, verrou dans le conteneur et refus des appels retardés. Un CAS
+SQLite atomique empêche une ancienne vérification d’effacer une intention
+plus récente. L’expiration seule n’autorise jamais une nouvelle intervention.
+Les deux assistants de mise à niveau et l’assistant de réparation graphique
+contrôlent cette intention ; le helper natif vérifie avant le premier APT.
+
+Les deux identités config/manifest de la même image linux/amd64 qualifiée
+sont reconnues pour les stockages Docker classique et containerd. Cette
+preuve ne rend pas une autre image acceptable. Les empreintes des outils,
+montages, profils et limites restent requises. Les invariants hors tunnel
+sont relus après l’action ; aucun correctif général du réseau n’est lancé.
+Voir WIREGUARD.txt pour le contrat complet et TESTS.txt pour sa qualification.

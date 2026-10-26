@@ -2,6 +2,7 @@
 from pathlib import Path
 from contextlib import closing
 import fcntl
+import json
 import os
 import sqlite3
 import subprocess
@@ -26,6 +27,19 @@ def guard(state=Path('/var/lib/aquahub/agent'), stop=None):
             with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True, timeout=5)) as connection:
                 if connection.execute("SELECT count(*) FROM jobs WHERE status IN ('running','queued')").fetchone()[0]:
                     raise RuntimeError('Une opération AquaHub n’est pas terminée. Vérifiez son état dans l’application avant de relancer l’installation.')
+                # A Docker exec can outlive its client/agent. Only the installed
+                # manager may clear this intent after proving execution ended;
+                # an elapsed timestamp alone is not that proof.
+                settings = connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'").fetchone()
+                if settings:
+                    row = connection.execute("SELECT value FROM settings WHERE key='wireguard_pending'").fetchone()
+                    if row:
+                        try:
+                            pending = json.loads(row[0])
+                        except (ValueError, TypeError):
+                            raise RuntimeError('L’état de réactivation WireGuard doit être vérifié dans AquaHub avant l’installation.') from None
+                        if pending is not None:
+                            raise RuntimeError('La fin de la réactivation WireGuard doit être confirmée dans AquaHub avant l’installation.')
         if stop is not None:
             stop()
         else:

@@ -45,8 +45,8 @@ Pour une mise à jour publique de l’application seule :
 
   python3 installer/build_package.py \
     --application-only \
-    --output dist/aquahub-application_0.2.5_amd64.deb \
-    --version 0.2.5
+    --output dist/aquahub-application_0.2.6_amd64.deb \
+    --version 0.2.6
 
 Ce mode n’accepte ni --payload ni --private-kit. Le paquet garde le nom Debian
 aquahub-setup afin de mettre à niveau l’installation 0.1.2 existante, sans
@@ -80,8 +80,8 @@ Exemple avec un payload externe déjà vérifié, depuis la racine du dépôt :
 
   python3 installer/build_package.py \
     --payload /chemin/hors-depot/payload \
-    --output dist/aquahub-setup_0.2.5_amd64.deb \
-    --version 0.2.5
+    --output dist/aquahub-setup_0.2.6_amd64.deb \
+    --version 0.2.6
 
 Cette commande refuse un payload déclaré privé ou contenant les formes de
 clés privées reconnues. L’option --private-kit permet uniquement une recette
@@ -143,7 +143,16 @@ Publier une version seulement quand le paquet est qualifié et redistribuable.
 Joindre les notes, l’architecture, la version Debian ciblée, les empreintes
 et la méthode de vérification de signature retenue. Ne pas joindre un kit privé.
 
-Paquet applicatif 0.2.5 construit localement : 147334 octets, SHA-256 :
+Candidat applicatif 0.2.6 construit localement : 162452 octets, SHA-256 :
+  aac08b1505d8b28d94c4ea73428e1fdfd86370213cd712563bc517bf4eecf717
+Le parcours de réactivation WireGuard, ses gardes et les preuves effectivement
+acquises sont décrits dans WIREGUARD.txt et TESTS.txt. Une réussite des sources
+ou de la CI n’annonce pas la disponibilité du pair, du drone ou d’un kit client.
+Les exemples de construction ne signifient pas qu’un kit complet 0.2.6 est
+déjà redistribuable. Aucune Release publique n’est créée par la publication
+du code ou par cette construction locale.
+
+Historique du paquet applicatif 0.2.5 : 147334 octets, SHA-256 :
   294b545b1fa407707dfd14edfa66bff55254979512ee60c7f4a9de540619dd98
 La configuration ciblée, les tests fournisseur sur transports simulés, la
 recette VM de mise à niveau/réinstallation et la mise à niveau du poste sont

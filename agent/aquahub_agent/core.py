@@ -111,6 +111,8 @@ class Application:
         application_update = getattr(self, "app_updates", None)
         if mutation and application_update is not None and method != "app_updates.install" and application_update.installation_pending():
             raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
+        if mutation:
+            self._check_wireguard_pending()
         key = context.idempotency_key
         if key is not None and (not isinstance(key, str) or not 1 <= len(key) <= 128):
             raise ApiError("invalid_params", "La clé d’opération doit contenir de 1 à 128 caractères.")
@@ -264,6 +266,17 @@ class Application:
             "name": row.get("label", row["service"]),
             "restarts": row.get("restart_count", 0),
         } for row in snapshot["services"]]
+        wireguard = getattr(self, "wireguard", None)
+        if wireguard is not None:
+            for row in snapshot["services"]:
+                if row["id"] == "wireguard":
+                    try:
+                        row["wireguard"] = wireguard.snapshot()
+                    except Exception:
+                        # One optional tunnel probe must not invalidate Docker
+                        # observations for all the other services.
+                        row["wireguard"] = {"state": "unknown", "checked_at": timestamp(),
+                            "can_reactivate": False, "reason": "La vérification de WireGuard est indisponible."}
         snapshot["machine"] = os.uname().nodename
         snapshot["docker_available"] = self._snapshot is not None and error is None
         snapshot["portainer_available"] = bool(snapshot.get("portainer", {}).get("available"))
@@ -306,7 +319,9 @@ class Application:
     def _service_action(self, operation, params, context):
         self._check_keys(params, ("service",))
         service = self._service(params)
-        if service == "wireguard" or (service in {"net_setup", "gcs_reactor"} and operation != "restart"):
+        if service == "wireguard":
+            raise ApiError("network_guard", "Le redémarrage complet du conteneur WireGuard est protégé. Utilisez la vérification et la réactivation dédiées du tunnel.")
+        if service in {"net_setup", "gcs_reactor"} and operation != "restart":
             raise ApiError("network_guard", "Cette action réseau ne dispose pas encore d’un parcours de reprise validé. Elle reste indisponible.")
         return self.submit_job(f"service.{operation}", service, {"service": service}, lambda: self.docker.action(service, operation))
 
@@ -333,6 +348,7 @@ class Application:
             application_update = getattr(self, "app_updates", None)
             if application_update is not None and application_update.installation_pending():
                 raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
+            self._check_wireguard_pending()
             maintenance_fd = os.open(self._maintenance_path, os.O_RDWR | os.O_NOFOLLOW)
             try:
                 fcntl.flock(maintenance_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
@@ -369,6 +385,7 @@ class Application:
             application_update = getattr(self, "app_updates", None)
             if application_update is not None and application_update.installation_pending():
                 raise ApiError("maintenance", "L’application AquaHub est en cours de mise à jour. Attendez son redémarrage avant une autre intervention.")
+            self._check_wireguard_pending()
             maintenance_fd = os.open(self._maintenance_path, os.O_RDWR | os.O_NOFOLLOW)
             try:
                 fcntl.flock(maintenance_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
@@ -392,6 +409,11 @@ class Application:
                     "message": error.message if isinstance(error, ApiError) else "L’opération n’a pas démarré."})
             self._mutation_lock.release()
             raise
+
+    def _check_wireguard_pending(self):
+        manager = getattr(self, "wireguard", None)
+        if manager is not None and manager.is_pending():
+            raise ApiError("maintenance", "La fin de la réactivation WireGuard reste à confirmer. Vérifiez WireGuard avant une autre intervention.")
 
     def _run_job(self, job, work, maintenance_fd=None):
         job_id = job["id"]
@@ -489,6 +511,8 @@ class Application:
 
     def close(self):
         self._stop.set()
+        wireguard = getattr(self, "wireguard", None)
+        wireguard_closed = wireguard is None or wireguard.close() is not False
         if self._poll_thread:
             self._poll_thread.join(timeout=45)
         with self._threads_lock:
@@ -496,7 +520,7 @@ class Application:
         for thread in threads:
             thread.join(timeout=60)
         # Long-running extension jobs may still hold references. Do not close beneath them.
-        if any(thread.is_alive() for thread in threads) or (self._poll_thread and self._poll_thread.is_alive()):
+        if not wireguard_closed or any(thread.is_alive() for thread in threads) or (self._poll_thread and self._poll_thread.is_alive()):
             return
         self.store.close()
         self._process_lock.close()

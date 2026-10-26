@@ -9,6 +9,7 @@ are performed here.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -17,6 +18,7 @@ from pathlib import Path, PurePosixPath
 import pwd
 import shutil
 import socket
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -24,7 +26,7 @@ import tarfile
 import tempfile
 import time
 
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 PROJECT = "aqua-hub-bundle"
 SERVICES = {"mosquitto", "dmx_fleet_controller", "gcs", "gcs_reactor", "net_setup", "mavlink_router", "rtcm_mavlink", "wireguard"}
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "HOME": "/root", "DOCKER_CONFIG": "/etc/aquahub/docker-client"}
@@ -33,6 +35,31 @@ MAX_BUNDLE_BYTES = 8 * 1024**3
 
 class SetupError(Exception):
     pass
+
+
+def check_agent_maintenance(state=Path("/var/lib/aquahub/agent")):
+    """Read under the native helper's maintenance lock, before APT or repair."""
+    try:
+        if not state.exists() and not state.is_symlink():
+            return
+        if state.is_symlink() or not state.is_dir() or state.stat().st_uid != os.geteuid() or state.stat().st_mode & 0o077:
+            raise SetupError("Le dossier d’état AquaHub n’est pas protégé ; l’installation est arrêtée.")
+        database = state / "aquahub.sqlite3"
+        if not database.exists() and not database.is_symlink():
+            return
+        info = database.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise SetupError("La base AquaHub n’est pas protégée ; l’installation est arrêtée.")
+        with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=5)) as db:
+            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if "jobs" in tables and db.execute("SELECT count(*) FROM jobs WHERE status IN ('running','queued')").fetchone()[0]:
+                raise SetupError("Une opération AquaHub n’est pas terminée. Vérifiez son état avant de réparer l’installation.")
+            if "settings" in tables:
+                row = db.execute("SELECT value FROM settings WHERE key='wireguard_pending'").fetchone()
+                if row and (not isinstance(row[0], str) or len(row[0]) > 4096 or json.loads(row[0]) is not None):
+                    raise SetupError("La fin de la réactivation WireGuard doit être confirmée dans AquaHub avant l’installation ou la réparation.")
+    except (OSError, ValueError, sqlite3.Error):
+        raise SetupError("L’état des opérations AquaHub ne peut pas être vérifié. L’installation est arrêtée avant toute modification système.") from None
 
 
 def verified_archive_identities(archive: Path, images: list[dict]) -> dict:
@@ -327,6 +354,7 @@ def render_new_bundle_unit(template: str, bundle: Path) -> str:
 def finish(resources: Path, operator_uid: int):
     if os.geteuid() != 0:
         raise SetupError("L’installation requiert l’autorisation administrateur du système.")
+    check_agent_maintenance()
     account = pwd.getpwuid(operator_uid)
     if operator_uid == 0 or account.pw_shell in {"/usr/sbin/nologin", "/bin/false"}:
         raise SetupError("Le compte opérateur doit être une session utilisateur ordinaire.")
@@ -385,12 +413,22 @@ def finish(resources: Path, operator_uid: int):
 
 
 def main(argv=None):
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments == ["--check-maintenance"]:
+        try:
+            if os.geteuid() != 0:
+                raise SetupError("La vérification système nécessite l’autorisation administrateur.")
+            check_agent_maintenance()
+            return 0
+        except SetupError as error:
+            progress("error", str(error))
+            return 1
     parser = argparse.ArgumentParser(description="Finalisation locale du kit AquaHub")
     parser.add_argument("--operator-uid", required=True, type=int)
     current_kit = Path("/usr/share/aquahub/offline")
     preserved_kit = Path("/var/lib/aquahub/offline")
     parser.add_argument("--resources", type=Path, default=current_kit if current_kit.exists() else preserved_kit)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     try:
         finish(args.resources, args.operator_uid)
         return 0

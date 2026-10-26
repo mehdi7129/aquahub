@@ -126,6 +126,7 @@ small{font-size:12px;line-height:1.6}
 .service-profile p{margin-top:10px;color:var(--muted);font-size:10px;display:flex;gap:6px;align-items:center}
 .service-profile p>.icon{width:13px;height:13px}
 .action-explanation{font-size:10px;line-height:1.7;color:var(--muted);margin-top:10px}
+.wireguard-actions{margin-top:14px}
 .detail-tabs{display:flex;border-bottom:1px solid var(--border);margin-top:21px}
 .detail-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;padding:13px 10px;font-size:11px;color:var(--muted);flex:1}
 .detail-tabs button[aria-selected=true]{border-bottom-color:var(--text);color:var(--text);font-weight:600}

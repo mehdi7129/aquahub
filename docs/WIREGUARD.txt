@@ -1,0 +1,144 @@
+AquaHub — observation et réactivation du tunnel WireGuard
+Préproduction 0.2.6 — contrat et limites du parcours dédié
+
+1. Parcours utilisateur
+
+Dans Supervision, sélectionner WireGuard. Le contour habituel décrit le
+conteneur Docker ; une seconde information décrit le tunnel local.
+
+Tunnel actif : le profil chargé, les adresses et les routes attendues sont
+confirmés. Vérifier WireGuard renouvelle une lecture, sans couper le tunnel.
+Tunnel absent : aucune interface wg0 n’est présente.
+Tunnel incomplet : l’interface reconnue a perdu une adresse ou une route
+attendue, ou n’est plus activée, sans contenir de configuration étrangère.
+Tunnel non vérifié/non pris en charge : le parcours refuse une intervention
+tant que les préconditions nécessaires ne sont pas confirmées.
+
+Réactiver le tunnel est proposé pour un tunnel absent ou incomplet, avec
+profil reconnu et observations récentes. Une confirmation précède la tâche.
+Les paramètres enregistrés restent inchangés ; les éléments du tunnel déjà
+prévus par ce profil sont remis en service. Aucun champ d’IP n’est ajouté.
+Une réponse perdue ne déclenche aucun nouvel essai automatique.
+
+Les échanges sont une observation séparée. Aucun échange récent peut
+simplement signifier qu’aucun trafic n’a été envoyé. Un handshake ne prouve
+pas la présence d’un Aqua_Drone, et son absence ne prouve pas une panne.
+La vérification du tunnel est possible sans drone et sur un autre réseau.
+Elle ne garantit ni l’accès au pair, ni l’accès aux applications distantes.
+
+2. Pourquoi une action dédiée
+
+Le démarrage historique du conteneur peut supprimer une route par défaut
+lorsque le profil est absent ou que son activation échoue. Le fait que son
+processus reste running ne prouve pas qu’une interface fonctionnelle existe.
+Ce risque justifie le maintien des gardes service.start/stop/restart.
+
+AquaHub utilise les outils wg et wg-quick existants de l’image reconnue.
+Il ne lance pas son ancien entrypoint, ne redémarre pas le conteneur et ne
+modifie aucun script fournisseur. Le correctif officiel de démarrage v1.0.1
+reste une intégration distincte : il est livré comme fichier monté, pas par
+un simple téléchargement de la même image.
+
+Une interface déjà chargée à l’identique donne un résultat consultatif sans
+mutation. Une interface incomplète ne peut être descendue/remontée que si
+son appartenance au profil est prouvée. Une interface étrangère est conservée.
+
+3. Contrat de la première version
+
+Le module agent/aquahub_agent/wireguard.py reconnaît une instance unique du
+service WireGuard dans le projet local attendu, l’image qualifiée, son PID,
+son dossier de travail et ses montages. Le conteneur doit déjà fonctionner.
+Le suivi fournisseur /run/activeconfs doit désigner le profil unique attendu.
+Un conteneur arrêté ou un ancien démarrage échoué sans suivi reste refusé.
+
+Le profil provient du chemin fixe config/wireguard/hub/wg0.conf du bundle,
+monté sous /config/wg_confs/wg0.conf. Les lectures sont bornées, ancrées par
+descripteurs et réservées aux fichiers réguliers. La copie montée doit être
+le même fichier que la source. Le profil n’est jamais choisi par le renderer.
+
+Le contrat initial couvre un profil IPv4 avec une adresse /32, des pairs
+fermement définis, des réseaux autorisés sans route par défaut et une table
+automatique. Les hooks, options inattendues, enregistrement automatique,
+tables personnalisées et configurations ambiguës sont refusés. Ce contrat
+ne prétend pas gérer tous les profils WireGuard possibles.
+
+Les outils et la résolution DNS de l’image font partie de la qualification.
+Dans ce montage, le DNS du profil concerne le fichier du conteneur, distinct
+de celui de l’hôte. Aucun partage inattendu de répertoire ou bus système
+n’est accepté pour ce parcours.
+
+4. Appartenance, état attendu et réseau extérieur
+
+La clé publique locale dérivée du profil doit correspondre à celle de
+l’interface. Les pairs, leurs réseaux autorisés et l’absence de marquage
+de politique inattendu sont contrôlés. Une adresse ou route supplémentaire
+non prévue sur wg0 bloque la réparation : elle n’est pas effacée.
+
+La réactivation peut restaurer les seules adresses et routes déjà prévues
+pour ce tunnel. Cela se distingue d’une modification des paramètres IP
+administrés. Les configurations du bundle, les adresses/routes hors wg0,
+les autres VPN, les règles IPv4/IPv6 et le résolveur hôte restent comparés.
+Les conflits avec un réseau existant bloquent l’activation.
+
+La descente wg-quick pouvant nettoyer ses artefacts de pare-feu, un artefact
+wg0 inattendu impose un refus avant intervention. Aucun effacement général
+de route, règle ou pare-feu n’est une procédure de réparation AquaHub.
+
+5. Exécution et erreurs
+
+Les octets validés du profil sont figés dans une copie privée éphémère du
+conteneur. Clés et profil passent sur stdin ; ils ne sont ni interpolés dans
+un shell, ni placés dans les arguments de Docker ou ses événements exec.
+Les commandes de contrôle et le helper sont des constantes AquaHub.
+Les copies temporaires sont privées et le fichier fournisseur n’est pas écrit.
+
+Sous un verrou dans le conteneur, le helper revérifie l’identité et l’état
+avant toute descente d’un tunnel incomplet. Une expiration refuse également
+une commande Docker retardée. L’exécution est bornée dans le conteneur et
+dans son client ; tuer seulement le client Docker ne prouverait pas sa fin.
+
+Un état wireguard_pending est conservé en SQLite avant l’appel externe.
+Une disparition de l’agent ne rend pas cette intention sûre par simple
+expiration. La fin doit être prouvée par l’état de l’instance et son verrou.
+En attendant, les autres mutations, précontrôles et installations AquaHub
+restent protégés. Les consultations et diagnostics restent accessibles.
+
+Après l’action, AquaHub vérifie le profil, le conteneur, le tunnel et les
+invariants extérieurs. Une erreur laisse un résultat non confirmé, sans
+réessai aveugle ni restauration automatique du réseau. Les messages destinés
+à la GUI et à l’historique restent fixes ; les sorties brutes pouvant répéter
+une clé ne sont pas exposées.
+
+6. API et autorisation
+
+wireguard.status({}) : lecture du statut local. Aucun mot de passe n’est
+nécessaire pour consulter cet état depuis le compte opérateur autorisé.
+
+wireguard.reactivate({confirmed:true}) : création d’une tâche sérialisée,
+kind=wireguard.reactivate, target=wireguard. Les autres paramètres et une
+confirmation absente sont refusés. L’autorisation administrative habituelle
+des interventions sur les services est conservée. L’exception sans mot de
+passe PC des précontrôles/configurations Aqua_Drones reste distincte.
+
+Le DTO expose state (active/absent/inactive/unknown/unsupported), checked_at,
+can_reactivate, les nombres de pairs/échanges récents et des messages bornés.
+Il ne contient ni clés, ni endpoints, ni adresses privées du profil. Des
+données invalides ou anciennes ne permettent pas d’activer le bouton.
+Le statut reçu par status.get utilise une collecte WireGuard séparée et
+non bloquante : une sonde indisponible ne masque pas les autres conteneurs.
+
+7. Validation et références
+
+Les recettes de cette livraison sont consignées séparément dans TESTS.txt.
+Les fixtures utilisent des identités synthétiques et une VM isolée ; elles
+ne démontrent pas la disponibilité d’un pair distant ni d’un drone absent.
+La qualification s’applique aux outils, montages et profil reconnus, pas à
+une future image ou à une configuration arbitraire.
+
+Références primaires sur les outils existants :
+https://git.zx2c4.com/wireguard-tools/about/src/man/wg-quick.8
+https://docs.linuxserver.io/images/docker-wireguard/
+
+Voir aussi SECURITE.txt, API_ET_DONNEES.txt, CONTRAT_BUNDLE.txt et
+PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt. La reprise générale après
+interruption et la rétention restent des lots distincts du plan V1.

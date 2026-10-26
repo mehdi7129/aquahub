@@ -17,9 +17,9 @@ export async function request<T>(method: string, params: Record<string, unknown>
 
 const serviceNames = [ ['mqtt', 'MQTT'], ['fleet-controller', 'Fleet Controller'], ['gcs', 'GCS'], ['reactor', 'Reactor'], ['net-setup', 'Réseau'], ['mavlink-router', 'Routeur MAVLink'], ['rtcm', 'Corrections RTCM'], ['wireguard', 'WireGuard'] ];
 const mockStatus: HubStatus = {
-  version: '0.2.5-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
+  version: '0.2.6-démo', machine: 'Poste de démonstration', docker_available: true, portainer_available: true,
   bundle_path: '/opt/exemple/aqua-hub-bundle', active_job: null,
-  services: serviceNames.map(([id, name], index) => ({ id, name, state: 'running', health: index < 2 ? 'healthy' : null, image_id: `sha256:demo-${id}`, restarts: 0, started_at: new Date(Date.now() - 3600000).toISOString() })),
+  services: serviceNames.map(([id, name], index) => ({ id, name, state: 'running', health: index < 2 ? 'healthy' : null, image_id: `sha256:demo-${id}`, restarts: 0, started_at: new Date(Date.now() - 3600000).toISOString(), ...(id === 'wireguard' ? { actions: { restart: false }, wireguard: { state: 'active' as const, checked_at: new Date().toISOString(), peer_count: 1, recent_peer_count: 0, can_reactivate: false, message: 'Démonstration : tunnel actif, aucun échange distant récent observé.' } } : {}) })),
 };
 let demoConfigured = false;
 let demoSettings: Settings = {};
@@ -37,7 +37,7 @@ const demoManualChecks = [
   {id:'firmware',label:'Versions Heron',details:'Relever les versions du firmware Heron et du chargeur de démarrage (BL).'},
   {id:'console',label:'Diagnostic matériel MAVLink',details:'Dans la console MAVLink de QGroundControl : uavcan status, gps status et listener esc_status.'},
 ];
-let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.5-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
+let demoAppUpdate: AppUpdateStatus = {current_version: '0.2.6-démo', repository:'https://github.com/mehdi7129/aquahub', available:false, message:'Aucune recherche lancée. Données de démonstration.'};
 let demoInstallationStarted = 0;
 
 
@@ -54,17 +54,18 @@ function syncJob() {
       if (demoJobTarget === 'app-download' && demoAppUpdate.release) demoAppUpdate.download = {version:demoAppUpdate.release.version,ready:true,sha256:'f'.repeat(64)};
       if (demoJobTarget === 'download') job.result = { downloaded: true, inspection: demoInspection() };
       const service = mockStatus.services.find(item => item.id === demoJobTarget);
-      if (service) { service.restarts = (service.restarts ?? 0) + 1; service.started_at = new Date().toISOString(); }
+      if (service && job.kind !== 'wireguard.reactivate') { service.restarts = (service.restarts ?? 0) + 1; service.started_at = new Date().toISOString(); }
+      if (service?.wireguard && job.kind === 'wireguard.reactivate') { service.wireguard = { ...service.wireguard, state: 'active', checked_at: new Date().toISOString(), can_reactivate: false, recent_peer_count: 0 }; job.result = { message: 'Démonstration : tunnel WireGuard réactivé, sans échange distant confirmé.' }; }
       demoEvents.unshift({ id: `event-${sequence}`, timestamp: new Date().toISOString(), service: service?.id ?? null, kind: 'maintenance_succeeded', message: `${job.label} : opération simulée terminée.` });
       mockStatus.active_job = null;
     }
   }
 }
-function startJob(label: string, target: string) {
+function startJob(label: string, target: string, kind?: string) {
   syncJob();
   if (mockStatus.active_job) throw new Error('Une tâche de démonstration est déjà en cours.');
   sequence += 1; demoJobTarget = target; jobStarted = Date.now();
-  job = { id: `demo-${sequence}`, label, created_at: new Date().toISOString(), started_at: new Date().toISOString(), ...(target === 'drone' ? {kind:'configure_drone',target:'Aqua_Drone_5'} : target==='app-download'?{kind:'app.download',target:'AquaHub 0.3.0-démo'}:mockStatus.services.some(service=>service.id===target)?{kind:'service.restart',target}:{}), status: 'running', message: 'Simulation en cours…', progress: 0 };
+  job = { id: `demo-${sequence}`, label, created_at: new Date().toISOString(), started_at: new Date().toISOString(), ...(kind ? { kind, target } : target === 'drone' ? {kind:'configure_drone',target:'Aqua_Drone_5'} : target==='app-download'?{kind:'app.download',target:'AquaHub 0.3.0-démo'}:mockStatus.services.some(service=>service.id===target)?{kind:'service.restart',target}:{}), status: 'running', message: 'Simulation en cours…', progress: 0 };
   mockStatus.active_job = job;
   mockStatus.jobs = [job, ...(mockStatus.jobs ?? [])].slice(0, 20);
   return structuredClone(job);
@@ -74,7 +75,7 @@ async function demoRequest(method: string, params: Record<string, unknown>): Pro
   await new Promise(resolve => setTimeout(resolve, 130));
   syncJob();
   switch (method) {
-    case 'status.get': return structuredClone({ ...mockStatus, collected_at: new Date().toISOString() });
+    case 'status.get': { const service = mockStatus.services.find(item => item.id === 'wireguard'); if (service?.wireguard) service.wireguard.checked_at = new Date().toISOString(); return structuredClone({ ...mockStatus, collected_at: new Date().toISOString() }); }
     case 'app.version': return { version: mockStatus.version };
     case 'app_updates.status': if(demoAppUpdate.installation?.status==='scheduled' && Date.now()-demoInstallationStarted>2500) {demoAppUpdate.installation={status:'installed',version:'0.3.0-démo',message:'Mise à jour simulée terminée.'};demoAppUpdate.current_version='0.3.0-démo';demoAppUpdate.available=false;} return structuredClone(demoAppUpdate);
     case 'app_updates.check': demoAppUpdate={...demoAppUpdate,available:true,release:{release_id:2,asset_id:3,version:'0.3.0-démo',tag:'v0.3.0-démo',notes:'Release fictive, aucun fichier réel téléchargé.',published_at:new Date().toISOString(),asset_name:'aquahub-application_0.3.0-demo_amd64.deb',asset_size:1024,sha256:'f'.repeat(64)},message:'Une version de démonstration est disponible.'};return structuredClone(demoAppUpdate);
@@ -84,7 +85,9 @@ async function demoRequest(method: string, params: Record<string, unknown>): Pro
     case 'events.list': return { events: structuredClone(demoEvents.filter(event => !params.service || event.service === params.service).slice(0, Number(params.limit ?? 200))) };
     case 'events.logs': return { id: 'demo-log-snapshot', text: '[DÉMONSTRATION]\nErreur simulée avant redémarrage du service.\nAucun journal de panne réel n’est chargé.', redacted: true, truncated: true };
     case 'service.logs': return { text: `[DÉMONSTRATION] ${String(params.service)}\n${new Date().toISOString()} Service simulé en cours.\nAucun journal réel n’est chargé.` };
-    case 'service.restart': return startJob(`Redémarrage de ${mockStatus.services.find(service => service.id === params.service)?.name ?? 'service'}`, String(params.service));
+    case 'service.restart': if (params.service === 'wireguard') throw new Error('Le redémarrage générique de WireGuard reste protégé. Utilisez son action dédiée.'); return startJob(`Redémarrage de ${mockStatus.services.find(service => service.id === params.service)?.name ?? 'service'}`, String(params.service));
+    case 'wireguard.status': { const service = mockStatus.services.find(item => item.id === 'wireguard')!; service.wireguard!.checked_at = new Date().toISOString(); return structuredClone(service.wireguard); }
+    case 'wireguard.reactivate': if (params.confirmed !== true) throw new Error('Confirmez la réactivation du tunnel.'); return startJob('Réactivation du tunnel WireGuard', 'wireguard', 'wireguard.reactivate');
     case 'portainer.restart': return startJob('Relance de Portainer', 'portainer');
     case 'native.export_logs': return {saved:false,canceled:true};
     case 'native.source_credentials': return { canceled: true };

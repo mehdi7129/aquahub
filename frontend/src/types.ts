@@ -1,6 +1,7 @@
 export type Theme = 'light' | 'dark';
 export type Page = 'overview' | 'updates' | 'drones' | 'history' | 'settings';
-export interface Service { id: string; name: string; state: string; health: string | null; image_id?: string; restarts?: number; started_at?: string; actions?: { restart?: boolean; reason?: string; disabled_reason?: string }; }
+export interface WireGuardStatus { state: 'active' | 'absent' | 'inactive' | 'unknown' | 'unsupported'; checked_at: string; peer_count?: number; recent_peer_count?: number; can_reactivate: boolean; reason?: string; message?: string; }
+export interface Service { id: string; name: string; state: string; health: string | null; image_id?: string; restarts?: number; started_at?: string; actions?: { restart?: boolean; reason?: string; disabled_reason?: string }; wireguard?: WireGuardStatus; }
 export interface JobProgress { label?: string; completed?: number; total?: number; percent?: number; indeterminate?: boolean; phase?: string; }
 export interface ManualCheck { id: string; label: string; details: string; }
 export interface Job { id: string; status: string; label?: string; kind?: string; target?: string; created_at?: string; started_at?: string; finished_at?: string; message?: string; progress?: number | JobProgress; steps?: Array<{ label?: string; name?: string; status?: string; message?: string }>; error?: string | { message?: string }; result?: unknown; }

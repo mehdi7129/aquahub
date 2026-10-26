@@ -10,7 +10,7 @@ import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "agent"))
 from aquahub_agent.core import Application, Config
@@ -90,6 +90,50 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(result["summary"]["without_healthcheck"], 7)
         self.assertIsNone(result["services"][0]["version"])
         self.assertFalse(result["stale"])
+
+    def test_wireguard_probe_failure_does_not_hide_other_container_states(self):
+        self.app.wireguard = Mock()
+        self.app.wireguard.snapshot.side_effect = RuntimeError("synthetic probe unavailable")
+        result = self.call("status.get")
+        self.assertFalse(result["stale"])
+        self.assertEqual(result["summary"]["running"], 8)
+        row = next(x for x in result["services"] if x["id"] == "wireguard")
+        self.assertEqual(row["wireguard"]["state"], "unknown")
+        self.assertIs(row["wireguard"]["can_reactivate"], False)
+        self.assertNotIn("synthetic probe", str(result))
+
+    def test_unresolved_wireguard_execution_blocks_mutations_but_not_reading(self):
+        self.app.wireguard = Mock()
+        self.app.wireguard.is_pending.return_value = True
+        self.app.wireguard.snapshot.return_value = {"state": "unknown", "can_reactivate": False}
+        self.assertFalse(self.call("status.get")["stale"])
+        self.assertCode("maintenance", "service.restart", {"service": "gcs"})
+        with self.assertRaises(ApiError) as caught:
+            with self.app.operation_guard():
+                self.fail("A preflight cannot overlap a possibly running exec")
+        self.assertEqual(caught.exception.code, "maintenance")
+        with self.assertRaises(ApiError) as caught:
+            self.app.submit_job("test", "test", {}, lambda: self.fail("must not execute"), idempotency_key="wireguard-pending")
+        self.assertEqual(caught.exception.code, "maintenance")
+        self.assertEqual(self.fake.actions, [])
+        self.assertEqual(self.app.store.jobs()[0]["status"], "failed")
+        self.assertTrue(self.app._mutation_lock.acquire(blocking=False))
+        self.app._mutation_lock.release()
+
+    def test_wireguard_pending_is_rechecked_when_the_job_slot_is_acquired(self):
+        self.app.wireguard = Mock()
+        self.app.wireguard.is_pending.side_effect = [False, True]
+        self.assertCode("maintenance", "service.restart", {"service": "gcs"})
+        self.assertEqual(self.fake.actions, [])
+        self.assertEqual(self.app.store.jobs(), [])
+
+    def test_store_stays_open_until_the_tunnel_observer_has_stopped(self):
+        self.app.wireguard = Mock()
+        self.app.wireguard.close.return_value = False
+        self.app.close()
+        self.app.store.setting_set("observer-fixture", "still available")
+        self.assertEqual(self.app.store.setting_get("observer-fixture"), "still available")
+        self.app.wireguard.close.return_value = True
 
     def test_collection_outage_preserves_snapshot_and_records_gap(self):
         self.call("status.get")

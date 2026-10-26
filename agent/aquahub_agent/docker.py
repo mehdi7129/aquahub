@@ -42,12 +42,17 @@ class Docker:
         self.context = context
         self.executable = executable
 
-    def run(self, args: list[str], timeout: float = 20, max_bytes: int = 2097152, combine: bool = False) -> str:
+    def run(self, args: list[str], timeout: float = 20, max_bytes: int = 2097152, combine: bool = False,
+            *, input_data: bytes | None = None) -> str:
+        # Private, bounded stdin supports a validated WireGuard profile without
+        # placing its key in argv, Docker exec events or shell interpolation.
+        if input_data is not None and (not isinstance(input_data, bytes) or len(input_data) > 65536):
+            raise ValueError("Docker input must be at most 64 KiB of bytes")
         env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/nonexistent",
                "DOCKER_CONFIG": "/etc/aquahub/docker-client", "LANG": "C.UTF-8"}
         try:
             proc = subprocess.Popen([self.executable, "--context", self.context, *args],
-                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, env=env)
         except OSError:
             raise ApiError("docker_unavailable", "Docker natif n’est pas disponible.") from None
@@ -57,12 +62,29 @@ class Docker:
             with selectors.DefaultSelector() as selector:
                 selector.register(proc.stdout, selectors.EVENT_READ, "out")
                 selector.register(proc.stderr, selectors.EVENT_READ, "err")
+                written = 0
+                if input_data:
+                    os.set_blocking(proc.stdin.fileno(), False)
+                    selector.register(proc.stdin, selectors.EVENT_WRITE, "in")
+                elif proc.stdin is not None:
+                    proc.stdin.close()
                 total = 0
                 while selector.get_map():
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise ApiError("timeout", "Docker n’a pas répondu dans le délai prévu.")
                     for key, _ in selector.select(min(remaining, .5)):
+                        if key.data == "in":
+                            try:
+                                written += os.write(key.fileobj.fileno(), memoryview(input_data)[written:])
+                            except BlockingIOError:
+                                continue
+                            except BrokenPipeError:
+                                written = len(input_data)
+                            if written == len(input_data):
+                                selector.unregister(key.fileobj)
+                                key.fileobj.close()
+                            continue
                         data = os.read(key.fileobj.fileno(), 65536)
                         if not data:
                             selector.unregister(key.fileobj)
@@ -80,6 +102,8 @@ class Docker:
             proc.wait()
             proc.stdout.close()
             proc.stderr.close()
+            if proc.stdin is not None:
+                proc.stdin.close()
         if proc.returncode:
             detail = redact(chunks["err"].decode("utf-8", "replace"), 1000).strip()
             raise ApiError("docker_error", f"Docker a refusé l’opération : {detail or 'erreur non précisée'}")
@@ -125,7 +149,7 @@ class Docker:
         guarded = service in NETWORK_SERVICES
         restart = not missing and (not guarded or service in NETWORK_RESTARTS)
         reason = ("Conteneur absent." if missing else
-                  "La relance de WireGuard attend la validation du comportement de ses routes en cas d’échec." if service == "wireguard" else None)
+                  "Le redémarrage complet de ce conteneur WireGuard est protégé. Utilisez la vérification et la réactivation dédiées du tunnel." if service == "wireguard" else None)
         return {"start": not (guarded or missing), "stop": not (guarded or missing),
                 "restart": restart, "disabled_reason": reason}
 

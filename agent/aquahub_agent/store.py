@@ -75,6 +75,15 @@ class Store:
             db.execute("INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                        (key, json.dumps(value, ensure_ascii=False)))
 
+    def setting_compare_and_set(self, key: str, expected, value) -> bool:
+        """Do not clear an execution intent replaced since its observation."""
+        with self.transaction() as db:
+            # One conditional UPDATE is atomic across SQLite connections too;
+            # a preceding SELECT would not itself open a SQLite transaction.
+            changed = db.execute("UPDATE settings SET value=? WHERE key=? AND value=?",
+                (json.dumps(value, ensure_ascii=False), key, json.dumps(expected, ensure_ascii=False))).rowcount
+            return changed == 1
+
     def event(self, kind: str, message: str, service: str | None = None,
               severity: str = "info", details=None, dedupe: str | None = None,
               at: str | None = None):

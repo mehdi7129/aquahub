@@ -5,7 +5,46 @@ changement de répertoire explicitement indiqué. Les sorties et captures sont
 des fichiers de travail ; elles ne doivent pas être ajoutées au dépôt public.
 Voir aussi docs/REPRISE_DEVELOPPEMENT.txt, docs/ARCHITECTURE.txt et docs/SECURITE.txt.
 
-0. Version 0.2.5 — configuration ciblée et diagnostic de reconnexion
+0. Version 0.2.6 — tunnel WireGuard et intention persistante
+
+Vérification du 26 octobre 2026 : 328/328 tests Python réussis avec les
+préconditions Docker, GTK/WebKit et fournisseur explicitement activées.
+Les lectures Docker restent consultatives ; les transports fournisseur
+des tests de configuration sont interceptés. Les 25 tests WireGuard couvrent
+les profils, interfaces absentes/incomplètes/actives, refus d’appartenance,
+réseau extérieur, erreurs sans fuite de clé et véritable helper shell sur
+transports simulés. TypeScript, build et 38 tests JavaScript passent.
+
+La double revue a ajouté l’empreinte de la copie reçue avant toute commande,
+le refus d’un transport tronqué, une intention unique et son effacement par
+CAS SQLite, ainsi que le contrôle de maintenance de la réparation graphique
+avant APT. Le parser utilise LF/CRLF et une syntaxe compatible avec l’outil
+Bash. Un test de contrat sérialise les vrais DTO Python pour les valider
+dans le renderer. Les deux identités config/manifest de l’image qualifiée
+sont liées cryptographiquement par les descripteurs d’une archive linux/amd64.
+
+Le nouveau parcours WebKit isolé passe 15/15 à 100 % et 15/15 à 200 %.
+Il couvre confirmation/annulation, double clic, tunnel incomplet avec conteneur
+en cours, cible pendant navigation, vérification consultative, réponse perdue
+sans répétition, échec, retour après rechargement et ancien cache. Quatre
+captures synthétiques clair/sombre ont été inspectées ; les contrôles restent
+accessibles, sans débordement ni superposition. Aucun équipement réel n’est
+contacté par cette recette.
+
+Candidat applicatif : 162452 octets,
+SHA-256 aac08b1505d8b28d94c4ea73428e1fdfd86370213cd712563bc517bf4eecf717.
+Vingt-six comparaisons runtime/frontend sont identiques aux sources/build
+testés ; la garde préinst Python correspond aussi à sa source et le helper C
+livré contient son mode de précontrôle. Le paquet extrait réussit le parcours
+GTK/WebKit de démonstration 19/19. Il ne contient aucun payload fournisseur.
+
+Les résultats des recettes système et de réactivation restent séparés de
+ces preuves de sources. Ce relevé ne démontre ni une liaison distante, ni
+un Aqua_Drone connecté, ni une réparation générale de la reconnexion RJ45.
+Les limites de profil, démarrage legacy et image sont dans WIREGUARD.txt.
+Les données réelles du banc et ses rapports détaillés restent privés.
+
+Historique 0.2.5 — configuration ciblée et diagnostic de reconnexion
 
 Vérification du 22 octobre 2026 : 291/291 tests Python réussis avec les
 préconditions Docker, GTK/WebKit et fournisseur explicitement activées.

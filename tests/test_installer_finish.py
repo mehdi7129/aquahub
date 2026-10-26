@@ -1,4 +1,5 @@
 import importlib.util
+from contextlib import closing
 import io
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ import tempfile
 import unittest
 import hashlib
 import sys
+import sqlite3
 import types
 from unittest.mock import patch
 
@@ -103,6 +105,55 @@ class BundleInstallationTests(unittest.TestCase):
         self.assertIn('WorkingDirectory=/opt/aqua-hub/bundle',rendered)
         self.assertEqual(rendered.count('--context default compose --project-name aqua-hub-bundle'),2)
         self.assertIn('compose up -d',template)
+
+
+class RepairMaintenanceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.state = Path(self.temp.name) / 'agent'
+        self.state.mkdir(mode=0o700)
+        self.db = self.state / 'aquahub.sqlite3'
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.execute('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)')
+            db.execute('CREATE TABLE jobs (status TEXT)')
+        self.db.chmod(0o600)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_missing_or_cleared_intent_allows_a_read_only_precheck(self):
+        finish.check_agent_maintenance(self.state)
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.execute('INSERT INTO settings VALUES (?, ?)', ('wireguard_pending', 'null'))
+        finish.check_agent_maintenance(self.state)
+
+    def test_elapsed_corrupt_or_replaced_intent_never_permits_repair(self):
+        for value in ('{"schema":1,"until":1}', '{}', 'false', 'corrupt-json'):
+            with self.subTest(value=value):
+                with closing(sqlite3.connect(self.db)) as db, db:
+                    db.execute('INSERT OR REPLACE INTO settings VALUES (?, ?)', ('wireguard_pending', value))
+                with self.assertRaises(finish.SetupError):
+                    finish.check_agent_maintenance(self.state)
+
+    def test_legacy_running_job_and_unsafe_database_block_precheck(self):
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.execute("INSERT INTO jobs VALUES ('running')")
+        with self.assertRaises(finish.SetupError):
+            finish.check_agent_maintenance(self.state)
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.execute('DELETE FROM jobs')
+        self.db.chmod(0o666)
+        with self.assertRaises(finish.SetupError):
+            finish.check_agent_maintenance(self.state)
+
+    def test_helper_precheck_mode_and_finish_stop_before_any_system_command(self):
+        with patch.object(finish.os, 'geteuid', return_value=0), \
+                patch.object(finish, 'check_agent_maintenance', side_effect=finish.SetupError('WireGuard fixture pending')), \
+                patch.object(finish, 'run') as run, patch.object(finish, 'progress'):
+            self.assertEqual(finish.main(['--check-maintenance']), 1)
+            with self.assertRaises(finish.SetupError):
+                finish.finish(Path('/fixture-not-read'), 1000)
+            run.assert_not_called()
 
 
 class ImageIdentityGuardTests(unittest.TestCase):

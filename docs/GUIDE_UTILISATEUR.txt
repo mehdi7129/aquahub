@@ -1,5 +1,5 @@
 AquaHub — guide utilisateur
-Préproduction 0.2.5
+Préproduction 0.2.6
 
 1. Disponibilité et installation
 
@@ -57,9 +57,48 @@ phase rouge : seule une observation d’arrêt ou d’échec produit cet état.
 
 Réseau du bundle et GCS Reactor disposent d’une relance individuelle avec
 contrôle des adresses et routes avant/après. Ces composants peuvent réappliquer
-leurs paramètres existants au démarrage. WireGuard reste indisponible dans
-l’attente de la validation de son comportement d’échec ; le motif est affiché.
-AquaHub ne réécrit pas les paramètres réseau pour corriger un résultat.
+leurs paramètres existants au démarrage. AquaHub ne réécrit pas les paramètres
+réseau pour corriger un résultat.
+
+3.1 Vérifier ou réactiver WireGuard
+
+Dans Supervision, sélectionner WireGuard. En cours décrit toujours le
+conteneur Docker. Une seconde information décrit le tunnel local :
+
+  Tunnel actif : le profil chargé, ses adresses et ses routes sont confirmés.
+  Tunnel absent : aucune interface du tunnel n’est présente.
+  Tunnel incomplet : l’interface reconnue a perdu un élément attendu ou
+    n’est plus activée ; elle n’est pas présentée comme un tunnel fonctionnel.
+  Tunnel non vérifié ou non pris en charge : lire le motif et renouveler
+    la vérification ; aucune réactivation n’est permise depuis un état incertain.
+
+Vérifier WireGuard renouvelle une lecture du tunnel sans demander le mot de
+passe administrateur. Ce contrôle ne coupe pas le tunnel et reste possible
+sans Aqua_Drone connecté, y compris sur un autre réseau.
+
+Réactiver le tunnel est proposé pour un tunnel absent ou incomplet lorsque
+le profil et l’instance sont reconnus. Lire la confirmation, autoriser
+l’intervention sur le service dans la boîte système si elle est demandée,
+puis attendre le résultat de la tâche. Les paramètres enregistrés ne changent
+pas : seuls les éléments du tunnel déjà prévus par ce profil sont remis en
+service. Aucun réglage d’adresse n’est demandé.
+
+L’action dédiée ne redémarre pas le conteneur historique. Son démarrage
+générique reste protégé ; un conteneur arrêté ou un profil non reconnu peut
+nécessiter une intervention distincte. Le motif s’affiche dans le détail.
+La réactivation garde l’autorisation habituelle des interventions sur les
+services ; elle ne change pas l’exception sans mot de passe PC des drones.
+
+Les échanges distants sont séparés de l’état du tunnel. L’absence d’échange
+récent n’est pas, à elle seule, une panne. Un échange WireGuard ne prouve pas
+qu’un Aqua_Drone est connecté. Un tunnel local actif ne garantit pas que le
+pair ou les applications distantes sont accessibles.
+
+Après une réponse perdue ou un résultat incertain, lire l’état et les logs
+avant de demander un nouvel essai. AquaHub ne rejoue pas automatiquement la
+réactivation. Les données anciennes deviennent non vérifiées ; l’application
+attend une observation postérieure à la tâche avant de confirmer le nouvel
+état du tunnel. Le contrat et ses limites sont détaillés dans WIREGUARD.txt.
 
 4. Journaux et historique
 

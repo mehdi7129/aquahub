@@ -3,6 +3,20 @@
 Les versions ci-dessous décrivent le code. Une entrée ne signifie pas qu’un
 installateur public ou une Release GitHub qualifiée est déjà disponible.
 
+## 0.2.6 — réactivation ciblée de WireGuard, préproduction
+
+- Supervision séparée du conteneur, du tunnel local et des échanges récents.
+  Aucun handshake n’est exigé pour reconnaître un tunnel local actif.
+- Réactivation du profil existant lorsque le tunnel a disparu ou que son
+  interface reconnue a perdu une adresse/route attendue ; confirmation et
+  tâche ciblée, sans redémarrage de l’ancien conteneur.
+- Scripts et configurations fournisseur conservés, copie privée figée,
+  contrôle de l’appartenance de l’interface et des invariants hors tunnel.
+- Exécution bornée dans le conteneur, état persistant de commande en cours
+  et gardes de maintenance, y compris pour l’installation d’AquaHub.
+- Refus des profils et instances hors du contrat qualifié ; le démarrage
+  complet du conteneur historique reste protégé. Voir docs/WIREGUARD.txt.
+
 ## 0.2.5 — configuration ciblée et qualification V1, préproduction
 
 - Le hub actif reste intégralement conservé pendant la configuration d’un

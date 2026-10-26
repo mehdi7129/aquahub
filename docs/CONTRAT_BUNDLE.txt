@@ -144,3 +144,16 @@ Les scripts fournisseur restent intacts ; deploy.py et le générateur sont
 inchangés dans cette version, sans besoin de réécriture complète à ce stade.
 La mise à jour de l’application AquaHub est déjà implémentée comme un
 troisième contrat distinct ; elle ne met pas le bundle à jour.
+
+7. Tunnel WireGuard : contrat dédié 0.2.6
+
+Ce parcours conserve l’image, le conteneur, le Compose et tous les fichiers
+fournisseur existants. Il appelle les outils de l’image reconnue avec une
+copie privée des octets validés du profil fixe. Le démarrage historique
+complet reste protégé ; le correctif officiel v1.0.1 est un lot distinct.
+
+Deux identités exactes de la même image qualifiée, liées par les descripteurs
+vérifiés de l’archive linux/amd64, couvrent les stockages classique/containerd.
+Aucun téléchargement, remplacement de script ou modification de montage n’est
+réalisé par le bouton. Le statut du tunnel ne prouve pas la liaison distante.
+Voir WIREGUARD.txt pour le profil admis, les refus et les invariants.

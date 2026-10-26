@@ -1,6 +1,6 @@
 AquaHub — architecture et points d’entrée
 
-Ce document décrit les sources de la préproduction 0.2.5. Il complète
+Ce document décrit les sources de la préproduction 0.2.6. Il complète
 README.md, docs/REPRISE_DEVELOPPEMENT.txt, docs/SECURITE.txt et docs/TESTS.txt.
 Les évolutions prévues sont distinctes du comportement implémenté ; consulter
 docs/ETAT_ET_FEUILLE_DE_ROUTE.txt pour la suite et docs/PUBLICATION.txt pour les livraisons.
@@ -34,7 +34,7 @@ Le chemin d’une action réelle est le suivant :
     -> desktop/aquahub_desktop/bridge.py : client JSON sur socket Unix
     -> agent/aquahub_agent/server.py : identité du processus et décodage
     -> agent/aquahub_agent/core.py : autorisation et orchestration
-    -> adaptateur Docker, drones, mises à jour ou Portainer
+    -> adaptateur Docker, WireGuard, drones, mises à jour ou Portainer
     -> SQLite, événement et résultat de tâche
     -> affichage et suivi dans l’interface.
 
@@ -67,6 +67,23 @@ permettent de reprendre ce suivi après reconnexion ou rechargement.
 observationFresh() et le timer de fraîcheur grisent les données devenues
 anciennes, même si une requête de supervision locale reste en attente.
 Ces règles ne remplacent pas les vérifications de résultat de l’agent.
+
+Depuis 0.2.6, WireGuard conserve son état de conteneur et expose séparément
+celui du tunnel local. wireGuardPresentation() et wireGuardReactivateAllowed()
+consomment un DTO strict : active, absent, inactive, unknown ou unsupported,
+avec date de sonde, éligibilité, nombres de pairs et textes bornés. inactive
+est présenté comme « Tunnel incomplet ». Les échanges récents restent une
+observation neutre ; leur absence ne prouve pas une panne ni celle d’un drone.
+
+Le bouton Vérifier WireGuard appelle une lecture dédiée sans élévation.
+Réactiver le tunnel est une opération confirmée réservée aux états absent
+ou incomplet reconnus. Elle suit une tâche wireguard.reactivate ciblée sur
+wireguard, avec les protections existantes contre doubles demandes, perte de
+réponse et données périmées. La sonde checked_at doit aussi être postérieure
+à finished_at : une nouvelle observation Docker seule ne confirme pas le
+tunnel. Une réponse de cache plus ancienne ne remplace pas une lecture dédiée
+plus récente. La démo n’incrémente pas le compteur de redémarrages Docker
+pour une simple réactivation. Voir docs/WIREGUARD.txt.
 
 src/bridge.ts choisit le transport natif ou la simulation explicite ?demo=1.
 La simulation porte un bandeau permanent et ne lance pas de maintenance.
@@ -119,7 +136,7 @@ Utiliser le mode démo ou une fixture isolée pour les essais d’interface.
 4. Agent et protocole : agent/aquahub_agent/
 
 __main__.py parse les chemins, instancie Application et enregistre les modules
-drone, updates, portainer et app_updates avant de servir la socket.
+drone, updates, portainer, app_updates et wireguard avant de servir la socket.
 Le protocole annoncé par app.version est 1. Les messages sont des objets JSON terminés par un saut
 de ligne ; voir server.py et desktop/…/bridge.py pour les limites exactes.
 
@@ -135,6 +152,7 @@ Principales familles de méthodes :
   app.version ; status.get ; service.logs ; service.start/stop/restart
   events.list ; events.logs ; jobs.get ; diagnostics.export ; logs.export
   settings.get/save ; portainer.status/initialize/restart
+  wireguard.status/reactivate
   drones.list/scan/identity/enroll/ssh_settings/preflight/configure
   updates.inspect/check/download/apply/rollback/settings
   app_updates.status/check/download/install
@@ -144,6 +162,8 @@ La collecte périodique observe les conteneurs et les événements Docker. Une
 panne de collecte rend les données périmées et enregistre un trou d’historique ;
 elle ne transforme pas le dernier état connu en état sain. L’état running
 d’un conteneur et son healthcheck restent deux informations distinctes.
+Le statut WireGuard provient d’une collecte séparée non bloquante. Son échec
+reste local au DTO du tunnel et ne grise pas les autres services Docker.
 
 Les handlers distinguent l’exclusion des opérations (mutation) de la demande
 d’autorisation administrateur (requires_admin). Depuis 0.2.4, drones.preflight
@@ -164,6 +184,13 @@ Au redémarrage de l’agent, les tâches inachevées deviennent interrupted :
 elles ne sont pas relancées silencieusement. Fermer la fenêtre ne termine
 pas l’agent et ne constitue pas une annulation de la maintenance.
 
+WireGuard persiste une intention wireguard_pending avant son appel externe.
+Tant que la fin n’est pas prouvée, les gardes de dispatch, d’opération et de
+tâche, ainsi que les helpers de paquet, refusent les interventions incompatibles.
+Une expiration seule ne vaut pas preuve de fin ; la vérification de l’instance
+et du verrou reste nécessaire. Les lectures et diagnostics restent possibles.
+Ce parcours ciblé ne remplace pas le futur catalogue général de récupération.
+
 store.py utilise SQLite en mode WAL et synchronous=FULL. settings contient
 des réglages JSON, events l’audit et jobs les demandes/résultats. Les secrets
 ne doivent pas être placés dans ces tables. health_history.py ajoute les
@@ -178,8 +205,29 @@ commandes sont des listes d’arguments, avec délais et volumes de sortie born�
 Les relances de net_setup et gcs_reactor visent les conteneurs existants et
 comparent les adresses et routes IPv4/IPv6 avant/après. Une différence reste
 un échec explicite sans réécriture du réseau. start/stop de ces composants
-et toutes les actions WireGuard restent bloqués. Le parcours d’échec du
-tunnel doit être validé séparément.
+et les actions génériques WireGuard restent bloqués.
+
+wireguard.py fournit le parcours dédié de 0.2.6. Il reconnaît l’instance,
+l’image, le montage du profil et l’appartenance de l’interface. Une interface
+déjà conforme donne un constat sans mutation ; une interface absente ou
+incomplète peut être réactivée avec le même profil reconnu. Un conteneur
+arrêté, un profil hors contrat ou une configuration étrangère restent refusés.
+La présence de wg0 seule ne suffit pas à déclarer le tunnel actif.
+
+L’adaptateur appelle les outils wg/wg-quick existants, sans relancer l’ancien
+entrypoint ni modifier les scripts ou le Compose du fournisseur. Le profil
+validé est figé dans une copie éphémère privée du conteneur ; les données
+sensibles passent sur stdin, jamais dans les arguments de Docker. Le helper
+fixe AquaHub revérifie l’état sous verrou et borne l’exécution dans le
+conteneur, indépendamment de la durée du client Docker.
+
+La restauration des seuls éléments du tunnel prévus par le profil est
+distincte de la conservation des IP/routes hors tunnel, des autres VPN,
+des règles et du résolveur hôte. Les fichiers fournisseur restent inchangés.
+Le contrôle local ne requiert pas de handshake et ne promet pas l’accès à un
+pair ou à un drone. wireguard.status est consultatif sans autorisation admin ;
+wireguard.reactivate conserve l’autorisation habituelle des services et les
+gardes de maintenance. Voir docs/WIREGUARD.txt pour le contrat et ses limites.
 
 drone.py contient le contrat actuel de numérotation et de cible du fournisseur.
 Le scan cherche les six cibles prévues, pas tout le réseau. Les profils du

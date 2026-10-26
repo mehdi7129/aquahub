@@ -8,7 +8,7 @@ Interface monochrome, navigation latérale, thèmes clair et sombre. La cible
 actuelle est **Debian 13 amd64 avec GNOME**. Le code AquaHub est distribué sous
 [licence MIT](LICENSE).
 
-**État : préproduction 0.2.5.** Les sources et les tests sont disponibles ;
+**État : préproduction 0.2.6.** Les sources et les tests sont disponibles ;
 aucun installateur public qualifié n’est encore proposé. Le bundle fournisseur,
 ses images et ses configurations privées doivent être obtenus séparément.
 
@@ -19,10 +19,11 @@ Capture de l’interface 0.2.2 avec données fictives uniquement.
 
 ## Fonctionnalités
 
-| Fonction | État dans 0.2.5 | Limite à connaître |
+| Fonction | État dans 0.2.6 | Limite à connaître |
 | --- | --- | --- |
 | Supervision | Huit services reconnus, contours colorés et détail par service | État du conteneur et santé distincts ; données anciennes neutralisées |
-| Relances | Tâche ciblée visible, résultat et observation après intervention | WireGuard reste protégé ; toutes les actions réseau ne sont pas ouvertes |
+| Relances | Tâche ciblée visible, résultat et observation après intervention | Un service à la fois ; WireGuard utilise son action dédiée |
+| WireGuard | Vérification du tunnel et réactivation du profil existant lorsqu’il est absent ou incomplet | Conteneur déjà en cours et profil reconnu ; démarrage générique toujours protégé, liaison distante distincte |
 | Journaux et historique | Logs techniques, événements, extraits de panne et exports | Collecte et conservation bornées ; aucun historique exhaustif garanti |
 | Aqua_Drones | Configuration ciblée dans l’ordre choisi, sans mot de passe administrateur du PC et sans réécriture du hub actif | Compte autorisé, identité confirmée et cible déjà couverte par le hub ; un appareil à la fois, accès SSH distincts |
 | Progression | Numéro du drone, étapes validées et remplissage conservé pendant l’attente | Les cinq contrôles manuels restent séparés |
@@ -39,8 +40,13 @@ drones ne sont pas validés automatiquement.
 Les états utilisent des contours discrets vert, rouge, orange ou gris ; une
 observation périmée n’est pas affichée comme un service actuellement en cours.
 Les relances de Réseau du bundle et GCS Reactor comparent les adresses et les
-routes avant et après. WireGuard reste protégé en attendant la validation de
-son comportement d’échec. La santé fonctionnelle reste distincte de l’état.
+routes avant et après. WireGuard dispose d’une action dédiée qui remet en
+service les seuls éléments déjà prévus par son profil, sans redémarrer le
+conteneur historique. Les scripts et configurations du bundle sont conservés.
+Son état de tunnel est séparé
+de celui du conteneur. L’absence d’échange récent ne constitue pas une panne
+ni une preuve d’absence de drone. Voir le [contrat WireGuard](docs/WIREGUARD.txt).
+La santé fonctionnelle reste distincte de l’état.
 
 ## Évolutions récentes
 
@@ -52,26 +58,34 @@ son comportement d’échec. La santé fonctionnelle reste distincte de l’éta
 | 0.2.3 | Identité native, nom et icône du bureau harmonisés ; assistant distinct sans second raccourci dans le menu |
 | 0.2.4 | Configuration d’un Aqua_Drone sans demande de mot de passe administrateur du PC, avec contrôles de cible et de maintenance conservés |
 | 0.2.5 | Hub actif conservé pendant la configuration ciblée, scripts fournisseur intacts ; capture privée de reconnexion et CI générique |
+| 0.2.6 | État du tunnel WireGuard distinct du conteneur, vérification consultative et réactivation ciblée du profil existant, sans redémarrage générique |
 
 Les [notes de version](CHANGELOG.md) décrivent le code livré. Les
 [résultats de validation](docs/TESTS.txt) séparent tests génériques, parcours
-graphiques, recettes de paquet et essais matériels. La recette 0.2.5 documente
-291 tests Python réussis avec les préconditions explicites du banc et 28 tests
-de domaine JavaScript. Les vrais scripts fournisseur sont exercés avec des
-transports interceptés ; aucune configuration physique n’est déduite de ces
-tests. Les résultats d’identité native 0.2.3 restent consignés séparément.
-Ces résultats ne qualifient pas une flotte ou un kit client générique.
-Une recette matérielle séparée configure Aqua_Drone_5 avec redémarrage et
-retour vérifiés, sans changement des IP/routes ni des fichiers du hub.
-Les cinq contrôles matériels manuels restent distincts de cette validation.
+graphiques, recettes de paquet et essais matériels. Les contrôles locaux des
+sources 0.2.6 passent **328 tests Python sans omission**, avec les préconditions
+explicites du banc, la vérification TypeScript et **38 tests JavaScript**.
+La suite comprend des lectures Docker réelles et des exécutions de scripts
+fournisseur sur transports simulés. La recette WebKit WireGuard passe
+**15 scénarios à 100 % et 15 à 200 %**, avec données synthétiques et les deux
+thèmes. Ces résultats ne qualifient pas une installation client complète,
+une flotte ou une liaison distante ; les recettes de paquet sont consignées
+séparément pour chaque artefact dans les tests.
+
+La recette historique 0.2.5 reste documentée séparément : 291 tests Python,
+28 tests JavaScript et une configuration matérielle d’Aqua_Drone_5 avec
+redémarrage et retour vérifiés, sans changement des IP/routes ni des fichiers
+du hub. Les cinq contrôles matériels manuels restent distincts. Les résultats
+d’identité native 0.2.3 ne constituent pas de nouveaux essais 0.2.6.
 
 ## Prochains chantiers
 
-- **Consolidation V1 et reconnexion Ethernet** : diagnostiquer la perte
-  d’Internet après rebranchement du RJ45, puis qualifier une reprise sans
-  reboot ; l’outil de capture est prêt, la panne reste à reproduire. La
-  configuration ciblée préserve désormais le hub actif ; sa recette physique
-  et la récupération après incident restent à compléter. Voir le
+- **Consolidation V1 et reconnexion Ethernet** : qualifier le retour
+  d’Internet après rebranchement du RJ45 et le distinguer de l’état du tunnel
+  WireGuard. L’outil de capture est disponible ; la réactivation ciblée 0.2.6
+  ne constitue pas un diagnostic de la cause initiale. La configuration ciblée
+  préserve le hub actif ; la recette d’une flotte physique et la récupération
+  après incident restent à compléter. Voir le
   [plan consolidé](docs/PLAN_V1_ET_RECONNEXION_ETHERNET_2026-10-22.txt).
   Aucune modification des scripts fournisseur ou des IP n’est autorisée par ce plan.
 - **Reprise et rétention** : les scénarios, protections et critères de test
@@ -79,7 +93,8 @@ Les cinq contrôles matériels manuels restent distincts de cette validation.
   et de [conservation des fichiers](docs/PLAN_RETENTION_ET_QUOTAS.txt).
   Leur implémentation reste un lot distinct ; aucun nettoyage n’est activé.
 - **Bundle fournisseur v1.0.1** : préparer le flux Git + registre, préserver
-  les configurations client et qualifier le correctif WireGuard. Voir le
+  les configurations client et qualifier son correctif officiel de démarrage
+  WireGuard, distinct de la réactivation 0.2.6. Voir le
   [plan distinct](docs/PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt).
 - **Distribution commerciale** : qualifier le kit générique, les artefacts
   publics et les signatures. Voir la [feuille de route](docs/ETAT_ET_FEUILLE_DE_ROUTE.txt).
@@ -146,6 +161,7 @@ des chemins d’état distincts. Les invariants sont détaillés dans
 | Exécuter les tests et comprendre leur portée | [Tests](docs/TESTS.txt) |
 | Comprendre les vérifications automatiques du dépôt | [CI](docs/CI.txt) |
 | Préparer une capture privée après reconnexion RJ45 | [Diagnostic Ethernet](docs/DIAGNOSTIC_RECONNEXION_ETHERNET.txt) |
+| Comprendre et réactiver le tunnel WireGuard reconnu | [WireGuard](docs/WIREGUARD.txt) |
 | Comprendre le protocole local et les tâches | [API et données](docs/API_ET_DONNEES.txt) |
 | Raccorder une livraison fournisseur | [Contrat du bundle](docs/CONTRAT_BUNDLE.txt) |
 | Préparer l’intégration fournisseur v1.0.1 | [Plan complémentaire](docs/PLAN_INTEGRATION_BUNDLE_V101_2026-10-21.txt) |

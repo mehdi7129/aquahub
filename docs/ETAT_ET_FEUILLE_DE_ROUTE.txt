@@ -1,5 +1,5 @@
 AquaHub — état et prochains chantiers
-Préproduction 0.2.5 — état du code et qualification à poursuivre
+Préproduction 0.2.6 — état du code et qualification à poursuivre
 
 Développé
 
@@ -32,8 +32,9 @@ L’artefact initial n’a pas été reproduit pendant la qualification graphiqu
 
 Le pilote actuel connaît huit services. Deux ont un healthcheck ; six sont
 sans sonde. Les relances de net_setup et gcs_reactor sont possibles avec
-comparaison du réseau. WireGuard attend la qualification du conteneur corrigé
-par AquaHub, après le correctif livré par le fournisseur.
+comparaison du réseau. WireGuard dispose d’une réactivation ciblée du profil
+existant, sans redémarrage du conteneur. Son démarrage complet attend la
+qualification du correctif officiel fourni ; AquaHub ne réécrit pas ce script.
 Le provisioning vérifie une cible SSH et respecte les adresses existantes.
 
 La version 0.2.4 retire aussi la demande de mot de passe administrateur du PC
@@ -49,6 +50,19 @@ Les sections/options requises sont comparées, les empreintes du hub actif
 vérifiées, et toute extension nécessitant un changement réseau reste refusée.
 Un outil privé de capture Ethernet et un workflow de tests génériques sont
 ajoutés. La panne de reconnexion n’est pas encore expliquée ni réparée.
+
+La version 0.2.6 distingue conteneur WireGuard, tunnel local et échanges.
+Elle reconnaît un tunnel absent ou une interface appartenant au profil ayant
+perdu son adresse/sa route, puis réactive ce profil après confirmation. Les
+configurations fournisseur et les paramètres réseau administrés sont conservés.
+Les états inconnus, interfaces étrangères et profils hors contrat restent
+refusés. Voir WIREGUARD.txt et TESTS.txt pour le périmètre et les preuves.
+
+Le 26 octobre, l’opérateur a signalé un retour Internet après désactivation
+puis réactivation de sa carte réseau. Sur un autre réseau sans Aqua_Drone,
+l’interface WireGuard existait sans adresse alors que son conteneur tournait.
+Ce constat justifie le contrôle du tunnel, mais ne démontre pas la cause de
+l’incident RJ45 initial ni la stabilité de plusieurs cycles de reconnexion.
 
 Validations initiales
 

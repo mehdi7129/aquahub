@@ -100,6 +100,18 @@ class ApplicationUpgradeTests(unittest.TestCase):
     def status(self):
         return json.loads((self.stage/'status.json').read_text())
 
+    def test_wireguard_intent_prevents_stopping_the_agent_even_when_time_elapsed(self):
+        with closing(sqlite3.connect(self.state/'aquahub.sqlite3')) as connection, connection:
+            connection.execute('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)')
+            connection.execute('INSERT INTO settings VALUES (?,?)', ('wireguard_pending', json.dumps({'schema': 1, 'until': 1})))
+        with self.assertRaisesRegex(upgrade.UpgradeError, 'WireGuard'):
+            upgrade.no_active_jobs(self.state)
+        self.assertTrue(self.active)
+        self.assertEqual(self.calls, [])
+        with closing(sqlite3.connect(self.state/'aquahub.sqlite3')) as connection, connection:
+            connection.execute('UPDATE settings SET value=?', ('null',))
+        upgrade.no_active_jobs(self.state)
+
     def test_application_install_stops_only_own_agent_and_releases_lock_before_dpkg(self):
         self.assertTrue(self.install())
         self.assertEqual(self.status()['status'], 'installed')

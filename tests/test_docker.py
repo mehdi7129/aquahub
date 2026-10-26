@@ -15,6 +15,33 @@ from aquahub_agent.security import ApiError
 
 
 class DockerAdapterTests(unittest.TestCase):
+    def test_private_stdin_is_complete_without_exposing_it_in_argv(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / "fake-docker"
+            script.write_text("#!/usr/bin/python3\nimport hashlib,json,sys\ndata=sys.stdin.buffer.read()\nprint(json.dumps({'argv':sys.argv[1:],'sha256':hashlib.sha256(data).hexdigest()}))\n")
+            script.chmod(0o700)
+            data = b"synthetic-private-stdin" * 2000
+            result = json.loads(Docker(executable=str(script)).run(["exec", "-i", "fixture", "reader"], input_data=data))
+            self.assertEqual(result["sha256"], hashlib.sha256(data).hexdigest())
+            self.assertEqual(result["argv"], ["--context", "default", "exec", "-i", "fixture", "reader"])
+            empty = json.loads(Docker(executable=str(script)).run(["exec", "fixture"], input_data=b""))
+            self.assertEqual(empty["sha256"], hashlib.sha256(b"").hexdigest())
+
+    def test_private_stdin_is_bounded_and_a_blocked_reader_times_out(self):
+        with patch("aquahub_agent.docker.subprocess.Popen") as spawn:
+            for data in (b"x" * 65537, "not bytes"):
+                with self.assertRaises(ValueError):
+                    Docker().run(["exec"], input_data=data)
+            spawn.assert_not_called()
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / "fake-docker"
+            script.write_text("#!/usr/bin/python3\nimport time\ntime.sleep(10)\n")
+            script.chmod(0o700)
+            with self.assertRaises(ApiError) as caught:
+                Docker(executable=str(script)).run(["exec"], input_data=b"x" * 65536, timeout=.05)
+            self.assertEqual(caught.exception.code, "timeout")
+
     def test_remote_context_is_refused(self):
         with self.assertRaises(ValueError):
             Docker("remote-server")

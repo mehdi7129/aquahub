@@ -1,5 +1,5 @@
 import { demo, request } from './bridge';
-import { ActionGate, counts, errorMessage, escape as e, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobState, jobSucceeded, normalizeRepository, observationFresh, plainLog, preflightAllowed, progressCaption, restartAllowed, servicePresentation, serviceState, validateStatus } from './domain';
+import { ActionGate, counts, errorMessage, escape as e, identifiedDrones, inspectionAllowed, isActive, jobLabel, jobProgress, jobState, jobSucceeded, normalizeRepository, observationFresh, plainLog, preflightAllowed, progressCaption, restartAllowed, servicePresentation, serviceState, validateStatus, validateWireGuardStatus, wireGuardFresh, wireGuardPresentation, wireGuardReactivateAllowed } from './domain';
 import { icon, serviceIcon } from './icons';
 import type { AppUpdateStatus, Check, Drone, EventsPage, HubEvent, HubStatus, Inspection, Job, ManualCheck, Page, Preflight, Release, Service, Settings, SshSettings, Theme } from './types';
 
@@ -29,6 +29,7 @@ let snapshotLoading = false;
 let appUpdateSequence = 0;
 let appUpdateChecking = false;
 let lastObservationFresh = false;
+let lastWireGuardFresh = false;
 
 function storageGet(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } }
 function storageSet(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* Session preferences remain usable when storage is unavailable. */ } }
@@ -43,11 +44,23 @@ function button(label: string, action: string, options: { icon?: string; primary
 }
 function badge(label: string, tone = ''): string { return `<span class="badge ${tone}">${e(label)}</span>`; }
 function servicesFresh(): boolean { return observationFresh(state.status, state.agentConnected); }
+function serviceOperationOptions(service: Service) { return { requesting: state.requestingService, job: state.job, jobError: state.jobError, unconfirmed: state.unconfirmedRestarts[service.id] }; }
 function serviceBadge(service: Service, compact = false): string {
-  const presentation = servicePresentation(service, state.status, state.agentConnected, { requesting: state.requestingService, job: state.job, jobError: state.jobError, unconfirmed: state.unconfirmedRestarts[service.id] });
+  const presentation = servicePresentation(service, state.status, state.agentConnected, serviceOperationOptions(service));
   const label = compact ? presentation.shortLabel ?? presentation.label : presentation.label;
   const accessible = [presentation.label, presentation.description].filter(Boolean).join(' · ');
   return `<span class="badge service-state state-${presentation.tone}${presentation.operation ? ' service-state-operation' : ''}"${presentation.description ? ` title="${e(accessible)}"` : ''}${presentation.operation ? ` data-operation="${presentation.operation}" aria-label="${e(accessible)}"` : ''}>${e(label)}${!presentation.operation && presentation.description ? '<span class="sr-only"> · État actuel non confirmé</span>' : ''}</span>`;
+}
+function wireGuardHint(service: Service): string {
+  if (service.id !== 'wireguard') return '';
+  const value = wireGuardPresentation(service, state.status, state.agentConnected, serviceOperationOptions(service));
+  return `<small class="service-health-alert" data-wireguard-state="${value.state}"${value.operation ? ` data-operation="${value.operation}"` : ''}>${icon(['absent', 'inactive'].includes(value.state) ? 'warning' : 'network')}${e(value.label)}</small>`;
+}
+function wireGuardPanel(service: Service): string {
+  const value = wireGuardPresentation(service, state.status, state.agentConnected, serviceOperationOptions(service));
+  const allowed = wireGuardReactivateAllowed(state.status, service, state.agentConnected, busy(), serviceOperationOptions(service));
+  const needsActivation = ['absent', 'inactive'].includes(value.state);
+  return `<section class="wireguard-panel" aria-label="Tunnel WireGuard"><span class="badge service-state state-${value.tone}" data-wireguard-detail="${value.state}"${value.operation ? ` data-operation="${value.operation}"` : ''}>${e(value.label)}</span><p class="action-explanation">${e(value.message)}</p>${value.peers ? `<p class="action-explanation">${e(value.peers)}</p>` : ''}<p class="action-explanation">Le tunnel et les échanges WireGuard sont distincts de la présence d’un Aqua_Drone.</p><div class="button-row wireguard-actions">${needsActivation ? button('Réactiver le tunnel', 'wireguard-reactivate', { icon: 'refresh', primary: true, disabled: !allowed }) : ''}${button('Vérifier WireGuard', 'wireguard-check', { icon: 'check', primary: !needsActivation, disabled: busy() || !state.agentConnected })}</div></section>`;
 }
 function empty(title: string, text: string, iconName = 'info'): string { return `<div class="empty-state">${icon(iconName)}<strong>${e(title)}</strong><p>${e(text)}</p></div>`; }
 function errorBox(message: string, retry?: string): string { return `<div class="notice error" role="alert">${icon('warning')}<div><strong>Vérification nécessaire</strong><p>${e(message)}</p>${retry ? button('Réessayer', retry, { class: 'small' }) : ''}</div></div>`; }
@@ -134,7 +147,7 @@ function renderPage() {
   const page = document.querySelector('#page-content')!;
   const renderers: Record<Page, () => string> = { overview: overviewPage, updates: updatesPage, drones: dronesPage, history: historyPage, settings: settingsPage };
   replaceKeepingFocus(page, renderers[state.page]());
-  if (state.page === 'overview') lastObservationFresh = servicesFresh();
+  if (state.page === 'overview') { lastObservationFresh = servicesFresh(); lastWireGuardFresh = wireGuardFresh(state.status?.services.find(service => service.id === 'wireguard')?.wireguard); }
   if (state.page === 'history') renderHistoryEvents();
 }
 
@@ -160,7 +173,7 @@ function overviewPage(): string {
   const knownDrones = identifiedDrones(state.drones);
   return `<section class="summary-strip" aria-label="État général"><div class="summary-main">${icon('server')}<div><strong>${summary.running}<span>/${summary.total}</span></strong><p>services en cours${servicesFresh() ? '' : ' · dernière observation'}</p></div></div><div class="summary-health ${summary.unhealthy && servicesFresh() ? 'health-alert' : ''}">${icon(summary.unhealthy ? 'warning' : 'heart')}<div><strong>${servicesFresh() ? 'Contrôles de santé' : 'Derniers contrôles de santé'}</strong><p>${summary.unhealthy ? `<strong>${summary.unhealthy} en échec</strong>` : summary.healthy ? `${summary.healthy} validé${summary.healthy > 1 ? 's' : ''}` : 'Détail par service'}</p></div></div><div class="maintenance-state">${icon('clock')}<span>${busy() ? 'Maintenance en cours' : 'Aucune tâche de maintenance'}</span></div></section>
   ${!state.status.docker_available ? `<div class="notice">${icon('info')}<div><strong>Le moteur Docker n’est pas accessible</strong><p>Les états des services ne peuvent pas être vérifiés. Consultez les réglages pour exporter un diagnostic.</p></div></div>` : ''}
-  <div class="supervision-grid"><section class="card services-card"><div class="card-heading"><h2>Services</h2><span class="subtle">${summary.total} composants</span></div><div class="service-table"><div class="service-table-head"><span>Composant</span><span>État</span><span class="sr-only">Détails</span></div>${state.status.services.length ? state.status.services.map(service => `<button type="button" class="service-row ${service.id === state.selectedService ? 'selected' : ''}" data-service="${e(service.id)}" aria-pressed="${service.id === state.selectedService}"><span class="service-title">${icon(serviceIcon(service.id))}<span>${e(service.name)}${service.health === 'unhealthy' ? `<small class="service-health-alert ${servicesFresh() ? 'health-alert' : ''}">${icon('warning')}${servicesFresh() ? 'Santé en échec' : 'Dernière santé : en échec'}</small>` : ''}</span></span><span>${serviceBadge(service, true)}</span>${icon('chevron', 'row-chevron')}</button>`).join('') : empty('Aucun service reconnu', 'Aucun composant du bundle n’a été identifié sur le moteur local.', 'server')}</div><div class="card-footnote">${icon('info')}<span>Le contour indique l’état du conteneur. Gris : état actuel non confirmé. Les contrôles de santé sont détaillés en sélectionnant un service.</span></div></section>
+  <div class="supervision-grid"><section class="card services-card"><div class="card-heading"><h2>Services</h2><span class="subtle">${summary.total} composants</span></div><div class="service-table"><div class="service-table-head"><span>Composant</span><span>État</span><span class="sr-only">Détails</span></div>${state.status.services.length ? state.status.services.map(service => `<button type="button" class="service-row ${service.id === state.selectedService ? 'selected' : ''}" data-service="${e(service.id)}" aria-pressed="${service.id === state.selectedService}"><span class="service-title">${icon(serviceIcon(service.id))}<span>${e(service.name)}${wireGuardHint(service)}${service.health === 'unhealthy' ? `<small class="service-health-alert ${servicesFresh() ? 'health-alert' : ''}">${icon('warning')}${servicesFresh() ? 'Santé en échec' : 'Dernière santé : en échec'}</small>` : ''}</span></span><span>${serviceBadge(service, true)}</span>${icon('chevron', 'row-chevron')}</button>`).join('') : empty('Aucun service reconnu', 'Aucun composant du bundle n’a été identifié sur le moteur local.', 'server')}</div><div class="card-footnote">${icon('info')}<span>Le contour indique l’état du conteneur. Gris : état actuel non confirmé. Les contrôles de santé sont détaillés en sélectionnant un service.</span></div></section>
   <section class="card detail-card" aria-label="Détail du service">${serviceDetail()}</section></div>
   <div class="bottom-grid"><section class="card compact-card"><div class="card-heading"><h2>${icon('apps')}Applications</h2></div>${button('Ouvrir GCS', 'open-gcs', { icon: 'monitor', class: 'full', disabled: !state.connected })}${button('Ouvrir Fleet Controller', 'open-fleet', { icon: 'server', class: 'full', disabled: !state.connected })}<p class="card-caption">Vos outils s’ouvrent dans le navigateur.</p></section>
   <section class="card compact-card"><div class="card-heading"><h2>${icon('refresh')}Mises à jour</h2></div><p class="muted">Retrouvez les nouvelles versions.</p>${button('Rechercher une mise à jour', 'go-updates', { icon: 'refresh', primary: true, class: 'full' })}<p class="card-caption">${icon('shield')}Vérifications avant toute installation</p></section>
@@ -172,7 +185,7 @@ function serviceDetail(): string {
   if (!service) return `<div class="card-heading"><h2>Détail du service</h2></div>${empty('Choisir un composant', 'Sélectionnez un service pour consulter son activité et ses journaux.', 'monitor')}`;
   const available = restartAllowed(servicesFresh() ? state.status : null, service, busy());
   return `<div class="card-heading"><h2>Détail du service</h2>${icon(serviceIcon(service.id), 'subtle')}</div><div class="service-profile"><div class="service-profile-icon">${icon(serviceIcon(service.id))}</div><div><h3>${e(service.name)}</h3>${serviceBadge(service)}<p class="${service.health === 'unhealthy' && servicesFresh() ? 'health-alert' : ''}">${icon(service.health === 'healthy' ? 'check' : service.health === 'unhealthy' ? 'warning' : 'info')}${!servicesFresh() ? 'Dernière observation · ' : ''}${service.health === 'healthy' ? 'Contrôle de santé validé' : service.health === 'unhealthy' ? 'Le contrôle de santé signale un échec' : service.health === 'starting' ? 'Contrôle de santé en cours' : 'Aucune sonde de santé fournie par le bundle'}</p></div></div>
-  ${button('Redémarrer', 'restart', { icon: 'refresh', primary: true, class: 'full', disabled: !available, title: service.actions?.disabled_reason })}${service.actions?.restart === false && service.actions.disabled_reason ? `<p class="action-explanation">${e(service.actions.disabled_reason)}</p>` : ''}
+  ${service.id === 'wireguard' ? wireGuardPanel(service) : `${button('Redémarrer', 'restart', { icon: 'refresh', primary: true, class: 'full', disabled: !available, title: service.actions?.disabled_reason })}${service.actions?.restart === false && service.actions.disabled_reason ? `<p class="action-explanation">${e(service.actions.disabled_reason)}</p>` : ''}`}
   <div class="detail-tabs" role="tablist" aria-label="Activité du service"><button type="button" role="tab" id="events-tab" aria-selected="${state.detailTab === 'events'}" aria-controls="service-activity" data-action="detail-events">Événements</button><button type="button" role="tab" id="logs-tab" aria-selected="${state.detailTab === 'logs'}" aria-controls="service-activity" data-action="detail-logs">Logs techniques</button></div>
   <div id="service-activity" role="tabpanel" aria-labelledby="${state.detailTab === 'events' ? 'events-tab' : 'logs-tab'}">${state.detailError ? errorBox(state.detailError, 'detail-refresh') : state.detailTab === 'logs' ? `<div class="logs-toolbar"><span>200 dernières lignes</span><label class="logs-follow"><input type="checkbox" id="logs-follow"${state.logsFollow ? ' checked' : ''}>Suivre</label><button class="text-button" type="button" data-action="detail-refresh"${disabled(state.logsLoading || !state.connected)}>${icon('refresh')}Actualiser</button></div><pre id="service-logs" class="logs" data-log-service="${e(service.id)}" tabindex="0" aria-label="Journaux de ${e(service.name)}">${state.logsLoading && !state.logs ? 'Chargement des journaux…' : e(state.logs || 'Aucun journal disponible pour ce service.')}</pre><div class="logs-export">${button('Enregistrer les logs', 'export-service-logs', { icon: 'download', class: 'small', disabled: busy() || !state.connected })}<p>Extrait récent : jusqu’à 1 000 lignes, environ 48 Ko après filtrage. Les logs conservés par Docker dépendent de leur rotation.</p></div>` : timeline(state.detailEvents.slice(0, 4), true)}</div>
   <button type="button" class="text-button card-link" data-action="service-history">Voir l’historique ${icon('arrow')}</button><details class="technical-details"><summary>Informations techniques</summary><dl><div><dt>Dernier démarrage</dt><dd>${e(date(service.started_at, true))}</dd></div><div><dt>Compteur Docker</dt><dd>${e(service.restarts ?? 'Non disponible')} redémarrage(s)</dd></div><div><dt>Image</dt><dd class="mono">${e(service.image_id ?? 'Non disponible')}</dd></div></dl><p>Le compteur Docker ne constitue pas un historique complet.</p></details>`;
@@ -272,6 +285,12 @@ async function refresh() {
   root.querySelector('[data-action="refresh"]')?.classList.add('refreshing');
   try {
     const status = validateStatus(await request<HubStatus>('status.get'));
+    // A force-probe can finish before a slower cached status reply. Keep the
+    // newer valid tunnel observation, while never concealing an invalid DTO.
+    const previousWireGuard = validateWireGuardStatus(state.status?.services.find(service => service.id === 'wireguard')?.wireguard);
+    const nextWireGuard = status.services.find(service => service.id === 'wireguard');
+    const nextObservation = validateWireGuardStatus(nextWireGuard?.wireguard);
+    if (previousWireGuard && nextWireGuard && nextObservation && Date.parse(previousWireGuard.checked_at) > Date.parse(nextObservation.checked_at)) nextWireGuard.wireguard = previousWireGuard;
     const collected = status.collected_at ? new Date(status.collected_at) : new Date();
     state.status = status; state.agentConnected = true; state.connected = !status.stale; state.error = status.stale ? status.error?.message ?? 'Les données des services n’ont pas pu être actualisées.' : ''; state.lastUpdate = Number.isNaN(collected.getTime()) ? new Date() : collected;
     if (!state.selectedService || !status.services.some(service => service.id === state.selectedService)) state.selectedService = status.services.find(service => service.id.toLowerCase().includes('gcs'))?.id ?? status.services[0]?.id ?? '';
@@ -472,6 +491,46 @@ async function handleAction(action: string, target?: HTMLElement) {
     }
     case 'load-drones': await loadDrones(); return;
     case 'scan-drones': await runAction('Recherche des Aqua_Drones', () => loadDrones(true)); return;
+    case 'wireguard-check': {
+      if (busy() || !state.agentConnected) return;
+      await runAction('Vérification de WireGuard', async () => {
+        try {
+          const value = validateWireGuardStatus(await request('wireguard.status'));
+          if (!value || !wireGuardFresh(value)) throw new Error('La réponse WireGuard est incomplète ou trop ancienne. Le tunnel reste à vérifier.');
+          const service = state.status?.services.find(item => item.id === 'wireguard');
+          const previous = validateWireGuardStatus(service?.wireguard);
+          if (service && (!previous || Date.parse(value.checked_at) >= Date.parse(previous.checked_at))) service.wireguard = value;
+          const result = value.state === 'active' ? 'Tunnel WireGuard actif. La présence d’un Aqua_Drone n’est pas confirmée par ce contrôle.' : value.reason || value.message || 'Tunnel WireGuard non actif ; consultez son état dans Supervision.';
+          notify(result, value.state === 'unknown' || value.state === 'unsupported');
+        } catch (error) {
+          const service = state.status?.services.find(item => item.id === 'wireguard');
+          if (service) service.wireguard = { state: 'unknown', checked_at: new Date().toISOString(), can_reactivate: false, message: errorMessage(error).slice(0, 2000) };
+          throw error;
+        }
+      }); return;
+    }
+    case 'wireguard-reactivate': {
+      const service = state.status?.services.find(item => item.id === 'wireguard');
+      if (!wireGuardReactivateAllowed(state.status, service, state.agentConnected, busy(), service ? serviceOperationOptions(service) : {})) return;
+      const yes = await confirmAction({ title: 'Réactiver le tunnel WireGuard ?', body: '<p>Le profil WireGuard déjà installé sera réactivé. Ses paramètres enregistrés seront conservés.</p><p>La connexion distante dépend du réseau et du pair. Ce contrôle ne confirme pas la présence d’un Aqua_Drone.</p>', confirm: 'Réactiver le tunnel' });
+      if (!yes || !service) return;
+      if (!wireGuardReactivateAllowed(state.status, service, state.agentConnected, busy(), serviceOperationOptions(service))) { notify('L’état du tunnel a changé ou doit être actualisé. Vérifiez WireGuard avant de réactiver le tunnel.', true); return; }
+      state.requestingService = 'wireguard';
+      const requestedAt = Date.now(); delete state.unconfirmedRestarts.wireguard;
+      try {
+        await runAction('Réactivation du tunnel WireGuard', async () => {
+          try {
+            receiveJob(await request<Job | { job: Job }>('wireguard.reactivate', { confirmed: true }));
+            state.requestingService = '';
+          } catch (error) {
+            const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+            if (!code || ['agent_timeout', 'agent_protocol', 'agent_unavailable', 'desktop_error'].includes(String(code))) state.unconfirmedRestarts.wireguard = { requestedAt, failedAt: Date.now() };
+            throw error;
+          }
+        });
+      } finally { state.requestingService = ''; renderChrome(); renderPage(); }
+      return;
+    }
     case 'restart': {
       const service = selectedService();
       if (!restartAllowed(servicesFresh() ? state.status : null, service, busy()) || !service) return;
@@ -644,7 +703,7 @@ async function init() {
   renderChrome(); renderPage();
   if (state.page === 'history') void loadHistory();
   const timer = setInterval(() => { if (!document.hidden && !dialog.open) void refresh().then(() => loadDrones()); }, 8000);
-  const freshnessTimer = setInterval(() => { const fresh = servicesFresh(); if (fresh !== lastObservationFresh) { lastObservationFresh = fresh; renderChrome(); if (state.page === 'overview') renderPage(); } }, 1000);
+  const freshnessTimer = setInterval(() => { const fresh = servicesFresh(); const wireguardFresh = wireGuardFresh(state.status?.services.find(service => service.id === 'wireguard')?.wireguard); if (fresh !== lastObservationFresh || wireguardFresh !== lastWireGuardFresh) { lastObservationFresh = fresh; lastWireGuardFresh = wireguardFresh; renderChrome(); if (state.page === 'overview') renderPage(); } }, 1000);
   const appTimer = setInterval(() => { if (state.appInstallPending || (!document.hidden && state.page === 'updates')) void loadAppUpdate(); }, 3000);
   window.addEventListener('hashchange', () => { const page = readPage(); if (page !== state.page) setPage(page); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh().then(() => loadDrones()); });

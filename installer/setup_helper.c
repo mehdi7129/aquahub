@@ -222,6 +222,11 @@ int main(int argc, char **argv) {
     resource(resource_path, sizeof resource_path, "repo-key.gpg");
     trusted_regular(resource_path);
     trusted_regular("/usr/lib/aquahub/installer/finish.py");
+    /* An exec may survive an agent crash. Check its durable intent while our
+       maintenance lock is held, before APT can restart Docker or a component. */
+    char *maintenance_check[] = {"/usr/bin/python3", "/usr/lib/aquahub/installer/finish.py", "--check-maintenance", NULL};
+    if (run(maintenance_check))
+        die("Une opération AquaHub doit être vérifiée avant l’installation ou la réparation. Aucun paquet système n’a été installé.");
     if (chdir(payload)) die("Le kit hors ligne est introuvable.");
     phase("Vérification du kit hors ligne…");
     char *verify[] = {"/usr/bin/sha256sum", "--check", "--strict", "SHA256SUMS", NULL};
